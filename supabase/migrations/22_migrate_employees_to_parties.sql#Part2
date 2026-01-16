@@ -1,0 +1,26 @@
+-- Phase 10: High-Performance Chunked Migration (Part 2/3)
+-- הרץ את זה רק אחרי ששלב 1 הסתיים (SELECT count(*) FROM parties; מראה 1,250,001)
+
+DO $$
+DECLARE
+    batch_size INT := 100000;
+    processed_count INT;
+BEGIN
+    LOOP
+        INSERT INTO people (party_id, first_name, last_name)
+        SELECT 
+            e.id,
+            split_part(e.name, ' ', 1) as first_name,
+            substring(e.name FROM position(' ' IN e.name) + 1) as last_name
+        FROM employees e
+        LEFT JOIN people p ON e.id = p.party_id
+        WHERE p.party_id IS NULL
+        LIMIT batch_size
+        ON CONFLICT (party_id) DO NOTHING;
+        
+        GET DIAGNOSTICS processed_count = ROW_COUNT;
+        EXIT WHEN processed_count = 0;
+        
+        COMMIT;
+    END LOOP;
+END $$;

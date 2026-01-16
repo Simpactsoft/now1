@@ -1,0 +1,30 @@
+-- Phase 10: High-Performance Chunked Migration (Part 3/3)
+-- הרץ את זה רק אחרי ששלב 2 הסתיים
+
+DO $$
+DECLARE
+    batch_size INT := 100000;
+    processed_count INT;
+BEGIN
+    LOOP
+        INSERT INTO party_memberships (tenant_id, person_id, organization_id, role_name, salary, org_path, created_at)
+        SELECT 
+            e.tenant_id,
+            e.id as person_id,
+            '00000000-0000-0000-0000-000000000000'::uuid,
+            'Employee',
+            e.salary,
+            e.org_path,
+            e.created_at
+        FROM employees e
+        LEFT JOIN party_memberships m ON e.id = m.person_id
+        WHERE m.person_id IS NULL
+        LIMIT batch_size
+        ON CONFLICT DO NOTHING;
+        
+        GET DIAGNOSTICS processed_count = ROW_COUNT;
+        EXIT WHEN processed_count = 0;
+        
+        COMMIT;
+    END LOOP;
+END $$;
