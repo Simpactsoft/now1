@@ -1,8 +1,10 @@
 import { cookies } from "next/headers";
-import PeopleGrid from "@/components/PeopleGrid";
+import PeopleViewWrapper from "@/components/PeopleViewWrapper";
 import TenantSwitcher from "@/components/TenantSwitcher";
+import AddPersonDialog from "@/components/AddPersonDialog";
 import { Suspense } from "react";
 import DashboardWrapper from "@/components/DashboardWrapper"; // Reusing or replacing wrapper logic
+import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +17,25 @@ export default async function PeoplePage() {
     const cookieStore = await cookies();
     const tenantId = cookieStore.get("tenant_id")?.value;
 
+    let countDisplay = "0";
+
+    if (tenantId) {
+        // [FIX] Use RPC instead of direct select to bypass RLS issues
+        const supabase = await createClient();
+        const { data, error } = await supabase.rpc("fetch_people_crm", {
+            arg_tenant_id: tenantId,
+            arg_start: 0,
+            arg_limit: 1,
+            arg_sort_col: 'updated_at',
+            arg_sort_dir: 'desc',
+            arg_filters: {}
+        });
+
+        if (!error && data && data.length > 0) {
+            countDisplay = Number(data[0].ret_total_count).toLocaleString();
+        }
+    }
+
     return (
         <div className="flex flex-col gap-8">
             <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-white/10">
@@ -23,14 +44,12 @@ export default async function PeoplePage() {
                         CRM Contacts
                     </h1>
                     <p className="text-zinc-500 text-sm">
-                        Total Database: 1,600,000+ Identities (Prospects & Active)
+                        Total Database: {countDisplay} Identities (Prospects & Active)
                     </p>
                 </div>
 
                 <div className="flex items-center gap-6">
-                    <Suspense fallback={<div className="h-12 w-48 bg-zinc-900 animate-pulse rounded-md" />}>
-                        <TenantSwitcher currentTenantId={tenantId} />
-                    </Suspense>
+                    <AddPersonDialog tenantId={tenantId ?? ""} />
                 </div>
             </header>
 
@@ -40,7 +59,7 @@ export default async function PeoplePage() {
                 </div>
             ) : (
                 <div className="glass rounded-2xl p-4">
-                    <PeopleGrid tenantId={tenantId} />
+                    <PeopleViewWrapper tenantId={tenantId} />
                 </div>
             )}
         </div>

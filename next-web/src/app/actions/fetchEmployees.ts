@@ -2,29 +2,19 @@
 
 import { createClient } from "@/lib/supabase/server";
 
-export interface GridParams {
-    startRow?: number;
-    endRow?: number;
-    sortModel?: { colId: string; sort: "asc" | "desc" }[];
-    filterModel?: any;
-    tenantId: string;
-}
+import { PaginatedQuerySchema, PaginatedQuery } from '@/lib/schemas';
 
-export async function fetchGridData({
-    startRow = 0,
-    endRow = 100,
-    sortModel = [],
-    filterModel = {},
-    tenantId,
-}: GridParams) {
+export async function fetchGridData(params: PaginatedQuery) {
     const supabase = await createClient();
     const startTime = Date.now();
 
-    // 0. Validate tenantId
-    if (!tenantId || tenantId === "undefined" || tenantId === "null") {
-        console.warn("fetchGridData: Invalid tenantId provided:", tenantId);
-        return { rowData: [], rowCount: 0, latency: 0, error: "Invalid Tenant ID" };
+    // 0. Validate Inputs with Zod
+    const validation = PaginatedQuerySchema.safeParse(params);
+    if (!validation.success) {
+        console.warn("fetchGridData: Validation Failed", validation.error);
+        return { rowData: [], rowCount: 0, latency: 0, error: "Invalid Parameters" };
     }
+    const { startRow, endRow, sortModel, filterModel, tenantId } = validation.data;
 
     try {
         console.log(`--- fetchGridData() Calling RPC for Tenant ${tenantId} ---`);
@@ -34,13 +24,16 @@ export async function fetchGridData({
 
         // Simplified filter (just name for now to match RPC signature)
         const filterName = filterModel.name?.filter || "";
+        // If sorting by name, map to display_name or ret_name
+        const rpcSortCol = sortCol === "name" || sortCol === "ret_name" ? "name" : "created_at";
+
 
         // 2. Call the Secure Gateway RPC
         const { data, error } = await supabase.rpc("fetch_employees_secure", {
             arg_tenant_id: tenantId,
             arg_start: startRow,
             arg_limit: endRow - startRow,
-            arg_sort_col: sortCol,
+            arg_sort_col: rpcSortCol,
             arg_sort_dir: sortDir,
             arg_filter_name: filterName
         });

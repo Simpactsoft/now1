@@ -3,8 +3,9 @@ import { Suspense } from "react";
 import ProfileHeader from "@/components/ProfileHeader";
 import ActionTimeline from "@/components/ActionTimeline";
 import { fetchPersonDetails } from "@/app/actions/fetchDetails";
-import Link from "next/link";
+import BackButton from "@/components/BackButton";
 import { ChevronLeft } from "lucide-react";
+import Link from "next/link"; // Kept for error state link
 
 export const dynamic = "force-dynamic";
 
@@ -46,12 +47,7 @@ export default async function PersonProfilePage({ params }: PageProps) {
         <div className="flex flex-col gap-8 max-w-5xl mx-auto">
             {/* Breadcrumb / Back */}
             <div className="flex items-center gap-4">
-                <Link href="/dashboard/people" className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors group">
-                    <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-brand-primary group-hover:text-white transition-colors">
-                        <ChevronLeft size={16} />
-                    </div>
-                    <span className="font-medium text-sm">Back to Contacts</span>
-                </Link>
+                <BackButton label="Back to Contacts" />
             </div>
 
             <ProfileHeader profile={profile} />

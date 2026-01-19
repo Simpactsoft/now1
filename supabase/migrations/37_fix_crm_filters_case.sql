@@ -1,7 +1,5 @@
--- Phase 20: Simplified CRM Fetch (Complete Filters)
--- Adds support for filtering by Company Size, Industry, and Join Dates (for Drill Down)
-
-DROP FUNCTION IF EXISTS fetch_people_crm(uuid, int, int, text, text, jsonb);
+-- Migration: Fix CRM Filters Case Sensitivity
+-- Updates fetch_people_crm to use case-insensitive matching for filters.
 
 CREATE OR REPLACE FUNCTION fetch_people_crm(
     arg_tenant_id uuid,
@@ -40,39 +38,41 @@ BEGIN
          v_where_clause := v_where_clause || ' AND p.display_name ILIKE ''%'' || ' || quote_literal(arg_filters->>'search') || ' || ''%'' ';
     END IF;
 
-    -- Status
+    -- Status (Case Insensitive)
     IF arg_filters->>'status' IS NOT NULL THEN
-        v_where_clause := v_where_clause || format(' AND p.status = %L ', arg_filters->>'status');
+        -- Using ILIKE or LOWER comparison to ensure "Customer" matches "customer"
+        v_where_clause := v_where_clause || format(' AND p.status ILIKE %L ', arg_filters->>'status');
     END IF;
 
-    -- Role (Subquery)
+    -- Role (Subquery, Case Insensitive)
     IF arg_filters->>'role_name' IS NOT NULL THEN
-        v_where_clause := v_where_clause || format(' AND EXISTS (SELECT 1 FROM party_memberships pm WHERE pm.person_id = p.id AND pm.role_name = %L) ', arg_filters->>'role_name');
+        v_where_clause := v_where_clause || format(' AND EXISTS (SELECT 1 FROM party_memberships pm WHERE pm.person_id = p.id AND pm.role_name ILIKE %L) ', arg_filters->>'role_name');
     END IF;
     
-    -- Company Size (Subquery)
+    -- Company Size (Subquery, Case Insensitive)
     IF arg_filters->>'company_size' IS NOT NULL THEN
         v_where_clause := v_where_clause || format(' 
         AND EXISTS (
             SELECT 1 FROM party_memberships pm 
             JOIN parties org ON pm.organization_id = org.id
             JOIN organizations_ext oe ON org.id = oe.party_id
-            WHERE pm.person_id = p.id AND oe.company_size = %L
+            WHERE pm.person_id = p.id AND oe.company_size ILIKE %L
         ) ', arg_filters->>'company_size');
     END IF;
 
-    -- Industry (Subquery)
+    -- Industry (Subquery, Case Insensitive)
     IF arg_filters->>'industry' IS NOT NULL THEN
         v_where_clause := v_where_clause || format(' 
         AND EXISTS (
             SELECT 1 FROM party_memberships pm 
             JOIN parties org ON pm.organization_id = org.id
             JOIN organizations_ext oe ON org.id = oe.party_id
-            WHERE pm.person_id = p.id AND oe.industry = %L
+            WHERE pm.person_id = p.id AND oe.industry ILIKE %L
         ) ', arg_filters->>'industry');
     END IF;
 
-    -- Tags (Array Contains) [NEW]
+    -- Tags (Array Contains) - Case sensitive usually for arrays, but let's keep standard behavior for now.
+    -- Arrays are harder to ILIKE without unnesting. Keeping it standard.
     IF arg_filters->>'tags' IS NOT NULL THEN
         v_where_clause := v_where_clause || format(' AND p.tags @> ARRAY[%L]::text[] ', arg_filters->>'tags');
     END IF;
@@ -89,6 +89,11 @@ BEGIN
     
     IF arg_filters->>'joined_quarter' IS NOT NULL THEN
         v_where_clause := v_where_clause || format(' AND to_char(p.created_at, ''YYYY "Q"Q'') = %L ', arg_filters->>'joined_quarter');
+    END IF;
+    
+    -- Added: joined_week
+    IF arg_filters->>'joined_week' IS NOT NULL THEN
+        v_where_clause := v_where_clause || format(' AND to_char(p.created_at, ''IYYY-IW'') = %L ', arg_filters->>'joined_week');
     END IF;
 
     -- 3. Get Total Count

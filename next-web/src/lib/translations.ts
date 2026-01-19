@@ -30,7 +30,12 @@ export const translations = {
         tags: "Tags",
         timeline: "Timeline",
         logins: "Logins",
-        riskScore: "Risk Score"
+        riskScore: "Risk Score",
+        system_admin: "Platform Admin",
+        status: "Status",
+        rating: "Rating",
+        group: "Group",
+        count: "Count"
     },
     he: {
         dashboard: "לוח בקרה",
@@ -61,6 +66,11 @@ export const translations = {
         tags: "תגיות",
         timeline: "ציר זמן",
         logins: "כניסות",
-        riskScore: "ציון סיכון"
+        riskScore: "ציון סיכון",
+        system_admin: "ניהול פלטפורמה",
+        status: "סטטוס",
+        rating: "דירוג",
+        group: "קבוצה",
+        count: "כמות"
     }
 };
