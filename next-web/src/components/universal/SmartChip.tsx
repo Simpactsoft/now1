@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import { X, Check, ChevronDown } from "lucide-react";
 import { FilterCondition } from "./ViewConfigContext";
@@ -22,7 +22,15 @@ const OPTIONS: Record<string, string[]> = {
 };
 
 export default function SmartChip({ filter, onUpdate, onRemove }: SmartChipProps) {
-    const [isOpen, setIsOpen] = useState(filter.defaultOpen || false);
+    const [isOpen, setIsOpen] = useState(false);
+
+    useEffect(() => {
+        if (filter.defaultOpen) {
+            // Small delay to ensure previous popover (Add Filter) clears focus
+            const timer = setTimeout(() => setIsOpen(true), 100);
+            return () => clearTimeout(timer);
+        }
+    }, [filter.defaultOpen]);
     const [tempValue, setTempValue] = useState(filter.value);
 
     // Options Logic

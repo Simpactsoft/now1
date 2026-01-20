@@ -12,6 +12,7 @@ import { Search, UserCircle, LayoutGrid, List, CreditCard, Database } from "luci
 import { useRouter } from "next/navigation";
 import { ViewConfigProvider, useViewConfig, FilterCondition } from "@/components/universal/ViewConfigContext";
 import FilterStrip from "@/components/universal/FilterStrip";
+import SavedViewsMenu from "@/components/SavedViewsMenu";
 
 // --- Types ---
 interface PeopleViewWrapperProps {
@@ -248,22 +249,11 @@ function PeopleViewContent({ tenantId }: PeopleViewWrapperProps) {
                         <Database className="w-4 h-4" />
                     </button>
 
-                    <GroupMatrixDialog
-                        tenantId={tenantId}
-                        onApplyFilter={(field, value) => {
-                            // Bridge Legacy Dialog to New Context
-                            dispatch({
-                                type: 'ADD_FILTER',
-                                payload: {
-                                    id: `matrix_${field}_${Date.now()}`,
-                                    field,
-                                    operator: 'equals',
-                                    value,
-                                    isEnabled: true
-                                }
-                            });
-                        }}
-                    />
+
+
+                    {/* Saved Views Menu */}
+                    <div className="h-6 w-px bg-border/50 mx-1 hidden md:block"></div>
+                    <SavedViewsMenu tenantId={tenantId} />
 
                     <div className="h-6 w-px bg-border/50 mx-1 hidden md:block"></div>
 
