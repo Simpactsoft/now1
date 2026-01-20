@@ -20,11 +20,16 @@ export async function fetchPeople(params: PaginatedQuery) {
         }
 
         // Default sorting
-        let sortCol = "updated_at";
+        let sortCol = "name"; // Most natural stable sort
+        // Note: Script randomizes names, so even this is unstable if script runs.
+        // But 'id' is ugly. Let's try 'created_at' again? No, script randomizes that too.
+        // I will use 'id' as the internal default to PROVE stability, but 'name' is better UX.
+        // The user complained about numbers. Stability is king right now.
+        sortCol = "id";
         let sortDir = "desc";
 
         if (sortModel && sortModel.length > 0) {
-            sortCol = sortModel[0].colId === 'name' ? 'name' : 'updated_at';
+            sortCol = sortModel[0].colId;
             sortDir = sortModel[0].sort;
         }
 
@@ -35,14 +40,17 @@ export async function fetchPeople(params: PaginatedQuery) {
 
         // 2. Specific Columns
         const fm = filterModel as any || {};
-        console.log("[fetchPeople] Filter Model Keys:", Object.keys(fm));
-        console.log("[fetchPeople] Status Filter raw:", JSON.stringify(fm.status));
+        if (fm.status) console.log("[fetchPeople] Status Filter:", JSON.stringify(fm.status));
+
 
         // 1. Search (Global)
         if (query) {
             filters.search = query;
-        } else if (fm.name) {
-            filters.search = fm.name.filter; // Legacy grid filter
+        }
+
+        // 1.1 Name Filter (Column Specific)
+        if (fm.name) {
+            filters.name = fm.name.filter;
         }
 
         // Helper to parse potential multi-select values

@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useEffect } from "react";
 import { MessageSquare, Phone, Mail, MoreHorizontal } from "lucide-react";
 
 interface SimplePeopleTableProps {
@@ -11,10 +12,36 @@ interface SimplePeopleTableProps {
     highlightId: string | null;
 }
 
-export default function SimplePeopleTable({ people, loading, hasMore, loadMore, onPersonClick, highlightId }: SimplePeopleTableProps) {
+export default function SimplePeopleTable({
+    people,
+    loading,
+    hasMore,
+    loadMore,
+    onPersonClick,
+    highlightId
+}: SimplePeopleTableProps) {
+    const observerTarget = useRef<HTMLTableRowElement>(null);
+
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting && hasMore && !loading) {
+                    loadMore();
+                }
+            },
+            { threshold: 0.1, rootMargin: '100px' }
+        );
+
+        if (observerTarget.current) {
+            observer.observe(observerTarget.current);
+        }
+
+        return () => observer.disconnect();
+    }, [hasMore, loading, loadMore]);
+
     return (
-        <div className="w-full overflow-auto border border-border rounded-xl bg-card shadow-sm">
-            <table className="w-full text-sm text-left">
+        <div className="w-full overflow-auto border border-border rounded-xl bg-card shadow-sm h-[600px]">
+            <table className="w-full text-sm text-left relative">
                 <thead className="text-xs text-muted-foreground uppercase bg-secondary/50 border-b border-border sticky top-0 z-20 backdrop-blur-md">
                     <tr>
                         <th className="w-12 px-4 py-3 font-medium text-center">#</th>
@@ -62,7 +89,7 @@ export default function SimplePeopleTable({ people, loading, hasMore, loadMore, 
                                     </span>
                                 </td>
                                 <td className="px-6 py-4 text-muted-foreground">
-                                    {person.role_name || '-'}
+                                    {person.ret_role_name || person.role_name || '-'}
                                 </td>
                                 <td className="px-6 py-4">
                                     <div className="flex flex-wrap gap-1 max-w-[200px]">
@@ -86,10 +113,10 @@ export default function SimplePeopleTable({ people, loading, hasMore, loadMore, 
                         );
                     })}
 
-                    {/* Loading or Load More Trigger */}
+                    {/* Intersection Observer Target */}
                     {hasMore && (
-                        <tr ref={(node) => { if (node && !loading) loadMore() }}>
-                            <td colSpan={5} className="text-center py-8 text-muted-foreground">
+                        <tr ref={observerTarget}>
+                            <td colSpan={6} className="text-center py-8 text-muted-foreground">
                                 {loading ? 'Loading more...' : 'Scroll for more'}
                             </td>
                         </tr>
