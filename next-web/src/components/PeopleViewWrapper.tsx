@@ -8,15 +8,66 @@ import GroupMatrixDialog from "@/components/GroupMatrixDialog";
 import SimplePeopleTable from "@/components/SimplePeopleTable";
 import { fetchPeople } from "@/app/actions/fetchPeople";
 import { fetchTotalStats } from "@/app/actions/fetchStats";
-import { Search, UserCircle, LayoutGrid, List, CreditCard, Database } from "lucide-react";
+import { Search, X, Filter, LayoutGrid, List, Kanban, Tag, MoreHorizontal, SlidersHorizontal, ArrowUpDown, ChevronDown, UserCircle, CreditCard, Database, RotateCcw, History } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { ViewConfigProvider, useViewConfig, FilterCondition } from "@/components/universal/ViewConfigContext";
-import FilterStrip from "@/components/universal/FilterStrip";
+import SmartChip from "@/components/universal/SmartChip";
+import AddFilterCommand from "@/components/universal/AddFilterCommand";
+// import FilterStrip from "@/components/universal/FilterStrip"; // Removed
 import SavedViewsMenu from "@/components/SavedViewsMenu";
+// ResponsiveActionsMenu is defined inline below
+import AddPersonDialog from "./AddPersonDialog";
+import { getSearchHistory, addToSearchHistory, clearSearchHistory } from "@/app/actions/searchHistory";
+import * as Popover from "@radix-ui/react-popover";
+import { createBrowserClient } from "@supabase/ssr";
 
 // --- Types ---
 interface PeopleViewWrapperProps {
     tenantId: string;
+}
+
+// --- Helper Components ---
+function ResponsiveActionsMenu({ viewMode, dispatch, total, filtered }: { viewMode: string, dispatch: any, total: number, filtered: number }) {
+    const [open, setOpen] = useState(false);
+    return (
+        <Popover.Root open={open} onOpenChange={setOpen}>
+            <Popover.Trigger asChild>
+                <button className="p-2 rounded-lg bg-secondary/50 border border-border/50 text-muted-foreground hover:text-foreground">
+                    <MoreHorizontal className="w-5 h-5" />
+                </button>
+            </Popover.Trigger>
+            <Popover.Portal>
+                <Popover.Content className="z-50 w-48 p-2 bg-popover text-popover-foreground rounded-xl border border-border shadow-lg animate-in fade-in zoom-in-95" align="end" sideOffset={5}>
+                    {/* View Switcher Mobile */}
+                    <div className="mb-2">
+                        <div className="text-xs font-semibold text-muted-foreground mb-1.5 px-1">View Mode</div>
+                        <div className="flex bg-secondary/30 p-1 rounded-lg border border-border/50 gap-1">
+                            <button onClick={() => { dispatch({ type: 'SET_VIEW_MODE', payload: 'tags' }); setOpen(false); }} className={`flex-1 p-1.5 rounded-md flex justify-center transition-all ${viewMode === 'tags' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground'}`}>
+                                <LayoutGrid className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => { dispatch({ type: 'SET_VIEW_MODE', payload: 'grid' }); setOpen(false); }} className={`flex-1 p-1.5 rounded-md flex justify-center transition-all ${viewMode === 'grid' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground'}`}>
+                                <List className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => { dispatch({ type: 'SET_VIEW_MODE', payload: 'cards' }); setOpen(false); }} className={`flex-1 p-1.5 rounded-md flex justify-center transition-all ${viewMode === 'cards' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground'}`}>
+                                <CreditCard className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => { dispatch({ type: 'SET_VIEW_MODE', payload: 'history' }); setOpen(false); }} className={`flex-1 p-1.5 rounded-md flex justify-center transition-all ${viewMode === 'history' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground'}`}>
+                                <History className="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Stats */}
+                    <div className="border-t border-border/50 pt-2 px-1">
+                        <div className="text-xs text-muted-foreground flex justify-between">
+                            <span>Results:</span>
+                            <span className="font-medium text-foreground">{filtered.toLocaleString()} / {total.toLocaleString()}</span>
+                        </div>
+                    </div>
+                </Popover.Content>
+            </Popover.Portal>
+        </Popover.Root>
+    );
 }
 
 // --- Wrapper Component (Provider) ---
@@ -33,10 +84,10 @@ function PeopleViewContent({ tenantId }: PeopleViewWrapperProps) {
     const router = useRouter();
 
     // Global View State
-    const { viewMode, filters, sort, dispatch } = useViewConfig();
+    const { viewMode, filters, sort, dispatch, searchTerm, activeSavedView, isModified } = useViewConfig();
 
-    // Local Search State (Immediate UI)
-    const [searchTerm, setSearchTerm] = useState("");
+    // Focus ref for input to allow clicking container to focus
+    const inputRef = useRef<HTMLInputElement>(null);
 
     // Data State
     const [people, setPeople] = useState<any[]>([]);
@@ -51,6 +102,75 @@ function PeopleViewContent({ tenantId }: PeopleViewWrapperProps) {
     // Counts State
     const [filteredCount, setFilteredCount] = useState(0);
     const [totalCount, setTotalCount] = useState(0);
+    const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+
+    // Initial Hydration Fix
+    useEffect(() => {
+        setLastRefreshed(new Date());
+    }, []);
+
+    // Search Interaction State
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+    // Split Search History:
+    // DB (view): 100 items - Now used for dropdown too
+    const [dbSearchHistory, setDbSearchHistory] = useState<string[]>([]);
+
+    const [showHistory, setShowHistory] = useState(false);
+
+    // Get current user ID for secure submission
+    const [userId, setUserId] = useState<string | null>(null);
+    useEffect(() => {
+        const supabase = createBrowserClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+        supabase.auth.getUser().then(({ data }) => {
+            if (data.user) setUserId(data.user.id);
+        });
+    }, []);
+
+    // Load DB History (Async) - Moved after userId definition
+    useEffect(() => {
+        if (!tenantId) return;
+        getSearchHistory(tenantId, userId || undefined).then(res => {
+            console.log(`[PeopleViewWrapper] Loaded DB History:`, res);
+            if (res.debug) console.log(`[PeopleViewWrapper] DB Debug:`, res.debug);
+            if (res.success && res.history) {
+                setDbSearchHistory(res.history as string[]);
+            }
+        });
+    }, [tenantId, lastRefreshed, userId]);
+
+    const handleAddHistory = async (term: string) => {
+        if (!term || term.trim().length < 2) return;
+
+        console.log(`[PeopleViewWrapper] Adding term: "${term}"`);
+
+        // Add to DB (Async)
+        try {
+            console.log(`[PeopleViewWrapper] calling addToSearchHistory...`);
+            // Pass userId explicitly to bypass server-side session issues with SECURITY DEFINER
+            const res = await addToSearchHistory(tenantId, term, userId || undefined);
+            console.log(`[PeopleViewWrapper] addToSearchHistory result:`, res);
+
+            if (res.success) {
+                // If successful, refresh DB history to include it
+                getSearchHistory(tenantId, userId || undefined).then(r => {
+                    console.log(`[PeopleViewWrapper] Refreshed DB history:`, r);
+                    if (r.debug) console.log(`[PeopleViewWrapper] DB Refresh Debug:`, r.debug);
+                    if (r.success && r.history) setDbSearchHistory(r.history as string[]);
+                });
+            }
+        } catch (e) {
+            console.warn("SearchHistory: DB Sync failed", e);
+        }
+    };
+
+    const handleClearHistory = async () => {
+        setDbSearchHistory([]);
+        await clearSearchHistory(tenantId);
+    };
 
     // Fetch Total Unfiltered Count on Mount
     useEffect(() => {
@@ -83,13 +203,18 @@ function PeopleViewContent({ tenantId }: PeopleViewWrapperProps) {
         const model: any = {};
         filters.forEach(f => {
             if (f.isEnabled && f.value) {
-                // If multiple filters for same field, join them? or last wins?
-                // API expects comma separated for Multi-Select. 
-                // Currently SmartChip handles one value. 
-                // If user adds two chips for 'Status', we might need to merge them.
-                // For simplistic V1: Last wins or we merge.
-                // Let's simple bind:
-                model[f.field] = { filterType: 'text', type: f.operator, filter: f.value };
+                const filterObj = { filterType: 'text', type: f.operator, filter: f.value };
+
+                if (model[f.field]) {
+                    // If exists, convert to array or push to array
+                    if (Array.isArray(model[f.field])) {
+                        model[f.field].push(filterObj);
+                    } else {
+                        model[f.field] = [model[f.field], filterObj];
+                    }
+                } else {
+                    model[f.field] = filterObj;
+                }
             }
         });
         return model;
@@ -146,6 +271,7 @@ function PeopleViewContent({ tenantId }: PeopleViewWrapperProps) {
                 if (reset || page === 0) {
                     setFilteredCount(result.rowCount ?? 0);
                 }
+                setLastRefreshed(new Date());
             } else if (!result.error) {
                 setHasMore(false);
             }
@@ -161,119 +287,265 @@ function PeopleViewContent({ tenantId }: PeopleViewWrapperProps) {
     return (
         <div className="flex flex-col gap-4 w-full h-full">
             {/* Standard Toolbar */}
-            <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-card/50 p-3 rounded-2xl border border-border backdrop-blur-sm shadow-sm sticky top-0 z-30">
-                {/* Search */}
-                <div className="relative w-full max-w-md">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Search className="h-4 w-4 text-muted-foreground" />
+            <div className="flex flex-col gap-2 bg-card/50 p-3 rounded-2xl border border-border backdrop-blur-sm shadow-sm sticky top-0 z-30">
+
+                {/* Top Row: Actions & Stats */}
+                <div className="flex items-center justify-between w-full">
+                    {/* Left: Stats or Title (Moved Stats here for visibility) */}
+                    <div className="flex items-center gap-2">
+                        {/* Results Count */}
+                        <div className="flex items-center gap-3">
+                            <span className="text-xs font-bold text-foreground tabular-nums">
+                                {people.length === 0 && !loading && filteredCount === 0 ? '0' : filteredCount.toLocaleString()}
+                                <span className="text-muted-foreground font-normal mx-1">/</span>
+                                {totalCount.toLocaleString()}
+                            </span>
+
+                            <button
+                                onClick={() => loadMore(true)}
+                                disabled={loading}
+                                className="group flex items-center gap-1.5 px-2 py-1 rounded-full bg-secondary/30 hover:bg-secondary border border-transparent hover:border-border transition-all disabled:opacity-50"
+                                title={lastRefreshed ? `Last updated: ${lastRefreshed.toLocaleTimeString()}` : ''}
+                            >
+                                <RotateCcw className={`w-3 h-3 text-muted-foreground group-hover:text-primary transition-colors ${loading ? 'animate-spin' : ''}`} />
+                                <span className="text-[10px] text-muted-foreground whitespace-nowrap hidden sm:inline-block">
+                                    {lastRefreshed ? lastRefreshed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                                </span>
+                            </button>
+                        </div>
                     </div>
-                    <input
-                        type="text"
-                        placeholder="Search people..."
-                        className="w-full bg-secondary/50 border border-border rounded-xl pl-9 pr-4 py-2 text-sm focus:bg-background focus:border-primary/50 transition-all outline-none"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
+
+                    {/* Right: Actions */}
+                    <div className="flex items-center gap-3">
+                        {/* Debug SQL Button */}
+                        <button
+                            onClick={() => {
+                                const model = getFilterModel();
+                                let sql = `SELECT count(*) FROM parties p WHERE p.tenant_id = '${tenantId}' AND p.type = 'person'`;
+                                if (searchTerm) {
+                                    if (searchTerm.length < 3) sql += ` AND lower(p.display_name) LIKE '${searchTerm.toLowerCase()}%'`;
+                                    else sql += ` AND p.display_name ILIKE '%${searchTerm}%'`;
+                                }
+                                const buildInClause = (filterVal: string | undefined) => {
+                                    if (!filterVal) return null;
+                                    return `(${filterVal.split(',').map(s => `'${s.trim().toLowerCase()}'`).join(', ')})`;
+                                };
+                                if (model.name) {
+                                    const vals = Array.isArray(model.name) ? model.name.map((o: any) => o.filter) : [model.name.filter];
+                                    vals.forEach((val: string) => {
+                                        if (val.length < 3) sql += ` AND lower(p.display_name) LIKE '${val.toLowerCase()}%'`;
+                                        else sql += ` AND p.display_name ILIKE '%${val}%'`;
+                                    });
+                                }
+                                if (model.status) { const inList = buildInClause(model.status.filter); if (inList) sql += ` AND lower(p.status) IN ${inList}`; }
+                                if (model.role_name) { const inList = buildInClause(model.role_name.filter); if (inList) sql += ` AND EXISTS (SELECT 1 FROM party_memberships pm WHERE pm.person_id = p.id AND lower(pm.role_name) IN ${inList})`; }
+                                if (model.tags) { const inList = buildInClause(model.tags.filter); if (inList) sql += ` AND p.tags && ARRAY[${inList}]::text[]`; }
+                                window.prompt("Generated Debug SQL:", sql);
+                            }}
+                            className="p-2 text-muted-foreground hover:text-primary transition-colors hidden md:block" // Hidden on mobile to save space
+                            title="Generate Debug SQL"
+                        >
+                            <Database className="w-4 h-4" />
+                        </button>
+
+                        <div className="h-6 w-px bg-border/50 mx-1 hidden md:block"></div>
+
+                        {/* View Switcher (Desktop) */}
+                        <div className="hidden md:flex bg-secondary/50 p-1 rounded-lg border border-border/50">
+                            <button onClick={() => dispatch({ type: 'SET_VIEW_MODE', payload: 'tags' })} className={`p-1.5 rounded-md transition-all ${viewMode === 'tags' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`}>
+                                <LayoutGrid className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => dispatch({ type: 'SET_VIEW_MODE', payload: 'grid' })} className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`}>
+                                <List className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => dispatch({ type: 'SET_VIEW_MODE', payload: 'cards' })} className={`p-1.5 rounded-md transition-all ${viewMode === 'cards' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`}>
+                                <CreditCard className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => dispatch({ type: 'SET_VIEW_MODE', payload: 'history' })} className={`p-1.5 rounded-md transition-all ${viewMode === 'history' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`}>
+                                <History className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        {/* Mobile Actions/More */}
+                        <div className="">
+                            <ResponsiveActionsMenu
+                                viewMode={viewMode}
+                                dispatch={dispatch}
+                                total={totalCount}
+                                filtered={filteredCount}
+                            />
+                        </div>
+                    </div>
                 </div>
 
-                {/* Actions */}
-                <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto">
-                    {/* Results Count */}
-                    <div className="hidden lg:flex flex-col items-end mr-2 px-2 border-r border-border/50">
-                        <span className="text-xs font-bold text-foreground tabular-nums">
-                            {people.length === 0 && !loading && filteredCount === 0 ? '0' : filteredCount.toLocaleString()}
-                            <span className="text-muted-foreground font-normal mx-1">/</span>
-                            {totalCount.toLocaleString()}
-
-
-                        </span>
+                {/* Bottom Row: Search & Filters */}
+                <div
+                    className="flex flex-wrap items-center gap-2 w-full bg-secondary/50 border border-border rounded-xl px-3 py-1.5 focus-within:border-primary/50 focus-within:bg-background transition-all"
+                    onClick={() => inputRef.current?.focus()}
+                >
+                    {/* Saved View Chip / Trigger */}
+                    <div className={`
+                        group flex items-center gap-1 pl-2 pr-1 py-1 rounded-full border transition-all select-none mr-1
+                        ${activeSavedView
+                            ? 'bg-blue-50/50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300'
+                            : 'bg-secondary/30 border-transparent hover:bg-secondary/50 hover:border-border text-muted-foreground'}
+                    `}>
+                        <SavedViewsMenu
+                            tenantId={tenantId}
+                            trigger={
+                                <button className="flex items-center gap-1.5 text-xs font-medium px-1 outline-none">
+                                    {activeSavedView ? (
+                                        <>
+                                            <span className="opacity-70 uppercase tracking-wider text-[10px]">View:</span>
+                                            <span className="font-bold truncate max-w-[100px]">{activeSavedView.name}</span>
+                                            {isModified && <span className="text-xs opacity-70" title="Unsaved changes">*</span>}
+                                        </>
+                                    ) : (
+                                        <Filter className="w-3.5 h-3.5 opacity-70" />
+                                    )}
+                                    <ChevronDown className="w-3 h-3 opacity-50" />
+                                </button>
+                            }
+                        />
+                        {activeSavedView && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    // Clear active view by restoring without one
+                                    dispatch({ type: 'RESTORE_STATE', payload: {}, savedView: undefined });
+                                    // Or implement a dedicated RESET_VIEW action if needed, but for now this clears the "Active View" tracker
+                                    // actually we want to KEEP current filters but just detach from the Saved View? or Reset to "All People" default?
+                                    // Let's reset to default state.
+                                    dispatch({
+                                        type: 'RESTORE_STATE',
+                                        payload: { filters: [], sort: [], viewMode: 'tags', searchTerm: '' }
+                                    });
+                                }}
+                                className="w-4 h-4 flex items-center justify-center rounded-full hover:bg-blue-200/50 dark:hover:bg-blue-800/50 transition-colors ml-0.5"
+                            >
+                                <X className="w-3 h-3" />
+                            </button>
+                        )}
                     </div>
 
-                    {/* Debug SQL Button (Temporary) */}
-                    <button
-                        onClick={() => {
-                            const model = getFilterModel();
-                            let sql = `SELECT count(*) FROM parties p WHERE p.tenant_id = '${tenantId}' AND p.type = 'person'`;
-
-                            // Global Search
-                            if (searchTerm) {
-                                if (searchTerm.length < 3) {
-                                    sql += ` AND lower(p.display_name) LIKE '${searchTerm.toLowerCase()}%'`;
-                                } else {
-                                    sql += ` AND p.display_name ILIKE '%${searchTerm}%'`;
+                    {/* Active Chips */}
+                    {/* Always Render Global Search Chip (Inline Input) */}
+                    <div className={`
+                        group flex items-center gap-2 pl-2 pr-1 py-1 rounded-full border transition-all mr-1 relative
+                        ${searchTerm
+                            ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300'
+                            : 'bg-background border-border hover:border-primary/50 text-muted-foreground focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10'}
+                    `}>
+                        <Search className={`w-3.5 h-3.5 shrink-0 ${searchTerm ? 'opacity-70' : 'opacity-50'}`} />
+                        <input
+                            type="text"
+                            placeholder="Type to search..."
+                            className="bg-transparent outline-none text-xs font-medium placeholder:text-muted-foreground/50 min-w-[100px] w-auto max-w-[200px]"
+                            value={searchTerm}
+                            onChange={(e) => dispatch({ type: 'SET_SEARCH_TERM', payload: e.target.value })}
+                            onFocus={() => setShowHistory(true)}
+                            onBlur={() => setTimeout(() => setShowHistory(false), 200)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    handleAddHistory(searchTerm);
+                                    setShowHistory(false);
                                 }
+                            }}
+                        />
+                        {searchTerm && (
+                            <button
+                                onClick={() => {
+                                    dispatch({ type: 'SET_SEARCH_TERM', payload: '' });
+                                    inputRef.current?.focus(); // Keep focus
+                                }}
+                                className="w-5 h-5 flex items-center justify-center rounded-full hover:bg-blue-200/50 dark:hover:bg-blue-800/50 transition-colors shrink-0 cursor-pointer"
+                                title="Clear Search"
+                            >
+                                <X className="w-3.5 h-3.5 opacity-70 group-hover:opacity-100" />
+                            </button>
+                        )}
+
+
+                        {/* Recent Searches Dropdown & Autocomplete */}
+                        {showHistory && (
+                            (() => {
+                                const filteredHistory = searchTerm
+                                    ? dbSearchHistory.filter(h => h.toLowerCase().includes(searchTerm.toLowerCase()))
+                                    : dbSearchHistory;
+
+                                if (filteredHistory.length === 0) return null;
+
+                                return (
+                                    <div className="absolute top-[calc(100%+4px)] left-0 w-[300px] bg-popover text-popover-foreground rounded-xl border border-border shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 flex flex-col max-h-[300px]">
+                                        <div className="text-[10px] font-bold text-muted-foreground bg-muted/30 px-3 py-2 flex justify-between items-center bg-popover/95 backdrop-blur-sm z-10 border-b shrink-0">
+                                            <span>{searchTerm ? 'SUGGESTIONS' : 'RECENT SEARCHES'}</span>
+                                            {!searchTerm && (
+                                                <button onMouseDown={(e) => { e.preventDefault(); handleClearHistory(); }} className="hover:text-destructive transition-colors">Clear All</button>
+                                            )}
+                                        </div>
+                                        <div className="flex flex-col overflow-y-auto">
+                                            {filteredHistory.map((term, i) => (
+                                                <button
+                                                    key={i}
+                                                    className="flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/50 text-left transition-colors group/item border-b border-border/30 last:border-0"
+                                                    onMouseDown={(e) => {
+                                                        // Prevent blur and select
+                                                        e.preventDefault();
+                                                        dispatch({ type: 'SET_SEARCH_TERM', payload: term });
+                                                        handleAddHistory(term); // Bump / Save
+                                                        setShowHistory(false);
+                                                    }}
+                                                >
+                                                    <History className="w-3.5 h-3.5 text-muted-foreground/50 group-hover/item:text-primary/50 shrink-0" />
+                                                    <span className="truncate">
+                                                        {term}
+                                                    </span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })()
+                        )}
+                    </div>
+
+                    {filters.map((filter) => (
+                        <SmartChip
+                            key={filter.id}
+                            filter={filter}
+                            onUpdate={(updates) => dispatch({ type: 'UPDATE_FILTER', payload: { id: filter.id, updates } })}
+                            onRemove={() => dispatch({ type: 'REMOVE_FILTER', payload: filter.id })}
+                        />
+                    ))}
+
+                    {/* Add Filter Trigger */}
+                    <AddFilterCommand
+                        minimal={true}
+                        onSelectField={(field) => {
+                            if (field === 'search') {
+                                setIsSearchOpen(true);
+                            } else {
+                                dispatch({
+                                    type: 'ADD_FILTER',
+                                    payload: {
+                                        id: `new_${field}_${Date.now()}`,
+                                        field,
+                                        operator: 'equals',
+                                        value: '',
+                                        isEnabled: true,
+                                        defaultOpen: true
+                                    }
+                                });
                             }
-
-                            // Helper for Multi-Select + Trim + Lower
-                            const buildInClause = (filterVal: string | undefined): string | null => {
-                                if (!filterVal) return null;
-                                // Split by comma, trim, lower, quote
-                                const parts = filterVal.split(',').map(s => `'${s.trim().toLowerCase()}'`).join(', ');
-                                return `(${parts})`;
-                            };
-
-                            // Name Column Filter (Hybrid)
-                            if (model.name) {
-                                const val = model.name.filter;
-                                if (val.length < 3) {
-                                    sql += ` AND lower(p.display_name) LIKE '${val.toLowerCase()}%'`;
-                                } else {
-                                    sql += ` AND p.display_name ILIKE '%${val}%'`;
-                                }
-                            }
-
-                            // Status (Multi-Select Support)
-                            if (model.status) {
-                                const inList = buildInClause(model.status.filter);
-                                if (inList) sql += ` AND lower(p.status) IN ${inList}`;
-                            }
-
-                            // Role (Multi-Select Support)
-                            if (model.role_name) {
-                                const inList = buildInClause(model.role_name.filter);
-                                // Note: In DB logic we optimize this, but for verify we use standard EXISTS
-                                if (inList) sql += ` AND EXISTS (SELECT 1 FROM party_memberships pm WHERE pm.person_id = p.id AND lower(pm.role_name) IN ${inList})`;
-                            }
-
-                            // Tags
-                            if (model.tags) {
-                                const inList = buildInClause(model.tags.filter);
-                                if (inList) sql += ` AND p.tags && ARRAY[${inList}]::text[]`; // Approximate check
-                            }
-
-                            window.prompt("Generated Debug SQL (Copy this):", sql);
                         }}
-                        className="p-2 text-muted-foreground hover:text-primary transition-colors"
-                        title="Generate Debug SQL"
-                    >
-                        <Database className="w-4 h-4" />
-                    </button>
+                    />
 
-
-
-                    {/* Saved Views Menu */}
-                    <div className="h-6 w-px bg-border/50 mx-1 hidden md:block"></div>
-                    <SavedViewsMenu tenantId={tenantId} />
-
-                    <div className="h-6 w-px bg-border/50 mx-1 hidden md:block"></div>
-
-                    {/* Integrated View Switcher */}
-                    <div className="flex bg-secondary/50 p-1 rounded-lg border border-border/50">
-                        <button onClick={() => dispatch({ type: 'SET_VIEW_MODE', payload: 'tags' })} className={`p-1.5 rounded-md transition-all ${viewMode === 'tags' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`}>
-                            <LayoutGrid className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => dispatch({ type: 'SET_VIEW_MODE', payload: 'grid' })} className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`}>
-                            <List className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => dispatch({ type: 'SET_VIEW_MODE', payload: 'cards' })} className={`p-1.5 rounded-md transition-all ${viewMode === 'cards' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`}>
-                            <CreditCard className="w-4 h-4" />
-                        </button>
-                    </div>
+                    {/* Removed Persistent Input */}
                 </div>
             </div>
 
-            {/* Universal Filter Strip */}
-            <FilterStrip />
+            {/* Universal Filter Strip - Removed and Integrated above */}
+            {/* <FilterStrip /> */}
 
             {/* Content Area */}
             <div className={`transition-all duration-300 min-h-[400px]`}>
@@ -286,6 +558,11 @@ function PeopleViewContent({ tenantId }: PeopleViewWrapperProps) {
                         tenantId={tenantId}
                         onPersonClick={handlePersonClick}
                         highlightId={highlightId}
+                        recentSearches={dbSearchHistory.slice(0, 10)} // In TAGS view we show top 10 DB history items
+                        onSearchHistoryClick={(term) => {
+                            dispatch({ type: 'SET_SEARCH_TERM', payload: term });
+                            handleAddHistory(term);
+                        }}
                     />
                 ) : viewMode === 'grid' ? (
                     <SimplePeopleTable
@@ -295,6 +572,22 @@ function PeopleViewContent({ tenantId }: PeopleViewWrapperProps) {
                         loadMore={() => loadMore()}
                         onPersonClick={handlePersonClick}
                         highlightId={highlightId}
+                    />
+                ) : viewMode === 'history' ? (
+                    /* Dedicated History View Mode -> Use FULL DB history (100+ items) */
+                    <PeopleTags
+                        people={[]} // Empty people list to focus on history
+                        loading={false}
+                        hasMore={false}
+                        loadMore={() => { }}
+                        tenantId={tenantId}
+                        onPersonClick={() => { }}
+                        highlightId={null}
+                        recentSearches={dbSearchHistory}
+                        onSearchHistoryClick={(term) => {
+                            dispatch({ type: 'SET_SEARCH_TERM', payload: term });
+                            handleAddHistory(term);
+                        }}
                     />
                 ) : (
                     // Simple inline Card View
@@ -387,5 +680,3 @@ function SimpleProfileCard({ person, onClick, isHighlighted }: { person: any, on
         </div>
     );
 }
-
-

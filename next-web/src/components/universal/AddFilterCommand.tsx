@@ -18,9 +18,11 @@ import * as Popover from "@radix-ui/react-popover";
 
 interface AddFilterCommandProps {
     onSelectField: (field: string) => void;
+    minimal?: boolean;
 }
 
 const AVAILABLE_FIELDS = [
+    { id: 'search', label: 'Global Search', icon: Search },
     { id: 'name', label: 'Name', icon: User },
     { id: 'status', label: 'Status', icon: Activity },
     { id: 'role_name', label: 'Role', icon: Briefcase },
@@ -30,23 +32,35 @@ const AVAILABLE_FIELDS = [
     { id: 'tags', label: 'Tags', icon: Tags },
 ];
 
-export default function AddFilterCommand({ onSelectField }: AddFilterCommandProps) {
+export default function AddFilterCommand({ onSelectField, minimal = false }: AddFilterCommandProps) {
     const [open, setOpen] = useState(false);
 
     return (
         <Popover.Root open={open} onOpenChange={setOpen}>
             <Popover.Trigger asChild>
-                <button className={`
-                    group flex items-center gap-2 px-4 py-2 
-                    bg-primary text-primary-foreground 
-                    text-sm font-medium rounded-full 
-                    hover:opacity-90 active:scale-95 transition-all 
-                    shadow-md hover:shadow-lg
-                    ${open ? 'ring-2 ring-offset-2 ring-primary/30' : ''}
-                `}>
-                    <Plus className="w-4 h-4 transition-transform group-hover:rotate-90" />
-                    <span>Add Filter</span>
-                </button>
+                {minimal ? (
+                    <button
+                        className={`
+                            w-[26px] h-[26px] flex items-center justify-center p-0 rounded-full bg-transparent border border-border text-primary hover:border-primary/50 hover:bg-primary/5 transition-all shadow-sm
+                            ${open ? 'ring-2 ring-offset-1 ring-primary/30' : ''}
+                        `}
+                        title="Add Filter"
+                    >
+                        <Plus className="w-4 h-4" />
+                    </button>
+                ) : (
+                    <button className={`
+                        group flex items-center gap-2 px-4 py-2 
+                        bg-primary text-primary-foreground 
+                        text-sm font-medium rounded-full 
+                        hover:opacity-90 active:scale-95 transition-all 
+                        shadow-md hover:shadow-lg
+                        ${open ? 'ring-2 ring-offset-2 ring-primary/30' : ''}
+                    `}>
+                        <Plus className="w-4 h-4 transition-transform group-hover:rotate-90" />
+                        <span>Add Filter</span>
+                    </button>
+                )}
             </Popover.Trigger>
             <Popover.Portal>
                 <Popover.Content

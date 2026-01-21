@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import AgGridRegistry from "@/lib/ag-grid-registry";
-import Sidebar from "@/components/Sidebar";
+import DashboardShell from "@/components/DashboardShell";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { cookies } from "next/headers";
@@ -45,23 +45,12 @@ export default async function RootLayout({
         >
           <LanguageProvider>
             <AgGridRegistry />
-            <div className="flex min-h-screen bg-background text-foreground transition-colors duration-300">
-              <Sidebar currentTenantId={tenantId} peopleCount={peopleCount} />
-              {/* Use margin-start (ms-64) for RTL support instead of ml-64 */}
-              <main className="flex-1 ms-64 p-8 relative overflow-hidden">
-                {/* Background blobs for premium feel - Opacity adjusted via CSS vars if needed or classes */}
-                <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 bg-brand-primary/10 rounded-full blur-[120px] pointer-events-none" />
-                <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-96 h-96 bg-brand-secondary/10 rounded-full blur-[120px] pointer-events-none" />
-
-                <div className="relative z-10">
-                  {children}
-                </div>
-              </main>
-            </div>
+            <DashboardShell currentTenantId={tenantId} peopleCount={peopleCount}>
+              {children}
+            </DashboardShell>
           </LanguageProvider>
         </ThemeProvider>
       </body>
-
     </html>
   );
 }

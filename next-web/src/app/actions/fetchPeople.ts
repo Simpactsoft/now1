@@ -43,34 +43,55 @@ export async function fetchPeople(params: PaginatedQuery) {
         if (fm.status) console.log("[fetchPeople] Status Filter:", JSON.stringify(fm.status));
 
 
+        // Helper to extract filter values (supports single object or array of objects)
+        const extractFilterValues = (entry: any): string[] | string | null => {
+            if (!entry) return null;
+            if (Array.isArray(entry)) {
+                // Multiple conditions/chips for same field
+                return entry.map(e => e.filter);
+            }
+            // Single condition
+            return entry.filter;
+        };
+
         // 1. Search (Global)
         if (query) {
             filters.search = query;
         }
 
         // 1.1 Name Filter (Column Specific)
-        if (fm.name) {
-            filters.name = fm.name.filter;
-        }
+        if (fm.name) filters.name = extractFilterValues(fm.name);
 
-        // Helper to parse potential multi-select values
-        const parseFilter = (val: string) => {
-            if (!val) return null;
-            if (val.includes(',')) {
-                return val.split(',').map(s => s.trim());
-            }
-            return val;
+        // Helper to parse potential multi-select values (comma separated strings)
+        // AND now supports array from multiple chips
+        const parseMultiSelect = (entry: any) => {
+            const raw = extractFilterValues(entry);
+            if (!raw) return null;
+
+            // If it's already an array (from multiple chips), we might have "A,B" and "C" mixed
+            // Let's normalize to a single flat array of strings
+            const list = Array.isArray(raw) ? raw : [raw];
+
+            let combined: string[] = [];
+            list.forEach(val => {
+                if (val && typeof val === 'string' && val.includes(',')) {
+                    combined.push(...val.split(',').map(s => s.trim()));
+                } else if (val) {
+                    combined.push(val);
+                }
+            });
+            return combined.length > 0 ? combined : null;
         };
 
-        if (fm.status) filters.status = parseFilter(fm.status.filter);
-        if (fm.role_name) filters.role_name = parseFilter(fm.role_name.filter); // Drill Down
-        if (fm.company_size) filters.company_size = parseFilter(fm.company_size.filter); // Drill Down
-        if (fm.industry) filters.industry = parseFilter(fm.industry.filter); // Drill Down
-        if (fm.joined_year) filters.joined_year = parseFilter(fm.joined_year.filter); // Drill Down
-        if (fm.joined_quarter) filters.joined_quarter = fm.joined_quarter.filter; // Keep single for now logic
-        if (fm.joined_month) filters.joined_month = fm.joined_month.filter; // Drill Down
-        if (fm.joined_week) filters.joined_week = fm.joined_week.filter; // Drill Down
-        if (fm.tags) filters.tags = parseFilter(fm.tags.filter); // Drill Down [NEW]
+        if (fm.status) filters.status = parseMultiSelect(fm.status);
+        if (fm.role_name) filters.role_name = parseMultiSelect(fm.role_name);
+        if (fm.company_size) filters.company_size = parseMultiSelect(fm.company_size);
+        if (fm.industry) filters.industry = parseMultiSelect(fm.industry);
+        if (fm.joined_year) filters.joined_year = parseMultiSelect(fm.joined_year);
+        if (fm.joined_quarter) filters.joined_quarter = extractFilterValues(fm.joined_quarter);
+        if (fm.joined_month) filters.joined_month = extractFilterValues(fm.joined_month);
+        if (fm.joined_week) filters.joined_week = extractFilterValues(fm.joined_week);
+        if (fm.tags) filters.tags = parseMultiSelect(fm.tags);
 
         const limit = endRow - startRow;
 

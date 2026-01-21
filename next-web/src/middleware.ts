@@ -1,30 +1,9 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { type NextRequest } from 'next/server';
+import { updateSession } from '@/lib/supabase/middleware';
 
-/**
- * Phase 5 Middleware: Defense in Depth
- * Distinguishes between Routing Security (Middleware) and Data Security (RLS).
- */
-export function middleware(request: NextRequest) {
-    const { pathname } = request.nextUrl;
-
-    // 1. Protected Route: Dashboard
-    if (pathname.startsWith('/dashboard')) {
-        const tenantId = request.cookies.get('tenant_id')?.value;
-
-        // If no tenant is selected, we might want to allow the page to load 
-        // but the UI will show the "Select a Tenant" state.
-        // However, if we move to path-based tenancy (/app/:tenant_id/...), 
-        // we would enforce a strict match here.
-
-        // Log for debugging (production logs would be more discreet)
-        console.log(`[Middleware] Path: ${pathname}, Tenant-ID from Cookie: ${tenantId || 'none'}`);
-
-        // Optional: If we wanted to ensure the user ALWAYS has a tenant context 
-        // before entering, we could redirect here.
-    }
-
-    return NextResponse.next();
+export async function middleware(request: NextRequest) {
+    // 1. Refresh Supabase Session (Critical for Server Actions & RLS)
+    return await updateSession(request);
 }
 
 // See "Matching Paths" below to learn more

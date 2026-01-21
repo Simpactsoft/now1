@@ -1,17 +1,20 @@
 "use client";
 
 import * as React from "react";
-import { Bookmark, Save, Trash2, Edit2, Check, X, MoreHorizontal, Plus } from "lucide-react";
+import { Bookmark, Save, Trash2, Edit2, Check, X, MoreHorizontal, Plus, ListFilter } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import { useViewConfig } from "@/components/universal/ViewConfigContext";
 import { getSavedViews, saveView, deleteView, renameView, SavedView } from "@/app/actions/savedViews";
 
 interface SavedViewsMenuProps {
     tenantId: string;
+    minimal?: boolean;     // If true, renders icon only
+    className?: string;    // Allow custom styling
+    trigger?: React.ReactNode; // [NEW] Allow custom trigger
 }
 
-export default function SavedViewsMenu({ tenantId }: SavedViewsMenuProps) {
-    const { filters, sort, viewMode, dispatch } = useViewConfig();
+export default function SavedViewsMenu({ tenantId, minimal = false, className = "", trigger }: SavedViewsMenuProps) {
+    const { filters, sort, viewMode, searchTerm, dispatch } = useViewConfig();
     const [open, setOpen] = React.useState(false);
     const [views, setViews] = React.useState<SavedView[]>([]);
     const [loading, setLoading] = React.useState(false);
@@ -43,11 +46,12 @@ export default function SavedViewsMenu({ tenantId }: SavedViewsMenuProps) {
         const config = {
             filters,
             sort,
-            viewMode
+            viewMode,
+            searchTerm
         };
         const res = await saveView(tenantId, viewName, config);
         if (res.error) {
-            alert(res.error); // Simple alert for V1
+            alert(res.error);
         } else {
             setViewName("");
             loadViews();
@@ -65,8 +69,10 @@ export default function SavedViewsMenu({ tenantId }: SavedViewsMenuProps) {
             payload: {
                 viewMode: config.viewMode,
                 sort: config.sort,
-                filters: config.filters
-            }
+                filters: config.filters.map((f: any) => ({ ...f, defaultOpen: false })),
+                searchTerm: config.searchTerm || ''
+            },
+            savedView: { id: view.id, name: view.name }
         });
         setOpen(false);
     };
@@ -91,10 +97,21 @@ export default function SavedViewsMenu({ tenantId }: SavedViewsMenuProps) {
     return (
         <Popover.Root open={open} onOpenChange={setOpen}>
             <Popover.Trigger asChild>
-                <button className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground bg-secondary/30 hover:bg-secondary/50 rounded-lg transition-colors border border-transparent hover:border-border">
-                    <Bookmark className="w-4 h-4" />
-                    <span className="hidden sm:inline">Saved Views</span>
-                </button>
+                {trigger ? trigger : (
+                    minimal ? (
+                        <button
+                            className={`p-1 text-muted-foreground hover:text-primary transition-colors ${className}`}
+                            title="Filter & Views"
+                        >
+                            <ListFilter className="w-4 h-4" />
+                        </button>
+                    ) : (
+                        <button className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground bg-secondary/30 hover:bg-secondary/50 rounded-lg transition-colors border border-transparent hover:border-border">
+                            <Bookmark className="w-4 h-4" />
+                            <span className="hidden sm:inline">Saved Views</span>
+                        </button>
+                    )
+                )}
             </Popover.Trigger>
 
             <Popover.Portal>
@@ -132,23 +149,7 @@ export default function SavedViewsMenu({ tenantId }: SavedViewsMenuProps) {
                             <div
                                 key={view.id}
                                 className="group flex items-center justify-between p-2 rounded-md hover:bg-accent/50 cursor-pointer transition-colors border border-transparent hover:border-border/50"
-                                onClick={() => {
-                                    if (editingId === view.id) return;
-                                    // Apply View (Atomic Restoration)
-                                    const { config } = view;
-                                    if (!config) return;
-
-                                    dispatch({
-                                        type: 'RESTORE_STATE',
-                                        payload: {
-                                            viewMode: config.viewMode,
-                                            sort: config.sort,
-                                            filters: config.filters
-                                        }
-                                    });
-
-                                    setOpen(false);
-                                }}
+                                onClick={() => handleSelect(view)}
                             >
                                 {editingId === view.id ? (
                                     <div className="flex items-center gap-1 flex-1" onClick={(e) => e.stopPropagation()}>

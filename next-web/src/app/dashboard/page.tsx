@@ -5,6 +5,8 @@ import PerformanceHUD from "@/components/PerformanceHUD";
 import { Suspense } from "react";
 import DashboardWrapper from "@/components/DashboardWrapper";
 import { Activity, Database } from "lucide-react";
+import { getSearchHistory } from "@/app/actions/searchHistory";
+import RecentSearchesCard from "@/components/RecentSearchesCard";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +18,15 @@ export const metadata = {
 export default async function DashboardPage() {
     const cookieStore = await cookies();
     const tenantId = cookieStore.get("tenant_id")?.value;
+
+    // Fetch Search History
+    let history: string[] = [];
+    if (tenantId) {
+        const historyRes = await getSearchHistory(tenantId);
+        if (historyRes.success && historyRes.history) {
+            history = historyRes.history;
+        }
+    }
 
     return (
         <div className="flex flex-col gap-8">
@@ -55,7 +66,8 @@ export default async function DashboardPage() {
                 ))}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                {/* Infrastructure - Spans 2 cols */}
                 <div className="lg:col-span-2 glass p-8 rounded-3xl border border-white/5">
                     <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
                         <Activity className="text-brand-primary" size={20} />
@@ -78,6 +90,7 @@ export default async function DashboardPage() {
                     </div>
                 </div>
 
+                {/* Data Distribution - Spans 1 col */}
                 <div className="glass p-8 rounded-3xl border border-white/5">
                     <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
                         <Database className="text-brand-secondary" size={20} />
@@ -101,6 +114,9 @@ export default async function DashboardPage() {
                         ))}
                     </div>
                 </div>
+
+                {/* Recent Searches - Spans 1 col */}
+                <RecentSearchesCard history={history} />
             </div>
         </div>
     );
