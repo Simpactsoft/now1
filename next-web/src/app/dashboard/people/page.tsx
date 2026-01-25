@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import PeopleViewWrapper from "@/components/PeopleViewWrapper";
 import TenantSwitcher from "@/components/TenantSwitcher";
-import AddPersonDialog from "@/components/AddPersonDialog";
+import PersonFormDialog from "@/components/PersonFormDialog";
 import { Suspense } from "react";
 import DashboardWrapper from "@/components/DashboardWrapper"; // Reusing or replacing wrapper logic
 import { createClient } from "@/lib/supabase/server";
@@ -49,7 +49,7 @@ export default async function PeoplePage() {
                 </div>
 
                 <div className="flex items-center gap-6">
-                    <AddPersonDialog tenantId={tenantId ?? ""} />
+                    <PersonFormDialog tenantId={tenantId ?? ""} />
                 </div>
             </header>
 

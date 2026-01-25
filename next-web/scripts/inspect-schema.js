@@ -7,25 +7,27 @@ const supabase = createClient(
 );
 
 async function inspectSchema() {
-    console.log("Fetching one party record...");
-    const { data, error } = await supabase
-        .from('parties')
-        .select('*')
+    console.log("Fetching PERSON_STATUS option set...");
+    const { data: sets } = await supabase
+        .from('option_sets')
+        .select('id')
+        .eq('code', 'PERSON_STATUS')
         .limit(1);
 
-    if (error) {
-        console.error("Error fetching party:", error);
-        return;
+    if (sets && sets.length > 0) {
+        const setId = sets[0].id;
+        console.log("Fetching values for set:", setId);
+        const { data: values } = await supabase
+            .from('option_values')
+            .select('*')
+            .eq('option_set_id', setId);
+
+        console.log(JSON.stringify(values, null, 2));
+    } else {
+        console.log("No PERSON_STATUS set found.");
     }
 
-    if (data && data.length > 0) {
-        console.log("--- Party Record Keys ---");
-        console.log(Object.keys(data[0]));
-        console.log("\n--- Sample Record ---");
-        console.log(JSON.stringify(data[0], null, 2));
-    } else {
-        console.log("No parties found.");
-    }
 }
+
 
 inspectSchema();

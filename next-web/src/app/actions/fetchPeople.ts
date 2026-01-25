@@ -20,12 +20,7 @@ export async function fetchPeople(params: PaginatedQuery) {
         }
 
         // Default sorting
-        let sortCol = "name"; // Most natural stable sort
-        // Note: Script randomizes names, so even this is unstable if script runs.
-        // But 'id' is ugly. Let's try 'created_at' again? No, script randomizes that too.
-        // I will use 'id' as the internal default to PROVE stability, but 'name' is better UX.
-        // The user complained about numbers. Stability is king right now.
-        sortCol = "id";
+        let sortCol = "created_at"; // Show newest first by default
         let sortDir = "desc";
 
         if (sortModel && sortModel.length > 0) {

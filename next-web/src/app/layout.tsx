@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Toaster } from "sonner";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import AgGridRegistry from "@/lib/ag-grid-registry";
@@ -48,6 +49,7 @@ export default async function RootLayout({
             <DashboardShell currentTenantId={tenantId} peopleCount={peopleCount}>
               {children}
             </DashboardShell>
+            <Toaster position="top-right" theme="system" />
           </LanguageProvider>
         </ThemeProvider>
       </body>

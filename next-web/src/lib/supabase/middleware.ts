@@ -39,15 +39,23 @@ export async function updateSession(request: NextRequest) {
         data: { user },
     } = await supabase.auth.getUser()
 
+    // DEBUG: Log cookies to understand why user is null
+    const cookieNames = request.cookies.getAll().map(c => c.name).join(', ');
+    console.log(`Middleware [${request.method} ${request.nextUrl.pathname}]: User=${user?.id ? 'Yes' : 'No'}, Cookies=[${cookieNames}]`);
+
+    const isServerAction = request.headers.get('next-action');
+    const isApi = request.nextUrl.pathname.startsWith('/api');
+
     if (
         !user &&
         !request.nextUrl.pathname.startsWith('/login') &&
-        !request.nextUrl.pathname.startsWith('/auth')
+        !request.nextUrl.pathname.startsWith('/auth') &&
+        !isServerAction && // Do not redirect Server Actions (let them fail gracefully with JSON)
+        !isApi
     ) {
-        // optional: redirect to login if you want to force auth on specific paths
-        // const url = request.nextUrl.clone()
-        // url.pathname = '/login'
-        // return NextResponse.redirect(url)
+        const url = request.nextUrl.clone()
+        url.pathname = '/login'
+        return NextResponse.redirect(url)
     }
 
     return initialResponse

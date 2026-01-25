@@ -6,6 +6,8 @@ import { fetchPersonDetails } from "@/app/actions/fetchDetails";
 import BackButton from "@/components/BackButton";
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link"; // Kept for error state link
+import { getTenantAttributes } from "@/app/actions/attributes";
+import CustomFieldsCard from "@/components/people/CustomFieldsCard";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +18,9 @@ interface PageProps {
 export default async function PersonProfilePage({ params }: PageProps) {
     const { id } = await params;
     const cookieStore = await cookies();
-    const tenantId = cookieStore.get("tenant_id")?.value;
+    const rawTenantId = cookieStore.get("tenant_id")?.value;
+    const tenantId = rawTenantId?.replace(/['"]+/g, '');
+    console.log("PersonProfilePage tenantId:", tenantId);
 
     if (!tenantId) {
         return (
@@ -27,6 +31,7 @@ export default async function PersonProfilePage({ params }: PageProps) {
     }
 
     const { profile, timeline, error } = await fetchPersonDetails(tenantId, id);
+    const { data: attributes } = await getTenantAttributes('person');
 
     if (error || !profile) {
         return (
@@ -50,7 +55,7 @@ export default async function PersonProfilePage({ params }: PageProps) {
                 <BackButton label="Back to Contacts" />
             </div>
 
-            <ProfileHeader profile={profile} />
+            <ProfileHeader profile={profile} tenantId={tenantId} />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Left Column: Stats / Meta */}
@@ -80,6 +85,14 @@ export default async function PersonProfilePage({ params }: PageProps) {
                             {!profile.tags && <span className="text-slate-500 text-sm">No tags found</span>}
                         </div>
                     </div>
+
+                    {/* Custom Fields (Dynamic) */}
+                    {attributes && attributes.length > 0 && (
+                        <CustomFieldsCard
+                            attributes={attributes}
+                            customFields={profile.custom_fields || {}}
+                        />
+                    )}
                 </div>
 
                 {/* Right Column: Timeline */}

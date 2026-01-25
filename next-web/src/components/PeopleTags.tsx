@@ -37,38 +37,11 @@ export default function PeopleTags({
         }
     };
 
-    console.log(`[PeopleTags] Render. Items: ${people?.length}, Loading: ${loading}`);
-
     return (
         <div className="flex flex-col gap-4 p-3">
 
             {/* Recent Searches Section - Always Visible for Debug/UX */}
-            {onSearchHistoryClick && (
-                <div className="flex flex-col gap-2 mb-2 p-3 bg-secondary/20 rounded-xl border border-border/50 border-dashed">
-                    <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-primary/50"></span>
-                        Recent Searches
-                    </h3>
-
-                    {recentSearches.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                            {recentSearches.map((term, i) => (
-                                <button
-                                    key={`history-${i}`}
-                                    onClick={() => onSearchHistoryClick(term)}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary/50 hover:bg-secondary text-secondary-foreground border border-border/50 hover:border-primary/30 transition-all text-sm group"
-                                >
-                                    <span className="font-medium opacity-90">{term}</span>
-                                </button>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="text-xs text-muted-foreground italic pl-2">
-                            No recent searches. Type in the search bar to add one.
-                        </div>
-                    )}
-                </div>
-            )}
+            {/* Recent Searches Header Removed (Moved to Search Combo) */}
 
             {/* People List */}
             <div className="flex flex-wrap gap-3">

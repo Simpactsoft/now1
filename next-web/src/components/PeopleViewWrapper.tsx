@@ -9,7 +9,7 @@ import SimplePeopleTable from "@/components/SimplePeopleTable";
 import { fetchPeople } from "@/app/actions/fetchPeople";
 import { fetchTotalStats } from "@/app/actions/fetchStats";
 import { Search, X, Filter, LayoutGrid, List, Kanban, Tag, MoreHorizontal, SlidersHorizontal, ArrowUpDown, ChevronDown, UserCircle, CreditCard, Database, RotateCcw, History } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { ViewConfigProvider, useViewConfig, FilterCondition } from "@/components/universal/ViewConfigContext";
 import SmartChip from "@/components/universal/SmartChip";
 import AddFilterCommand from "@/components/universal/AddFilterCommand";
@@ -51,9 +51,6 @@ function ResponsiveActionsMenu({ viewMode, dispatch, total, filtered }: { viewMo
                             <button onClick={() => { dispatch({ type: 'SET_VIEW_MODE', payload: 'cards' }); setOpen(false); }} className={`flex-1 p-1.5 rounded-md flex justify-center transition-all ${viewMode === 'cards' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground'}`}>
                                 <CreditCard className="w-4 h-4" />
                             </button>
-                            <button onClick={() => { dispatch({ type: 'SET_VIEW_MODE', payload: 'history' }); setOpen(false); }} className={`flex-1 p-1.5 rounded-md flex justify-center transition-all ${viewMode === 'history' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground'}`}>
-                                <History className="w-4 h-4" />
-                            </button>
                         </div>
                     </div>
 
@@ -82,6 +79,8 @@ export default function PeopleViewWrapper({ tenantId }: PeopleViewWrapperProps) 
 // --- Content Component (Logic) ---
 function PeopleViewContent({ tenantId }: PeopleViewWrapperProps) {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const pathname = usePathname();
 
     // Global View State
     const { viewMode, filters, sort, dispatch, searchTerm, activeSavedView, isModified } = useViewConfig();
@@ -109,6 +108,34 @@ function PeopleViewContent({ tenantId }: PeopleViewWrapperProps) {
         setLastRefreshed(new Date());
     }, []);
 
+    // Handle New Person Creation (via URL param)
+    useEffect(() => {
+        const createdId = searchParams.get('created');
+        if (createdId) {
+            console.log(`[PeopleViewWrapper] Detected createdId: ${createdId}`);
+            setHighlightId(createdId);
+
+            // Clear filters to ensure visibility
+            // We preserve viewMode but reset everything else
+            dispatch({
+                type: 'RESTORE_STATE',
+                payload: { filters: [], sort: [], searchTerm: '', viewMode: viewMode }
+            });
+
+            // Trigger refresh to load the new person
+            // We set a small timeout to let the DB settle if needed, though revalidatePath was called.
+            setTimeout(() => {
+                loadMore(true);
+            }, 500);
+
+            // Clear the param
+            const params = new URLSearchParams(searchParams.toString());
+            params.delete('created');
+            router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+        }
+    }, [searchParams, pathname, router]);
+
+
     // Search Interaction State
     const [isSearchOpen, setIsSearchOpen] = useState(false);
 
@@ -134,8 +161,6 @@ function PeopleViewContent({ tenantId }: PeopleViewWrapperProps) {
     useEffect(() => {
         if (!tenantId) return;
         getSearchHistory(tenantId, userId || undefined).then(res => {
-            console.log(`[PeopleViewWrapper] Loaded DB History:`, res);
-            if (res.debug) console.log(`[PeopleViewWrapper] DB Debug:`, res.debug);
             if (res.success && res.history) {
                 setDbSearchHistory(res.history as string[]);
             }
@@ -145,20 +170,14 @@ function PeopleViewContent({ tenantId }: PeopleViewWrapperProps) {
     const handleAddHistory = async (term: string) => {
         if (!term || term.trim().length < 2) return;
 
-        console.log(`[PeopleViewWrapper] Adding term: "${term}"`);
-
         // Add to DB (Async)
         try {
-            console.log(`[PeopleViewWrapper] calling addToSearchHistory...`);
             // Pass userId explicitly to bypass server-side session issues with SECURITY DEFINER
             const res = await addToSearchHistory(tenantId, term, userId || undefined);
-            console.log(`[PeopleViewWrapper] addToSearchHistory result:`, res);
 
             if (res.success) {
                 // If successful, refresh DB history to include it
                 getSearchHistory(tenantId, userId || undefined).then(r => {
-                    console.log(`[PeopleViewWrapper] Refreshed DB history:`, r);
-                    if (r.debug) console.log(`[PeopleViewWrapper] DB Refresh Debug:`, r.debug);
                     if (r.success && r.history) setDbSearchHistory(r.history as string[]);
                 });
             }
@@ -340,7 +359,10 @@ function PeopleViewContent({ tenantId }: PeopleViewWrapperProps) {
                                 if (model.status) { const inList = buildInClause(model.status.filter); if (inList) sql += ` AND lower(p.status) IN ${inList}`; }
                                 if (model.role_name) { const inList = buildInClause(model.role_name.filter); if (inList) sql += ` AND EXISTS (SELECT 1 FROM party_memberships pm WHERE pm.person_id = p.id AND lower(pm.role_name) IN ${inList})`; }
                                 if (model.tags) { const inList = buildInClause(model.tags.filter); if (inList) sql += ` AND p.tags && ARRAY[${inList}]::text[]`; }
-                                window.prompt("Generated Debug SQL:", sql);
+                                console.log("[Debug SQL]", sql);
+                                navigator.clipboard.writeText(sql)
+                                    .then(() => alert("SQL copied to clipboard! Check console for details."))
+                                    .catch(() => window.prompt("SQL (Copy manually):", sql));
                             }}
                             className="p-2 text-muted-foreground hover:text-primary transition-colors hidden md:block" // Hidden on mobile to save space
                             title="Generate Debug SQL"
@@ -361,9 +383,7 @@ function PeopleViewContent({ tenantId }: PeopleViewWrapperProps) {
                             <button onClick={() => dispatch({ type: 'SET_VIEW_MODE', payload: 'cards' })} className={`p-1.5 rounded-md transition-all ${viewMode === 'cards' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`}>
                                 <CreditCard className="w-4 h-4" />
                             </button>
-                            <button onClick={() => dispatch({ type: 'SET_VIEW_MODE', payload: 'history' })} className={`p-1.5 rounded-md transition-all ${viewMode === 'history' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`}>
-                                <History className="w-4 h-4" />
-                            </button>
+
                         </div>
 
                         {/* Mobile Actions/More */}
@@ -572,23 +592,9 @@ function PeopleViewContent({ tenantId }: PeopleViewWrapperProps) {
                         loadMore={() => loadMore()}
                         onPersonClick={handlePersonClick}
                         highlightId={highlightId}
-                    />
-                ) : viewMode === 'history' ? (
-                    /* Dedicated History View Mode -> Use FULL DB history (100+ items) */
-                    <PeopleTags
-                        people={[]} // Empty people list to focus on history
-                        loading={false}
-                        hasMore={false}
-                        loadMore={() => { }}
                         tenantId={tenantId}
-                        onPersonClick={() => { }}
-                        highlightId={null}
-                        recentSearches={dbSearchHistory}
-                        onSearchHistoryClick={(term) => {
-                            dispatch({ type: 'SET_SEARCH_TERM', payload: term });
-                            handleAddHistory(term);
-                        }}
                     />
+
                 ) : (
                     // Simple inline Card View
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
@@ -658,7 +664,7 @@ function SimpleProfileCard({ person, onClick, isHighlighted }: { person: any, on
             onClick={onClick}
             className={`
                 group relative flex flex-col bg-card hover:bg-accent/50 border rounded-2xl p-5 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md
-                ${isHighlighted ? 'ring-2 ring-primary border-primary bg-primary/5' : 'border-border hover:border-primary/50'}
+                ${isHighlighted ? 'ring-2 ring-primary border-primary bg-primary/5 shadow-lg shadow-primary/10' : 'border-border hover:border-primary/50'}
             `}
         >
             <div className="flex items-center gap-3 mb-4">

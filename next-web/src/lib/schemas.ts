@@ -17,7 +17,8 @@ export const CreatePersonSchema = z.object({
     lastName: z.string().min(2, "Last Name is required"),
     email: z.string().email("Invalid email").optional().or(z.literal("")),
     phone: z.string().optional(),
-    tenantId: z.string().min(1, "Tenant ID is required")
+    tenantId: z.string().min(1, "Tenant ID is required"),
+    customFields: z.record(z.any()).optional() // Flexible JSON for attributes
 });
 
 export type CreatePersonInput = z.infer<typeof CreatePersonSchema>;

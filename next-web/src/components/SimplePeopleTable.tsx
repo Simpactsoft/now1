@@ -3,6 +3,8 @@
 import { useRef, useEffect } from "react";
 import { MessageSquare, Phone, Mail, MoreHorizontal } from "lucide-react";
 
+import { StatusBadge } from "./StatusBadge";
+
 interface SimplePeopleTableProps {
     people: any[];
     loading: boolean;
@@ -10,6 +12,7 @@ interface SimplePeopleTableProps {
     loadMore: () => void;
     onPersonClick: (id: string) => void;
     highlightId: string | null;
+    tenantId?: string; // Optional for backward/forward compatibility
 }
 
 export default function SimplePeopleTable({
@@ -18,7 +21,8 @@ export default function SimplePeopleTable({
     hasMore,
     loadMore,
     onPersonClick,
-    highlightId
+    highlightId,
+    tenantId
 }: SimplePeopleTableProps) {
     const observerTarget = useRef<HTMLTableRowElement>(null);
 
@@ -61,7 +65,7 @@ export default function SimplePeopleTable({
                             <tr
                                 key={`${id}-${idx}`}
                                 onClick={() => onPersonClick(id)}
-                                id={`person-row-${id}`}
+                                id={`person-${id}`}
                                 className={`
                                     group transition-colors cursor-pointer
                                     ${isHighlighted ? 'bg-primary/5 hover:bg-primary/10' : 'hover:bg-accent/50'}
@@ -80,13 +84,17 @@ export default function SimplePeopleTable({
                                     </div>
                                 </td>
                                 <td className="px-6 py-4">
-                                    <span className={`px-2 py-1 rounded-full text-[10px] uppercase font-bold tracking-wider
-                                        ${person.ret_status?.toLowerCase() === 'customer' ? 'bg-green-500/10 text-green-600 border border-green-500/20' :
-                                            person.ret_status?.toLowerCase() === 'churned' ? 'bg-destructive/10 text-destructive border border-destructive/20' :
-                                                'bg-blue-500/10 text-blue-600 border border-blue-500/20'}
-                                    `}>
-                                        {person.ret_status || 'Lead'}
-                                    </span>
+                                    {tenantId && person.ret_status ? (
+                                        <StatusBadge status={person.ret_status} tenantId={tenantId} />
+                                    ) : (
+                                        <span className={`px-2 py-1 rounded-full text-[10px] uppercase font-bold tracking-wider
+                                            ${person.ret_status?.toLowerCase() === 'customer' ? 'bg-green-500/10 text-green-600 border border-green-500/20' :
+                                                person.ret_status?.toLowerCase() === 'churned' ? 'bg-destructive/10 text-destructive border border-destructive/20' :
+                                                    'bg-blue-500/10 text-blue-600 border border-blue-500/20'}
+                                        `}>
+                                            {person.ret_status || 'Lead'}
+                                        </span>
+                                    )}
                                 </td>
                                 <td className="px-6 py-4 text-muted-foreground">
                                     {person.ret_role_name || person.role_name || '-'}
