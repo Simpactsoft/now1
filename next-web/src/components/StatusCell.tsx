@@ -25,32 +25,53 @@ export function StatusCell({ status, personId, tenantId, statusOptions }: Status
     const router = useRouter();
     const { language } = useLanguage();
 
+    // Optimistic State
+    const [currentStatus, setCurrentStatus] = useState(status);
+
+    // Normalize: Lowercase, Trim, AND replace underscores with spaces
+    // This handles "NEW_LEAD" (Code) matching "New Lead" (DB value)
+    const normalize = (val: string | null | undefined) => {
+        if (!val) return '';
+        return val.trim().toLowerCase().replace(/_/g, ' ');
+    };
+
     const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const newStatus = e.target.value;
-        if (newStatus === status) return;
+        const selectedValue = e.target.value; // This matches option value (RAW CODE)
+
+        // Find the OPTION that was selected to get its raw Code
+        // (Value is already code, but let's be sure)
+        // If normalization matches, we use the option's value.
+
+        const rawCode = statusOptions.find(o => o.value === selectedValue)?.value || selectedValue;
+
+        // Check against current status (normalized)
+        if (normalize(rawCode) === normalize(currentStatus)) return;
+
+        // Optimistic Update
+        // Ensure we set the OPTIMISTIC value to something that the SELECT can display
+        // Since SELECT uses normalize(val) for comparison? No, I need to update render logic first.
+        setCurrentStatus(rawCode);
 
         startTransition(async () => {
             const payload = {
                 id: personId,
                 tenantId,
-                customFields: { status: newStatus }
+                customFields: { status: rawCode } // Save the CODE
             };
 
             const res = await updatePerson(payload);
-            if (res.success) {
-                // Success - Server action revalidates path, Router syncs
-                // router.refresh(); // redundant if action revalidates, but safe
-            } else {
+            if (!res.success) {
                 console.error("Failed to update status", res.error);
-                alert("Failed to update status"); // Simple feedback
+                alert("Failed to update status");
+                setCurrentStatus(status); // Revert
             }
         });
     };
 
     return (
         <div className="relative group w-fit">
-            {/* Display Badge */}
-            <StatusBadge status={status} tenantId={tenantId} className={pending ? "opacity-50" : ""} />
+            {/* Display Badge (Use currentStatus) */}
+            <StatusBadge status={currentStatus} tenantId={tenantId} className={pending ? "opacity-50" : ""} />
 
             {/* Loading Indicator */}
             {pending && (
@@ -62,16 +83,17 @@ export function StatusCell({ status, personId, tenantId, statusOptions }: Status
             {/* Invisible Select Overlay */}
             <select
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                value={status || ""}
+                value={normalize(currentStatus)} // Select value is normalized for comparison
                 onChange={handleChange}
                 disabled={pending}
                 onClick={(e) => e.stopPropagation()} // Prevent row click
                 title="Change Status"
             >
-                <option value={status} disabled hidden>{status}</option>
+                {/* Placeholder option, its value is normalized for comparison, but it's disabled/hidden */}
+                <option value={normalize(currentStatus)} disabled hidden>{currentStatus}</option>
                 {/* Current Value Placeholder if options not loaded */}
                 {statusOptions.map(opt => (
-                    <option key={opt.value} value={opt.value}>
+                    <option key={opt.value} value={opt.value}> {/* Option value is RAW code */}
                         {opt.payload?.label_i18n?.[language] || opt.label || opt.value}
                     </option>
                 ))}

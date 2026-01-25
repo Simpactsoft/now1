@@ -140,7 +140,17 @@ export default function SmartChip({ filter, onUpdate, onRemove }: SmartChipProps
 
                             {isEnum ? (
                                 <div className="flex flex-col gap-0.5">
-                                    {options.map((opt) => {
+                                    {options.filter(opt => {
+                                        // Filter logic: if typing in text box, filter options by the *current* typing (last after comma)
+                                        if (filter.field === 'role_name' && tempValue) {
+                                            const lastTerm = tempValue.split(',').pop()?.trim().toLowerCase() || '';
+                                            // If last term is empty (e.g. "CEO, "), show all. If matches, show filtered.
+                                            // Also show if it's already selected to keep context? No, standard autocomplete hides non-matches.
+                                            if (!lastTerm) return true;
+                                            return opt.toLowerCase().includes(lastTerm);
+                                        }
+                                        return true;
+                                    }).map((opt) => {
                                         const isSelected = tempValue.split(',').map((s: string) => s.trim().toLowerCase()).includes(opt.toLowerCase());
                                         return (
                                             <button

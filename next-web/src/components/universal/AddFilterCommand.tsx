@@ -15,25 +15,30 @@ import {
     ChevronRight
 } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface AddFilterCommandProps {
     onSelectField: (field: string) => void;
     minimal?: boolean;
 }
 
-const AVAILABLE_FIELDS = [
-    { id: 'search', label: 'Global Search', icon: Search },
-    { id: 'name', label: 'Name', icon: User },
-    { id: 'status', label: 'Status', icon: Activity },
-    { id: 'role_name', label: 'Role', icon: Briefcase },
-    { id: 'company_size', label: 'Company Size', icon: Building2 },
-    { id: 'industry', label: 'Industry', icon: Factory },
-    { id: 'joined_year', label: 'Joined Year', icon: Calendar },
-    { id: 'tags', label: 'Tags', icon: Tags },
+// Moved inside component to access language
+const getAvailableFields = (lang: string) => [
+    { id: 'search', label: lang === 'he' ? 'חיפוש גלובלי' : 'Global Search', icon: Search },
+    { id: 'name', label: lang === 'he' ? 'שם' : 'Name', icon: User },
+    { id: 'status', label: lang === 'he' ? 'סטטוס' : 'Status', icon: Activity },
+    { id: 'role_name', label: lang === 'he' ? 'תפקיד' : 'Role', icon: Briefcase },
+    // { id: 'company_size', label: 'Company Size', icon: Building2 }, // Removed
+    { id: 'industry', label: lang === 'he' ? 'תעשייה' : 'Industry', icon: Factory },
+    { id: 'joined_year', label: lang === 'he' ? 'שנת הצטרפות' : 'Joined Year', icon: Calendar },
+    { id: 'tags', label: lang === 'he' ? 'תגיות' : 'Tags', icon: Tags },
 ];
 
 export default function AddFilterCommand({ onSelectField, minimal = false }: AddFilterCommandProps) {
     const [open, setOpen] = useState(false);
+    const { language } = useLanguage();
+
+    const AVAILABLE_FIELDS = getAvailableFields(language);
 
     return (
         <Popover.Root open={open} onOpenChange={setOpen}>
@@ -72,16 +77,16 @@ export default function AddFilterCommand({ onSelectField, minimal = false }: Add
                         <div className="flex items-center px-3 py-2 border-b border-border/40 pb-2 mb-1">
                             <Search className="mr-2 h-4 w-4 shrink-0 opacity-50 text-muted-foreground" />
                             <Command.Input
-                                placeholder="Search fields..."
+                                placeholder={language === 'he' ? 'חפש שדות...' : 'Search fields...'}
                                 className="flex h-8 w-full rounded-md bg-transparent text-sm outline-none placeholder:text-muted-foreground/70"
                                 autoFocus
                             />
                         </div>
                         <Command.List className="max-h-[300px] overflow-y-auto overflow-x-hidden py-1 px-1">
                             <Command.Empty className="py-4 text-center text-xs text-muted-foreground">
-                                No matching fields via search.
+                                {language === 'he' ? 'לא נמצאו שדות' : 'No matching fields via search.'}
                             </Command.Empty>
-                            <Command.Group heading="Available Filters" className="text-[10px] uppercase font-bold text-muted-foreground px-2 py-1 select-none">
+                            <Command.Group heading={language === 'he' ? 'מסננים זמינים' : 'Available Filters'} className="text-[10px] uppercase font-bold text-muted-foreground px-2 py-1 select-none">
                                 {AVAILABLE_FIELDS.map((f) => {
                                     const Icon = f.icon;
                                     return (
@@ -108,9 +113,9 @@ export default function AddFilterCommand({ onSelectField, minimal = false }: Add
                                 })}
                             </Command.Group>
                         </Command.List>
-                    </Command>
-                </Popover.Content>
-            </Popover.Portal>
-        </Popover.Root>
+                    </Command >
+                </Popover.Content >
+            </Popover.Portal >
+        </Popover.Root >
     );
 }
