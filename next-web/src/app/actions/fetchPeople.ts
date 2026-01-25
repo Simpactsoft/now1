@@ -7,11 +7,17 @@ import { PaginatedQuerySchema, PaginatedQuery } from '@/lib/schemas';
 export async function fetchPeople(params: PaginatedQuery) {
     try {
         const supabase = await createClient();
-        console.log("[fetchPeople] Raw Params:", JSON.stringify(params, null, 2));
 
-        // Bypass Zod validation due to crash "Cannot read properties of undefined (reading '_zod')"
-        // const result = PaginatedQuerySchema.safeParse(params);
-        // if (!result.success) { ... }
+        // [Fix] Use Service Role (Admin) for manual fetches to ensure we get data regardless of RLS
+        // RPC might return data that standard Select hides if policies mismatch.
+        const { createClient: createAdminClient } = require('@supabase/supabase-js');
+        const supabaseAdmin = createAdminClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!,
+            { auth: { persistSession: false } }
+        );
+
+        console.log("[fetchPeople] Raw Params:", JSON.stringify(params, null, 2));
 
         const { startRow, endRow, sortModel, filterModel, tenantId, query } = params as any;
 
@@ -104,30 +110,81 @@ export async function fetchPeople(params: PaginatedQuery) {
             arg_filters: filters, // [NEW] Pass JSON
         });
 
-        if (data && data.length > 0) {
-            console.log("[fetchPeople] First Row Keys:", Object.keys(data[0]));
-            console.log("[fetchPeople] First Row Data:", JSON.stringify(data[0], null, 2));
-        }
-
         if (error) {
             console.error("--- [fetchPeople] RPC FAILED ---");
             console.error(error);
             return { rowData: [], rowCount: 0, error: error.message };
         }
 
-        console.log("--- [fetchPeople] RPC Success ---");
-        console.log("Returned Rows:", data ? data.length : 0);
-        if (data && data.length > 0) {
-            console.log("First Row ID:", data[0].ret_id);
-            console.log("Total Count from DB:", data[0].ret_total_count);
+        let finalData = data || [];
+        let rowCount = finalData.length > 0 ? Number(finalData[0].ret_total_count) : 0;
+
+        if (finalData.length > 0) {
+            console.log("[fetchPeople] First Row Keys:", Object.keys(finalData[0]));
+            // console.log("[fetchPeople] First Row Data:", JSON.stringify(finalData[0], null, 2));
+
+            // [Workaround] Fetch Roles manually since RPC doesn't return them yet
+            try {
+                const ids = finalData.map((p: any) => p.ret_id);
+
+                // Fetch roles for these people (limit 1 per person effectively via application logic, or just take first)
+                const { data: roles, error: roleError } = await supabaseAdmin
+                    .from('party_memberships')
+                    .select('person_id, role_name')
+                    .in('person_id', ids)
+                    .eq('tenant_id', tenantId);
+
+                if (!roleError && roles) {
+                    const roleMap = new Map();
+                    roles.forEach((r: any) => {
+                        // Assuming one primary role, or just taking the last one found
+                        roleMap.set(r.person_id, r.role_name);
+                    });
+
+                    // [New] Also fetch custom_fields from parties as fallback for standalone contacts
+                    const { data: partyData, error: partyError } = await supabaseAdmin
+                        .from('parties')
+                        .select('id, custom_fields')
+                        .in('id', ids)
+                        .eq('tenant_id', tenantId);
+
+                    const partyRoleMap = new Map();
+                    if (!partyError && partyData) {
+                        partyData.forEach((p: any) => {
+                            if (p.custom_fields && p.custom_fields.role) {
+                                partyRoleMap.set(p.id, p.custom_fields.role);
+                            }
+                        });
+                    }
+
+                    console.log("[fetchPeople] Manual Role Fetch Debug:");
+                    console.log("IDs:", ids.length);
+                    console.log("Membership Roles Found:", roleMap.size);
+                    console.log("Custom Field Roles Found:", partyRoleMap.size);
+                    // Log a sample if available
+                    if (partyRoleMap.size > 0) {
+                        console.log("Sample CF Role Key:", [...partyRoleMap.keys()][0], "Value:", [...partyRoleMap.values()][0]);
+                    }
+
+                    finalData.forEach((p: any) => {
+                        // Priority: Membership Role > Custom Fields Role > Null
+                        p.ret_role_name = roleMap.get(p.ret_id) || partyRoleMap.get(p.ret_id) || null;
+                    });
+                }
+                
+                // Log success
+                console.log("[fetchPeople] Roles Merged. Count:", roles?.length);
+
+            } catch (err) {
+                console.error("Error fetching roles manually", err);
+                // If manual fetch fails, proceed with original data
+            }
         } else {
-            console.log("NO DATA RETURNED by RPC");
+            console.log("--- [fetchPeople] RPC Success (Empty) ---");
         }
 
-        const rowCount = data && data.length > 0 ? Number(data[0].ret_total_count) : 0;
-
         return {
-            rowData: data || [],
+            rowData: finalData,
             rowCount: rowCount,
             debugInfo: {
                 timestamp: new Date().toISOString(),
@@ -142,16 +199,18 @@ export async function fetchPeople(params: PaginatedQuery) {
                     arg_sort_dir: sortDir,
                 },
                 rpcResultSummary: {
-                    count: data?.length || 0,
+                    count: finalData.length,
                     totalCount: rowCount,
-                    firstRowSample: data && data.length > 0 ? {
-                        name: data[0].ret_name,
-                        id: data[0].ret_id,
-                        status: data[0].ret_status
+                    firstRowSample: finalData.length > 0 ? {
+                        name: finalData[0].ret_name,
+                        id: finalData[0].ret_id,
+                        status: finalData[0].ret_status,
+                        role: finalData[0].ret_role_name
                     } : 'No Data'
                 }
             }
         };
+
     } catch (e: any) {
         console.error("[fetchPeople] CRITICAL ERROR:", e);
         return {

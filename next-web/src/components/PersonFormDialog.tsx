@@ -15,6 +15,7 @@ interface PersonData {
     email?: string;
     phone?: string;
     status?: string;
+    role?: string;
 }
 
 interface Props {
@@ -41,7 +42,8 @@ export default function PersonFormDialog({ tenantId, initialData, trigger }: Pro
         lastName: "",
         email: "",
         phone: "",
-        status: ""
+        status: "",
+        role: ""
     });
 
     // Options State
@@ -61,10 +63,11 @@ export default function PersonFormDialog({ tenantId, initialData, trigger }: Pro
                     lastName: initialData.lastName || "",
                     email: initialData.email || "",
                     phone: initialData.phone || "",
-                    status: initialData.status || ""
+                    status: initialData.status || "",
+                    role: (initialData as any).role || (initialData as any).job_title || ""
                 });
             } else {
-                setFormData({ firstName: "", lastName: "", email: "", phone: "", status: "" });
+                setFormData({ firstName: "", lastName: "", email: "", phone: "", status: "", role: "" });
             }
         }
     }, [isOpen, initialData]);
@@ -92,6 +95,10 @@ export default function PersonFormDialog({ tenantId, initialData, trigger }: Pro
         setError(null);
 
         try {
+            const customFields: any = {};
+            if (formData.status) customFields.status = formData.status;
+            if (formData.role) customFields.role = formData.role;
+
             let res;
             if (isEditMode && initialData?.id) {
                 // Update
@@ -102,7 +109,7 @@ export default function PersonFormDialog({ tenantId, initialData, trigger }: Pro
                     lastName: formData.lastName,
                     email: formData.email,
                     phone: formData.phone,
-                    customFields: formData.status ? { status: formData.status } : {}
+                    customFields
                 });
             } else {
                 // Create
@@ -112,7 +119,7 @@ export default function PersonFormDialog({ tenantId, initialData, trigger }: Pro
                     email: formData.email,
                     phone: formData.phone,
                     tenantId,
-                    customFields: formData.status ? { status: formData.status } : {}
+                    customFields
                 });
             }
 
@@ -120,7 +127,7 @@ export default function PersonFormDialog({ tenantId, initialData, trigger }: Pro
                 setIsOpen(false);
                 if (!isEditMode) {
                     // Clear form on create success
-                    setFormData({ firstName: "", lastName: "", email: "", phone: "", status: "" });
+                    setFormData({ firstName: "", lastName: "", email: "", phone: "", status: "", role: "" });
 
                     // Highlight newly created person
                     const params = new URLSearchParams(searchParams.toString());
@@ -203,6 +210,18 @@ export default function PersonFormDialog({ tenantId, initialData, trigger }: Pro
                             placeholder="+972-50-0000000"
                             value={formData.phone}
                             onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                        />
+                    </div>
+
+                    {/* Role Field */}
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-muted-foreground">Role (Job Title)</label>
+                        <input
+                            type="text"
+                            className="w-full bg-secondary/50 border border-input rounded-lg px-3 py-2 text-foreground placeholder:text-muted-foreground focus:border-primary outline-none transition-colors"
+                            placeholder="e.g. CEO"
+                            value={formData.role}
+                            onChange={e => setFormData({ ...formData, role: e.target.value })}
                         />
                     </div>
 

@@ -122,6 +122,22 @@ export default function SmartChip({ filter, onUpdate, onRemove }: SmartChipProps
                         </div>
 
                         <div className="p-1 max-h-[250px] overflow-y-auto">
+                            {/* [Fix] For Role, allow both Text Input AND List */}
+                            {(isEnum && filter.field === 'role_name') && (
+                                <div className="p-2 border-b mb-1">
+                                    <input
+                                        autoFocus
+                                        type="text"
+                                        placeholder="Type custom role..."
+                                        className="w-full bg-secondary border rounded-md px-2 py-1.5 text-sm focus:ring-2 ring-primary/20 outline-none"
+                                        value={tempValue}
+                                        onChange={(e) => setTempValue(e.target.value)}
+                                        onKeyDown={handleKeyDown}
+                                    />
+                                    <p className="text-[10px] text-muted-foreground mt-1 px-1">Or select from list:</p>
+                                </div>
+                            )}
+
                             {isEnum ? (
                                 <div className="flex flex-col gap-0.5">
                                     {options.map((opt) => {

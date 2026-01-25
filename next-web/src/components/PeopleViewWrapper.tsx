@@ -103,6 +103,20 @@ function PeopleViewContent({ tenantId }: PeopleViewWrapperProps) {
     const [totalCount, setTotalCount] = useState(0);
     const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
 
+    // Status Options State (Lifted for Performance)
+    const [statusOptions, setStatusOptions] = useState<any[]>([]);
+
+    // Fetch Status Options Once
+    useEffect(() => {
+        if (!tenantId) return;
+        fetch(`/api/options?code=PERSON_STATUS&tenantId=${tenantId}`)
+            .then(res => res.json())
+            .then(json => {
+                if (json.data) setStatusOptions(json.data);
+            })
+            .catch(err => console.error("Failed to fetch status options", err));
+    }, [tenantId]);
+
     // Initial Hydration Fix
     useEffect(() => {
         setLastRefreshed(new Date());
@@ -593,7 +607,9 @@ function PeopleViewContent({ tenantId }: PeopleViewWrapperProps) {
                         onPersonClick={handlePersonClick}
                         highlightId={highlightId}
                         tenantId={tenantId}
+                        statusOptions={statusOptions}
                     />
+
 
                 ) : (
                     // Simple inline Card View

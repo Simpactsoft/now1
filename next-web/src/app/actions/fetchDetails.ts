@@ -61,8 +61,14 @@ export async function fetchPersonDetails(tenantId: string, personId: string) {
         }
 
         // [Fix] Merge manual role fetch
-        if (membershipResult.data?.role_name) {
-            profile.job_title = membershipResult.data.role_name;
+        // Priority: Membership Role > Custom Fields Role
+        const membershipRole = membershipResult.data?.role_name;
+        const customFieldsRole = customFieldsResult.data?.custom_fields?.role;
+
+        if (membershipRole) {
+            profile.job_title = membershipRole;
+        } else if (customFieldsRole) {
+            profile.job_title = customFieldsRole;
         }
     }
 

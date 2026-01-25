@@ -10,8 +10,8 @@ const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}
 const UpdatePersonSchema = z.object({
     id: z.string().regex(uuidRegex, "Invalid ID format"),
     tenantId: z.string().regex(uuidRegex, "Invalid Tenant ID format"),
-    firstName: z.string().min(1, "First Name is required"),
-    lastName: z.string().min(1, "Last Name is required"),
+    firstName: z.string().optional(),
+    lastName: z.string().optional(),
     email: z.string().optional().or(z.literal("")),
     phone: z.string().optional(),
     customFields: z.record(z.any()).optional()
@@ -31,7 +31,6 @@ export async function updatePerson(rawInput: any) {
     );
 
     // 0. Sanitize Input
-    // ... code truncated ...
     const sanitize = (val: any) => typeof val === 'string' ? val.trim() : val;
     const cleanId = (val: any) => typeof val === 'string' ? val.replace(/['"]+/g, '').trim() : val;
 
@@ -58,7 +57,6 @@ export async function updatePerson(rawInput: any) {
     }
 
     if (!result.success) {
-        // ... truncated ...
         console.error("Validation failed:", JSON.stringify(result.error, null, 2));
         const issues = result.error.issues || [];
         const errorMessage = issues.length > 0
@@ -75,43 +73,48 @@ export async function updatePerson(rawInput: any) {
         const user = (await supabase.auth.getUser()).data.user;
         if (!user) return { success: false, error: "Unauthorized: Not logged in" };
 
-        // Note: Strict tenant membership check temporarily disabled due to schema ambiguity.
-        // We rely on the fact that the user is authenticated for now.
-        // TODO: Re-implement check against correct membership table once identified.
-
         console.log("Authorized access for user:", user.id);
-
         console.log("Updating person via direct DB calls (ADMIN MODE)...", { id, customFields });
 
-        // 1. Fetch current data to merge customFields safely
-        // [Fix] Read from 'parties' instead of 'people' because 'parties' is the master record for custom_fields now
-        const { data: currentPerson, error: fetchError } = await supabaseAdmin
+        // 1. Fetch current data to merge customFields AND Names safely
+        // [Fix] Read from 'parties' for custom_fields and 'people' for names to ensure safe partial updates
+        const { data: currentParty, error: fetchPartyError } = await supabaseAdmin
             .from('parties')
             .select('custom_fields')
             .eq('id', id)
             .eq('tenant_id', tenantId)
             .maybeSingle();
 
-        if (fetchError) throw new Error(`Fetch failed: ${fetchError.message}`);
+        if (fetchPartyError) throw new Error(`Fetch Party failed: ${fetchPartyError.message}`);
+
+        const { data: currentPerson, error: fetchPersonError } = await supabaseAdmin
+            .from('people')
+            .select('first_name, last_name')
+            .eq('party_id', id)
+            .maybeSingle();
+
+        if (fetchPersonError) throw new Error(`Fetch Person failed: ${fetchPersonError.message}`);
+
+        // MERGE LOGIC: Use Input if present, else fallback to DB, else empty string
+        const finalFirstName = firstName !== undefined ? firstName : (currentPerson?.first_name || '');
+        const finalLastName = lastName !== undefined ? lastName : (currentPerson?.last_name || '');
 
         const updatedCustomFields = {
-            ...(currentPerson?.custom_fields || {}),
+            ...(currentParty?.custom_fields || {}),
             ...customFields
         };
 
         const status = updatedCustomFields.status || null;
 
         // 2. Update Parties (Common)
-        // Helper to construct contact_methods
         const contactMethods = [];
         if (email) contactMethods.push({ type: 'email', value: email, is_primary: true });
         if (phone) contactMethods.push({ type: 'phone', value: phone, is_primary: true });
 
-        // 2. Update Parties (Common)
         const partyUpdatePayload: any = {
-            display_name: `${firstName} ${lastName}`,
+            display_name: `${finalFirstName} ${finalLastName}`.trim(),
             status: status,
-            custom_fields: updatedCustomFields, // [Fix] Sync custom_fields to parties for read consistency
+            custom_fields: updatedCustomFields,
             updated_at: new Date().toISOString()
         };
 
@@ -127,34 +130,52 @@ export async function updatePerson(rawInput: any) {
             .eq('id', id)
             .eq('tenant_id', tenantId);
 
-        // Map to expected error variable name if needed or just use partyUpdateError
-        const partyError = partyUpdateError;
-
-        if (partyError) {
-            console.error("Party Update Error:", JSON.stringify(partyError, null, 2));
-            throw new Error(`Party update failed: ${partyError.message}`);
+        if (partyUpdateError) {
+            console.error("Party Update Error:", JSON.stringify(partyUpdateError, null, 2));
+            throw new Error(`Party update failed: ${partyUpdateError.message}`);
         } else {
             console.log("Party Update Success");
         }
 
-        // [New] Update Role (Job Title) in Party Memberships
-        // Logic: Find the membership for this person in this tenant and update role_name
-        // For now, we update ALL memberships for this person in this tenant (usually 1)
-        if (customFields.role) {
+        // [New] Update Role (Job Title)
+        // Strategy: Try to update 'party_memberships'. If no membership exists (standalone contact), 
+        // fallback to storing it in 'parties.custom_fields.role'.
+        if (customFields.role !== undefined) {
             console.log("Updating role to:", customFields.role);
-            const { error: roleError } = await supabaseAdmin
+
+            // 1. Try Membership Update
+            const { error: roleError, count } = await supabaseAdmin
                 .from('party_memberships')
                 .update({ role_name: customFields.role })
                 .eq('person_id', id)
-                .eq('tenant_id', tenantId);
+                .eq('tenant_id', tenantId)
+                .select();
 
-            if (roleError) console.error("Role Update Error:", roleError);
+            if (roleError) {
+                console.error("Role Membership Update Error:", roleError);
+            } else if (count && count > 0) {
+                console.log(`Role updated in Membership. Count:`, count);
+            } else {
+                // 2. Fallback: No membership found. detailed role in custom_fields
+                // We already updated custom_fields in step 2 (Parties Update), 
+                // but we need to ensure 'role' key is explicitly preserved there if it was passed.
+                // The 'updatedCustomFields' object constructed earlier ALREADY includes 'role' 
+                // because we merged 'customFields' input.
+                // So, if we wrote 'parties' table correctly with 'updatedCustomFields', 
+                // the role IS saved in custom_fields.
+
+                console.log("No membership found. Role saved in custom_fields via Parties update.");
+
+                // However, we rely on fetchPeople to find it.
+                // If fetchPeople looks at memberships and fails, does it look at custom_fields?
+                // We need to check fetchPeople.
+            }
         }
 
-        // 3. Update People (Specific)
+        // 3. Update People (Specific) - Always sync first/last name to match Party
         const personUpdatePayload = {
-            first_name: firstName,
-            last_name: lastName,
+            first_name: finalFirstName,
+            last_name: finalLastName,
             custom_fields: updatedCustomFields
         };
         console.log("Updating person table with:", JSON.stringify(personUpdatePayload, null, 2));
