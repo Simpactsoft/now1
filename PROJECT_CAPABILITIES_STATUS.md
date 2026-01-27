@@ -51,9 +51,9 @@
 **4. מתקדם (Advanced) - ניהול נתונים:**
 *   [ ] **Attribute Manager:** מנהל שדות מורחב - צפייה בשדות מערכת (System Fields) ושדות נעולים.
 *   [ ] **Global Picklists:** ניהול רשימות בחירה משותפות (ערים, מקצועות) לשימוש חוזר.
-*   [ ] **Input Masks & Validation:** מסכות קלט (טלפון, ת"ז) וחוקי ולידציה (חובה/רשות).
-*   [ ] **Advanced Field Logic:** הבחנה בין Multi-Select ל-Single Select.
-*   [ ] **AI Insights:** תובנות אוטומטיות על הנתונים.
+*   [ ] **Workflow Engine:** מנוע מצבים לאכיפת תהליכים עסקיים (BPM).
+*   [ ] **Connectivity (API/Webhooks):** מנגנון Webhooks יוצאים וניהול API Keys לאינטגרציות (Zapier/External ERP).
+*   [ ] **Compliance:** כלי GDPR, מחיקת מידע לפי מדיניות (Retention), והצפנה.
 
 ---
 ---
@@ -109,14 +109,16 @@
 **4. Advanced - Data Management:**
 *   [ ] **Attribute Manager:** Enhanced manager - View System Fields and Locked Fields.
 *   [ ] **Global Picklists:** Reusable shared picklists (Cities, Occupations).
-*   [ ] **Input Masks & Validation:** Input masks (Phone, ID) and validation rules.
-*   [ ] **Advanced Field Logic:** Multi-Select vs. Single-Select logic.
-*   [ ] **AI Insights:** Automated data insights.
+*   [ ] **Workflow Engine:** State machine for enforcing business processes (BPM).
+*   [ ] **Connectivity (API/Webhooks):** Outbound Webhooks and API Key management for integrations.
+*   [ ] **Compliance:** GDPR tools, Data Retention policies, and Encryption features.
 
 **5. Deep Infrastructure - *Added post-reviews (Combined)*:**
 *   [x] **RBAC Engine:** Declarative permission management (Read/Write/Delete definitions).
 *   [x] **Auditing:** Full change history (`audit_logs`) tracking specific field changes.
 *   [x] **Unified Activity Stream:** Centralized timeline infrastructure per entity.
+*   [x] **Input Masks & Validation:** DB-level enforcement (Regex, Min/Max) for custom fields.
+*   [ ] **Soft Delete:** Recoverability logic.
 *   [ ] **Soft Delete:** Recoverability logic.
 *   [ ] **Workflow Engine:** State machine for enforcing business processes (BPM).
 *   [ ] **Connectivity (API/Webhooks):** Outbound Webhooks and API Key management for integrations.
@@ -126,6 +128,8 @@
 *   [x] **RBAC Engine:** ניהול הרשאות דקלרטיבי (מי יכול לערוך/למחוק).
 *   [x] **Auditing:** היסטוריית שינויים מלאה (`audit_logs`) עם פירוט שדות שהשתנו.
 *   [x] **Unified Activity Stream:** יומן פעולות מרכזי לכל ישות (Timeline infrastructure).
+*   [x] **Input Masks & Validation:** אכיפת חוקי קלט (למשל Regex, אורך) ברמת DB.
+*   [ ] **Soft Delete:** מחיקה רכה (שחזור) לכל טבלה.
 *   [ ] **Soft Delete:** מחיקה רכה (שחזור) לכל טבלה.
 *   [ ] **Workflow Engine:** מנוע מצבים לאכיפת תהליכים עסקיים (BPM).
 *   [ ] **Connectivity (API/Webhooks):** מנגנון Webhooks יוצאים וניהול API Keys לאינטגרציות (Zapier/External ERP).
