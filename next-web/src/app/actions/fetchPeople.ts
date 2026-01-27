@@ -55,14 +55,6 @@ export async function fetchPeople(params: PaginatedQuery) {
             return entry.filter;
         };
 
-        // 1. Search (Global)
-        if (query) {
-            filters.search = query;
-        }
-
-        // 1.1 Name Filter (Column Specific)
-        if (fm.name) filters.name = extractFilterValues(fm.name);
-
         // Helper to parse potential multi-select values (comma separated strings)
         // AND now supports array from multiple chips
         const parseMultiSelect = (entry: any) => {
@@ -83,6 +75,15 @@ export async function fetchPeople(params: PaginatedQuery) {
             });
             return combined.length > 0 ? combined : null;
         };
+
+        // 1. Search (Global)
+        if (query) {
+            filters.search = query;
+        }
+
+        // 1.1 Name Filter (Column Specific)
+        // [User Request] Apply Multi-Value Split (OR logic) for Name, similar to Tags
+        if (fm.name) filters.name = parseMultiSelect(fm.name);
 
         if (fm.status) filters.status = parseMultiSelect(fm.status);
         if (fm.role_name) filters.role_name = parseMultiSelect(fm.role_name);

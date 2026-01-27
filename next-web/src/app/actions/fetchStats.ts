@@ -4,10 +4,16 @@ import { createClient } from "@/lib/supabase/server";
 
 export async function fetchTotalStats(tenantId: string) {
     try {
-        const supabase = await createClient();
+        // Use Admin to ensure accurate count regardless of RLS
+        const { createClient: createAdminClient } = require('@supabase/supabase-js');
+        const supabaseAdmin = createAdminClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!,
+            { auth: { persistSession: false } }
+        );
 
         // Count all people for this tenant (unfiltered)
-        const { count, error } = await supabase
+        const { count, error } = await supabaseAdmin
             .from('cards')
             .select('*', { count: 'exact', head: true })
             .eq('tenant_id', tenantId)
