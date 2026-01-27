@@ -9,6 +9,7 @@ interface SmartChipProps {
     filter: FilterCondition;
     onUpdate: (updates: Partial<FilterCondition>) => void;
     onRemove: () => void;
+    dynamicOptions?: Record<string, any[]>;
 }
 
 const OPTIONS: Record<string, string[]> = {
@@ -16,12 +17,13 @@ const OPTIONS: Record<string, string[]> = {
     role_name: ['CEO', 'CTO', 'VP Sales', 'Developer', 'Designer', 'Product Manager', 'HR Manager', 'Sales Rep', 'Customer Success', 'Employee'],
     joined_year: ['2023', '2024', '2025', '2026', '2027'],
     language_preference: ['Hebrew', 'English', 'French', 'German', 'Spanish', 'Dutch'],
-    tags: ['Decision Maker', 'VIP', 'High Priority', 'Referral', 'Investor', 'Local'],
+    language_preference: ['Hebrew', 'English', 'French', 'German', 'Spanish', 'Dutch'],
+    // tags: ['Decision Maker', 'VIP', 'High Priority', 'Referral', 'Investor', 'Local'], // Fetched dynamically or free text
     company_size: ['1-10', '11-50', '51-200', '201-500', '500+'],
     industry: ['Technology', 'Finance', 'Healthcare', 'Retail', 'Real Estate']
 };
 
-export default function SmartChip({ filter, onUpdate, onRemove }: SmartChipProps) {
+export default function SmartChip({ filter, onUpdate, onRemove, dynamicOptions = {} }: SmartChipProps) {
     const [isOpen, setIsOpen] = useState(false);
 
     useEffect(() => {
@@ -34,7 +36,10 @@ export default function SmartChip({ filter, onUpdate, onRemove }: SmartChipProps
     const [tempValue, setTempValue] = useState(filter.value);
 
     // Options Logic
-    const options = OPTIONS[filter.field];
+    let options: any[] = dynamicOptions[filter.field] || OPTIONS[filter.field];
+
+    // Normalize options to simple string array if possible, or handle objects in render
+    // For now, let's treat everything as strings for simple comparison, or support {value, label}
     const isEnum = !!options;
 
     // --- Enum Handlers ---
@@ -122,13 +127,13 @@ export default function SmartChip({ filter, onUpdate, onRemove }: SmartChipProps
                         </div>
 
                         <div className="p-1 max-h-[250px] overflow-y-auto">
-                            {/* [Fix] For Role, allow both Text Input AND List */}
-                            {(isEnum && filter.field === 'role_name') && (
+                            {/* [Fix] For Role & Tags, allow both Text Input AND List */}
+                            {(isEnum && (filter.field === 'role_name' || filter.field === 'tags')) && (
                                 <div className="p-2 border-b mb-1">
                                     <input
                                         autoFocus
                                         type="text"
-                                        placeholder="Type custom role..."
+                                        placeholder={filter.field === 'tags' ? "Type tag..." : "Type custom role..."}
                                         className="w-full bg-secondary border rounded-md px-2 py-1.5 text-sm focus:ring-2 ring-primary/20 outline-none"
                                         value={tempValue}
                                         onChange={(e) => setTempValue(e.target.value)}
@@ -141,27 +146,38 @@ export default function SmartChip({ filter, onUpdate, onRemove }: SmartChipProps
                             {isEnum ? (
                                 <div className="flex flex-col gap-0.5">
                                     {options.filter(opt => {
+                                        const valToCheck = typeof opt === 'string' ? opt : (opt.value || opt.label);
                                         // Filter logic: if typing in text box, filter options by the *current* typing (last after comma)
-                                        if (filter.field === 'role_name' && tempValue) {
+                                        if ((filter.field === 'role_name' || filter.field === 'tags') && tempValue) {
                                             const lastTerm = tempValue.split(',').pop()?.trim().toLowerCase() || '';
-                                            // If last term is empty (e.g. "CEO, "), show all. If matches, show filtered.
-                                            // Also show if it's already selected to keep context? No, standard autocomplete hides non-matches.
                                             if (!lastTerm) return true;
-                                            return opt.toLowerCase().includes(lastTerm);
+                                            return valToCheck.toLowerCase().includes(lastTerm);
                                         }
                                         return true;
                                     }).map((opt) => {
-                                        const isSelected = tempValue.split(',').map((s: string) => s.trim().toLowerCase()).includes(opt.toLowerCase());
+                                        const optValue = typeof opt === 'string' ? opt : (opt.value || opt.label);
+                                        const optLabel = typeof opt === 'string' ? opt : (opt.label || opt.value);
+
+                                        const currentValues = tempValue ? tempValue.split(',').map((s: string) => s.trim().toLowerCase()) : [];
+                                        // Check against normalized value (we might need to be careful with case sensitivity here, sticking to lower for comparison)
+                                        const isSelected = currentValues.includes(optValue.toLowerCase());
+
+                                        // Handler
+                                        const handleClick = () => {
+                                            // Use the original casing for the value when adding
+                                            handleToggleOption(optValue);
+                                        }
+
                                         return (
                                             <button
-                                                key={opt}
-                                                onClick={() => handleToggleOption(opt)}
+                                                key={optValue}
+                                                onClick={handleClick}
                                                 className={`
                                                     flex items-center justify-between w-full px-2 py-1.5 text-xs rounded hover:bg-muted text-left transition-colors
                                                     ${isSelected ? 'text-primary font-medium bg-primary/5' : ''}
                                                 `}
                                             >
-                                                <span>{opt}</span>
+                                                <span>{optLabel}</span>
                                                 {isSelected && <Check className="w-3 h-3" />}
                                             </button>
                                         );

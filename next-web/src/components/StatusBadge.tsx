@@ -23,19 +23,29 @@ interface StatusBadgeProps {
     status: string; // The raw code, e.g. "contacted" or "new"
     tenantId: string;
     className?: string;
+    options?: StatusOption[];
 }
 
-export function StatusBadge({ status, tenantId, className }: StatusBadgeProps) {
+export function StatusBadge({ status, tenantId, className, options }: StatusBadgeProps) {
     const { language } = useLanguage();
     const [option, setOption] = useState<StatusOption | null>(null);
 
     useEffect(() => {
         if (!status) return;
 
-        // Check if we have options in cache
+        // 1. Use provided options if available
+        if (options && options.length > 0) {
+            const found = options.find(opt => opt.value.toLowerCase().trim() === status.toLowerCase().trim());
+            if (found) {
+                setOption(found);
+                return;
+            }
+        }
+
+        // 2. Check cache
         const cached = STATUS_CACHE[tenantId];
         if (cached) {
-            const found = cached.find(opt => opt.value === status);
+            const found = cached.find(opt => opt.value.toLowerCase().trim() === status.toLowerCase().trim());
             if (found) setOption(found);
             return;
         }
@@ -47,7 +57,7 @@ export function StatusBadge({ status, tenantId, className }: StatusBadgeProps) {
             .then(json => {
                 if (json.data) {
                     STATUS_CACHE[tenantId] = json.data;
-                    const found = json.data.find((opt: any) => opt.value === status);
+                    const found = json.data.find((opt: any) => opt.value.toLowerCase().trim() === status.toLowerCase().trim());
                     if (found) setOption(found);
                 }
             })

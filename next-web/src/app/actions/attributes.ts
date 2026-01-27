@@ -18,6 +18,59 @@ export type AttributeDefinition = {
     description?: string;
 };
 
+
+const SYSTEM_ATTRIBUTES: AttributeDefinition[] = [
+    {
+        id: 'sys_status',
+        entity_type: 'party',
+        attribute_key: 'status',
+        attribute_type: 'select',
+        label_i18n: { en: 'Status', he: 'סטטוס' },
+        is_required: true,
+        is_system: true,
+        ui_order: 0,
+        options_config: [{ value: 'CONTACT_STATUS', label: { en: 'Contact Status', he: 'סטטוס קשר' } }]
+    },
+    {
+        id: 'sys_tags',
+        entity_type: 'party',
+        attribute_key: 'tags',
+        attribute_type: 'multi_select',
+        label_i18n: { en: 'Tags', he: 'תגיות' },
+        is_system: true,
+        ui_order: 1
+    },
+    {
+        id: 'sys_first_name',
+        entity_type: 'person',
+        attribute_key: 'first_name',
+        attribute_type: 'text',
+        label_i18n: { en: 'First Name', he: 'שם פרטי' },
+        is_required: true,
+        is_system: true,
+        ui_order: 2
+    },
+    {
+        id: 'sys_last_name',
+        entity_type: 'person',
+        attribute_key: 'last_name',
+        attribute_type: 'text',
+        label_i18n: { en: 'Last Name', he: 'שם משפחה' },
+        is_required: true,
+        is_system: true,
+        ui_order: 3
+    },
+    {
+        id: 'sys_email',
+        entity_type: 'person', // Technically contact method, but often treated as main field
+        attribute_key: 'email',
+        attribute_type: 'text',
+        label_i18n: { en: 'Email', he: 'אימייל' },
+        is_system: true,
+        ui_order: 4
+    }
+];
+
 export async function getTenantAttributes(entityType?: 'person' | 'organization' | 'party') {
     const supabase = await createClient();
 
@@ -44,17 +97,94 @@ export async function getTenantAttributes(entityType?: 'person' | 'organization'
         .order('ui_order', { ascending: true });
 
     if (entityType) {
-        query = query.eq('entity_type', entityType);
+        // If requesting 'person', we want 'person' AND 'party' attributes
+        if (entityType === 'person') {
+            query = query.in('entity_type', ['person', 'party']);
+        } else if (entityType === 'organization') {
+            query = query.in('entity_type', ['organization', 'party']);
+        } else {
+            query = query.eq('entity_type', entityType);
+        }
     }
 
-    const { data, error } = await query;
+    const { data: dbAttributes, error } = await query;
 
     if (error) {
         console.error("Error fetching attributes:", error);
         return { error: error.message };
     }
 
-    return { data };
+    // Filter System Attributes based on specific request
+    let systemAttrs = SYSTEM_ATTRIBUTES;
+    if (entityType) {
+        if (entityType === 'person') {
+            systemAttrs = SYSTEM_ATTRIBUTES.filter(a => a.entity_type === 'person' || a.entity_type === 'party');
+        } else if (entityType === 'organization') {
+            systemAttrs = SYSTEM_ATTRIBUTES.filter(a => a.entity_type === 'organization' || a.entity_type === 'party');
+        } else {
+            systemAttrs = SYSTEM_ATTRIBUTES.filter(a => a.entity_type === entityType);
+        }
+    }
+
+    // Merge: System First, then Custom
+    // Note: In real app, might want to respect ui_order across both.
+    // Logic: DB Attributes OVERRIDE System Attributes if keys match.
+    // This allows a tenant to "Save" a system attribute with new Label/Required settings.
+
+    const dbKeys = new Set((dbAttributes || []).map(a => a.attribute_key));
+    const effectiveSystemAttrs = systemAttrs.filter(sa => !dbKeys.has(sa.attribute_key));
+
+    const merged = [...effectiveSystemAttrs, ...(dbAttributes || [])].sort((a, b) => (a.ui_order || 99) - (b.ui_order || 99));
+
+    return { data: merged };
+}
+
+export async function addTenantOptionValue(setCode: string, value: string, label: string) {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Unauthorized" };
+
+    let tenantId = user.app_metadata?.tenant_id;
+    if (!tenantId) {
+        const cookieStore = await cookies();
+        const rawCookie = cookieStore.get('tenant_id')?.value;
+        if (rawCookie) tenantId = rawCookie.replace(/['"]+/g, '').trim();
+    }
+    if (!tenantId) return { error: "No Tenant Context" };
+
+    // 1. Find the Option Set ID (Global or Tenant)
+    // We prefer the Tenant local set if it exists, otherwise the Global set.
+    // Actually, usually it's the same Set ID shared, or we just need ANY id that matches the code.
+    const { data: sets, error: fetchError } = await supabase
+        .from('option_sets')
+        .select('id, tenant_id')
+        .eq('code', setCode)
+        .order('tenant_id', { ascending: false }); // helper to pick tenant specific if multiple?
+
+    if (fetchError || !sets || sets.length === 0) {
+        return { error: `Option Set '${setCode}' not found.` };
+    }
+
+    const targetSetId = sets[0].id;
+
+    // 2. Insert Option Value
+    const { error } = await supabase
+        .from('option_values')
+        .insert({
+            option_set_id: targetSetId,
+            tenant_id: tenantId,
+            internal_code: value.toUpperCase().replace(/[^A-Z0-9_]/g, '_'),
+            label_i18n: { en: label },
+            is_custom: true
+        });
+
+    if (error) {
+        console.error("Error adding option value:", error);
+        return { error: error.message };
+    }
+
+    revalidatePath('/dashboard/settings');
+    return { success: true };
 }
 
 export async function upsertAttribute(attribute: AttributeDefinition) {

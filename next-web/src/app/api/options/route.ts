@@ -73,8 +73,8 @@ export async function GET(request: Request) {
         // If existing is tenant specific and current is system, do NOT overwrite.
         if (!existing || (rv.tenant_id === tenantId)) {
 
-            // Resolve Label (English default)
-            const label = rv.label_i18n?.['en'] || rv.label_i18n?.['he'] || rv.internal_code;
+            // Resolve Label (Hebrew preference)
+            const label = rv.label_i18n?.['he'] || rv.label_i18n?.['en'] || rv.internal_code;
 
             merged.set(rv.internal_code, {
                 value: rv.internal_code,

@@ -25,7 +25,7 @@ export async function fetchPersonDetails(tenantId: string, personId: string) {
             arg_limit: 50
         }),
         // Use Admin client for direct fetch to ensure we see the data regardless of RLS
-        supabaseAdmin.from('parties').select('custom_fields, contact_methods').eq('id', personId).eq('tenant_id', tenantId).maybeSingle(),
+        supabaseAdmin.from('cards').select('custom_fields, contact_methods').eq('id', personId).eq('tenant_id', tenantId).maybeSingle(),
         // [New] Fetch Role (Job Title) manually
         supabaseAdmin.from('party_memberships').select('role_name').eq('person_id', personId).eq('tenant_id', tenantId).maybeSingle()
     ]);
@@ -61,6 +61,25 @@ export async function fetchPersonDetails(tenantId: string, personId: string) {
         }
 
         // [Fix] Merge manual role fetch
+        // 2. Fetch from 'cards' (base table) to get missing fields (email, phone, status, etc.)
+        // We use supabaseAdmin to avoid RLS mismatch issues since we already validated via RPC
+        const { data: cardData, error: cardError } = await supabaseAdmin
+            .from('cards')
+            .select('contact_methods, status, custom_fields')
+            .eq('id', personId)
+            .single();
+
+        if (cardError) {
+            console.error("fetchPersonDetails: Error fetching card data:", cardError);
+        } else if (cardData) {
+            // Merge logic...
+            if (!profile.status && cardData.status) profile.status = cardData.status;
+
+            // Merge custom fields
+            if (cardData.custom_fields) {
+                profile.custom_fields = { ...profile.custom_fields, ...cardData.custom_fields };
+            }
+        }
         // Priority: Membership Role > Custom Fields Role
         const membershipRole = membershipResult.data?.role_name;
         const customFieldsRole = customFieldsResult.data?.custom_fields?.role;

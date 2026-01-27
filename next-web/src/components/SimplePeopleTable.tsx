@@ -31,24 +31,7 @@ export default function SimplePeopleTable({
     statusOptions
 }: SimplePeopleTableProps) {
     const { language } = useLanguage();
-    const observerTarget = useRef<HTMLTableRowElement>(null);
-
-    useEffect(() => {
-        const observer = new IntersectionObserver(
-            (entries) => {
-                if (entries[0].isIntersecting && hasMore && !loading) {
-                    loadMore();
-                }
-            },
-            { threshold: 0.1 }
-        );
-
-        if (observerTarget.current) {
-            observer.observe(observerTarget.current);
-        }
-
-        return () => observer.disconnect();
-    }, [hasMore, loading, loadMore]);
+    // Manual Load More Implementation
 
     return (
         <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
@@ -68,7 +51,12 @@ export default function SimplePeopleTable({
                             {language === 'he' ? 'תגיות' : 'Tags'}
                         </th>
                         <th className={`px-6 py-4 ${language === 'he' ? 'text-left' : 'text-right'}`}>
-                            {language === 'he' ? 'אינטראקציה אחרונה' : 'Last Interaction'}
+                            {language === 'he' ? (
+                                <div className="flex items-center justify-end gap-1">
+                                    <MessageSquare className="w-4 h-4" />
+                                    <span>אחרונה</span>
+                                </div>
+                            ) : 'Last Interaction'}
                         </th>
                     </tr>
                 </thead>
@@ -188,11 +176,24 @@ export default function SimplePeopleTable({
                         );
                     })}
 
-                    {/* Infinite Scroll Trigger Row */}
+                    {/* Manual Load More Trigger */}
                     {hasMore && (
-                        <tr ref={observerTarget}>
-                            <td colSpan={5} className="text-center py-8 text-muted-foreground">
-                                {loading ? 'Loading more...' : 'Scroll for more'}
+                        <tr>
+                            <td colSpan={5} className="text-center py-4">
+                                <button
+                                    onClick={() => loadMore()}
+                                    disabled={loading}
+                                    className="px-6 py-2 text-sm font-medium text-muted-foreground border border-dashed border-border rounded-full hover:bg-muted transition-colors disabled:opacity-50"
+                                >
+                                    {loading ? (
+                                        <div className="flex items-center gap-2">
+                                            <span className="animate-spin">⏳</span>
+                                            {language === 'he' ? 'טוען...' : 'Loading...'}
+                                        </div>
+                                    ) : (
+                                        <span>{language === 'he' ? 'טען עוד' : 'Load More'}</span>
+                                    )}
+                                </button>
                             </td>
                         </tr>
                     )}

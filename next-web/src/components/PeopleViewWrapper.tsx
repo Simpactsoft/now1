@@ -265,11 +265,27 @@ function PeopleViewContent({ tenantId }: PeopleViewWrapperProps) {
         return () => clearTimeout(timeoutId);
     }, [searchTerm, filters]); // Trigger on global filter changes
 
+    // Loading Lock Ref to prevent "Accumulation" of requests
+    const loadingRef = useRef(false);
+    // Cooldown Ref to prevent rapid-fire sequential requests
+    const lastLoadTimeRef = useRef(0);
+
     const loadMore = useCallback(async (reset = false) => {
-        if (loading && !reset) return;
+        // Immediate check against ref (synchronous)
+        if (loadingRef.current && !reset) return;
         if (!hasMore && !reset) return;
 
+        // Cooldown check (skip if resetting)
+        // If we just finished loading < 500ms ago, don't load again immediately.
+        // This gives the user time to see the new data and prevents "momentum" scrolling from triggering multiple pages.
+        if (!reset && Date.now() - lastLoadTimeRef.current < 500) {
+            return;
+        }
+
+        // Set Lock
+        loadingRef.current = true;
         setLoading(true);
+
         if (reset) setError(null);
 
         try {
@@ -314,8 +330,12 @@ function PeopleViewContent({ tenantId }: PeopleViewWrapperProps) {
             setHasMore(false);
         } finally {
             setLoading(false);
+            // Release Lock
+            loadingRef.current = false;
+            // Set cooldown timestamp
+            lastLoadTimeRef.current = Date.now();
         }
-    }, [page, loading, hasMore, tenantId, searchTerm, getFilterModel]);
+    }, [page, hasMore, tenantId, searchTerm, getFilterModel, sort]);
 
     return (
         <div className="flex flex-col gap-4 w-full h-full">
@@ -354,7 +374,7 @@ function PeopleViewContent({ tenantId }: PeopleViewWrapperProps) {
                         <button
                             onClick={() => {
                                 const model = getFilterModel();
-                                let sql = `SELECT count(*) FROM parties p WHERE p.tenant_id = '${tenantId}' AND p.type = 'person'`;
+                                let sql = `SELECT count(*) FROM cards p WHERE p.tenant_id = '${tenantId}' AND p.type = 'person'`;
                                 if (searchTerm) {
                                     if (searchTerm.length < 3) sql += ` AND lower(p.display_name) LIKE '${searchTerm.toLowerCase()}%'`;
                                     else sql += ` AND p.display_name ILIKE '%${searchTerm}%'`;
@@ -549,6 +569,9 @@ function PeopleViewContent({ tenantId }: PeopleViewWrapperProps) {
                             filter={filter}
                             onUpdate={(updates) => dispatch({ type: 'UPDATE_FILTER', payload: { id: filter.id, updates } })}
                             onRemove={() => dispatch({ type: 'REMOVE_FILTER', payload: filter.id })}
+                            dynamicOptions={{
+                                status: statusOptions
+                            }}
                         />
                     ))}
 

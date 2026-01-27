@@ -37,13 +37,22 @@ export default function PersonFormDialog({ tenantId, initialData, trigger }: Pro
     const pathname = usePathname();
 
     // Form State
-    const [formData, setFormData] = useState({
+    const [formData, setFormData] = useState<{
+        firstName: string;
+        lastName: string;
+        email: string;
+        phone: string;
+        status: string;
+        role: string;
+        tags: string[];
+    }>({
         firstName: "",
         lastName: "",
         email: "",
         phone: "",
         status: "",
-        role: ""
+        role: "",
+        tags: []
     });
 
     // Options State
@@ -64,10 +73,11 @@ export default function PersonFormDialog({ tenantId, initialData, trigger }: Pro
                     email: initialData.email || "",
                     phone: initialData.phone || "",
                     status: initialData.status || "",
-                    role: (initialData as any).role || (initialData as any).job_title || ""
+                    role: (initialData as any).role || (initialData as any).job_title || "",
+                    tags: (initialData as any).tags || []
                 });
             } else {
-                setFormData({ firstName: "", lastName: "", email: "", phone: "", status: "", role: "" });
+                setFormData({ firstName: "", lastName: "", email: "", phone: "", status: "", role: "", tags: [] });
             }
         }
     }, [isOpen, initialData]);
@@ -109,7 +119,8 @@ export default function PersonFormDialog({ tenantId, initialData, trigger }: Pro
                     lastName: formData.lastName,
                     email: formData.email,
                     phone: formData.phone,
-                    customFields
+                    customFields,
+                    tags: formData.tags
                 });
             } else {
                 // Create
@@ -119,7 +130,8 @@ export default function PersonFormDialog({ tenantId, initialData, trigger }: Pro
                     email: formData.email,
                     phone: formData.phone,
                     tenantId,
-                    customFields
+                    customFields,
+                    tags: formData.tags
                 });
             }
 
@@ -246,6 +258,40 @@ export default function PersonFormDialog({ tenantId, initialData, trigger }: Pro
                                 })}
                             </select>
                             {loadingStatus && <div className="absolute right-3 top-2.5"><Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /></div>}
+                        </div>
+                    </div>
+
+                    {/* Tags Field (New) */}
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-muted-foreground">Tags</label>
+                        <div className="min-h-[42px] w-full bg-secondary/50 border border-input rounded-lg px-3 py-2 text-foreground focus-within:border-primary transition-colors flex flex-wrap gap-2 items-center">
+                            {formData.tags?.map((tag: string) => (
+                                <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                                    {tag}
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData({ ...formData, tags: formData.tags.filter((t: string) => t !== tag) })}
+                                        className="hover:text-primary/70"
+                                    >
+                                        &times;
+                                    </button>
+                                </span>
+                            ))}
+                            <input
+                                type="text"
+                                className="bg-transparent border-none outline-none text-sm placeholder:text-muted-foreground flex-1 min-w-[80px]"
+                                placeholder="Add tag + Enter..."
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        const val = e.currentTarget.value.trim();
+                                        if (val && !formData.tags?.includes(val)) {
+                                            setFormData({ ...formData, tags: [...(formData.tags || []), val] });
+                                            e.currentTarget.value = "";
+                                        }
+                                    }
+                                }}
+                            />
                         </div>
                     </div>
 

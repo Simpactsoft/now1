@@ -32,15 +32,15 @@ export async function GET() {
 
     // 3. Cleanup
     await supabase.from('party_memberships').delete().eq('tenant_id', tenantId);
-    await supabase.from('people').delete().in('party_id', (
-        await supabase.from('parties').select('id').eq('tenant_id', tenantId).eq('type', 'person')
+    await supabase.from('people').delete().in('card_id', (
+        await supabase.from('cards').select('id').eq('tenant_id', tenantId).eq('type', 'person')
     ).data?.map(p => p.id) || []);
-    await supabase.from('parties').delete().eq('tenant_id', tenantId).eq('type', 'person');
-    await supabase.from('parties').delete().eq('tenant_id', tenantId).eq('type', 'organization');
+    await supabase.from('cards').delete().eq('tenant_id', tenantId).eq('type', 'person');
+    await supabase.from('cards').delete().eq('tenant_id', tenantId).eq('type', 'organization');
 
     // 4. Create Org
     const orgId = crypto.randomUUID();
-    await supabase.from('parties').insert({
+    await supabase.from('cards').insert({
         id: orgId,
         tenant_id: tenantId,
         type: 'organization',
@@ -79,7 +79,7 @@ export async function GET() {
         });
 
         newPeople.push({
-            party_id: id,
+            card_id: id,
             first_name: firstName,
             last_name: lastName
         });
@@ -94,7 +94,7 @@ export async function GET() {
     }
 
     // 6. Insert All
-    const { error: pErr } = await supabase.from('parties').insert(newParties);
+    const { error: pErr } = await supabase.from('cards').insert(newParties);
     if (pErr) return NextResponse.json({ error: "Parties: " + pErr.message }, { status: 500 });
 
     const { error: pplErr } = await supabase.from('people').insert(newPeople);

@@ -9,7 +9,7 @@ export async function getPeopleCount(tenantId: string) {
 
     // Efficient count using count(*), assuming index on tenant_id + type exists
     const { count, error } = await supabase
-        .from("parties")
+        .from("cards")
         .select('*', { count: 'exact', head: true })
         .eq("tenant_id", tenantId)
         .eq("type", "person");

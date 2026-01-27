@@ -8,7 +8,7 @@ export async function fetchTotalStats(tenantId: string) {
 
         // Count all people for this tenant (unfiltered)
         const { count, error } = await supabase
-            .from('parties')
+            .from('cards')
             .select('*', { count: 'exact', head: true })
             .eq('tenant_id', tenantId)
             .eq('type', 'person');

@@ -14,7 +14,8 @@ const UpdatePersonSchema = z.object({
     lastName: z.string().optional(),
     email: z.string().optional().or(z.literal("")),
     phone: z.string().optional(),
-    customFields: z.record(z.any()).optional()
+    customFields: z.record(z.any()).optional(),
+    tags: z.array(z.string()).optional()
 });
 
 export type UpdatePersonInput = z.infer<typeof UpdatePersonSchema>;
@@ -65,7 +66,7 @@ export async function updatePerson(rawInput: any) {
         return { success: false, error: errorMessage };
     }
 
-    const { id, tenantId, firstName, lastName, email, phone } = result.data;
+    const { id, tenantId, firstName, lastName, email, phone, tags } = result.data;
     const customFields = (result.data as any).customFields || {};
 
     try {
@@ -74,33 +75,25 @@ export async function updatePerson(rawInput: any) {
         if (!user) return { success: false, error: "Unauthorized: Not logged in" };
 
         console.log("Authorized access for user:", user.id);
-        console.log("Updating person via direct DB calls (ADMIN MODE)...", { id, customFields });
+        console.log("Updating person via direct DB calls (ADMIN MODE)...", { id, customFields, tags });
 
         // 1. Fetch current data to merge customFields AND Names safely
         // [Fix] Read from 'parties' for custom_fields and 'people' for names to ensure safe partial updates
-        const { data: currentParty, error: fetchPartyError } = await supabaseAdmin
-            .from('parties')
-            .select('custom_fields')
-            .eq('id', id)
-            .eq('tenant_id', tenantId)
-            .maybeSingle();
-
-        if (fetchPartyError) throw new Error(`Fetch Party failed: ${fetchPartyError.message}`);
-
-        const { data: currentPerson, error: fetchPersonError } = await supabaseAdmin
+        // 1. Fetch existing data from 'people' and 'cards' to merge custom_fields
+        const { data: currentPerson, error: fetchError } = await supabaseAdmin
             .from('people')
-            .select('first_name, last_name')
-            .eq('party_id', id)
+            .select('*, cards!inner(*)') // Inner join to ensure card exists
+            .eq('card_id', id)
             .maybeSingle();
 
-        if (fetchPersonError) throw new Error(`Fetch Person failed: ${fetchPersonError.message}`);
+        if (fetchError) throw new Error(`Fetch Person failed: ${fetchError.message}`);
 
         // MERGE LOGIC: Use Input if present, else fallback to DB, else empty string
         const finalFirstName = firstName !== undefined ? firstName : (currentPerson?.first_name || '');
         const finalLastName = lastName !== undefined ? lastName : (currentPerson?.last_name || '');
 
         const updatedCustomFields = {
-            ...(currentParty?.custom_fields || {}),
+            ...(currentPerson?.cards?.custom_fields || {}),
             ...customFields
         };
 
@@ -118,6 +111,10 @@ export async function updatePerson(rawInput: any) {
             updated_at: new Date().toISOString()
         };
 
+        if (tags !== undefined) {
+            partyUpdatePayload.tags = tags;
+        }
+
         if (contactMethods.length > 0) {
             partyUpdatePayload.contact_methods = contactMethods;
         }
@@ -125,7 +122,7 @@ export async function updatePerson(rawInput: any) {
         console.log("updatePerson calling parties update with:", JSON.stringify(partyUpdatePayload, null, 2));
 
         const { error: partyUpdateError } = await supabaseAdmin
-            .from('parties')
+            .from('cards')
             .update(partyUpdatePayload)
             .eq('id', id)
             .eq('tenant_id', tenantId);
@@ -183,7 +180,7 @@ export async function updatePerson(rawInput: any) {
         const { error: personError } = await supabaseAdmin
             .from('people')
             .update(personUpdatePayload)
-            .eq('party_id', id);
+            .eq('card_id', id);
 
         if (personError) {
             console.error("Person Update Error:", JSON.stringify(personError, null, 2));

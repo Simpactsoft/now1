@@ -50,7 +50,7 @@ export default async function DashboardPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {[
-                    { label: 'Total Identities', value: '2.3M+', detail: 'Parties Table', color: 'text-blue-400' },
+                    { label: 'Total Identities', value: '2.3M+', detail: 'Cards Table', color: 'text-blue-400' },
                     { label: 'Personnel', value: '1.6M', detail: 'People Table', color: 'text-emerald-400' },
                     { label: 'Managed Memberships', value: '100k', detail: 'Active Links', color: 'text-purple-400' },
                     { label: 'System Health', value: 'OPTIMAL', detail: 'Compute Small', color: 'text-amber-400' },

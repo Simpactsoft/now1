@@ -101,33 +101,51 @@ export async function fetchPeople(params: PaginatedQuery) {
         console.log("Start:", startRow, "Limit:", limit);
         console.log("Filters Constructed:", JSON.stringify(filters, null, 2));
 
-        const { data, error } = await supabase.rpc("fetch_people_crm", {
+        // OPTIMIZATION: Run Data and Count in parallel only if needed
+        // If startRow > 0, we don't strictly need count again if the client tracks it
+        const shouldFetchCount = startRow === 0;
+
+        const dataPromise = supabase.rpc("fetch_people_data", {
             arg_tenant_id: tenantId,
             arg_start: startRow,
             arg_limit: limit,
             arg_sort_col: sortCol,
             arg_sort_dir: sortDir,
-            arg_filters: filters, // [NEW] Pass JSON
+            arg_filters: filters,
         });
 
-        if (error) {
-            console.error("--- [fetchPeople] RPC FAILED ---");
-            console.error(error);
-            return { rowData: [], rowCount: 0, error: error.message };
+        const countPromise = shouldFetchCount
+            ? supabase.rpc("get_people_count", {
+                arg_tenant_id: tenantId,
+                arg_filters: filters
+            })
+            : Promise.resolve({ data: 0, error: null }); // Mock result
+
+        const [dataResult, countResult] = await Promise.all([dataPromise, countPromise]);
+
+        if (dataResult.error) {
+            console.error("--- [fetchPeople] Data RPC FAILED ---");
+            console.error(dataResult.error);
+            return { rowData: [], rowCount: 0, error: dataResult.error.message };
         }
 
-        let finalData = data || [];
-        let rowCount = finalData.length > 0 ? Number(finalData[0].ret_total_count) : 0;
+        if (shouldFetchCount && countResult.error) {
+            console.warn("--- [fetchPeople] Count RPC Failed (Non-fatal) ---", countResult.error);
+        }
+
+        let finalData = dataResult.data || [];
+        // If we didn't fetch count, we return 0. The client relies on 'reset' flag to update count.
+        let rowCount = shouldFetchCount ? (countResult.data as number) : 0;
 
         if (finalData.length > 0) {
             console.log("[fetchPeople] First Row Keys:", Object.keys(finalData[0]));
-            // console.log("[fetchPeople] First Row Data:", JSON.stringify(finalData[0], null, 2));
 
             // [Workaround] Fetch Roles manually since RPC doesn't return them yet
             try {
                 const ids = finalData.map((p: any) => p.ret_id);
 
                 // Fetch roles for these people (limit 1 per person effectively via application logic, or just take first)
+                // Use Admin client
                 const { data: roles, error: roleError } = await supabaseAdmin
                     .from('party_memberships')
                     .select('person_id, role_name')
@@ -137,13 +155,12 @@ export async function fetchPeople(params: PaginatedQuery) {
                 if (!roleError && roles) {
                     const roleMap = new Map();
                     roles.forEach((r: any) => {
-                        // Assuming one primary role, or just taking the last one found
                         roleMap.set(r.person_id, r.role_name);
                     });
 
-                    // [New] Also fetch custom_fields from parties as fallback for standalone contacts
+                    // [New] Also fetch custom_fields from cards as fallback for standalone contacts
                     const { data: partyData, error: partyError } = await supabaseAdmin
-                        .from('parties')
+                        .from('cards')
                         .select('id, custom_fields')
                         .in('id', ids)
                         .eq('tenant_id', tenantId);
@@ -157,21 +174,12 @@ export async function fetchPeople(params: PaginatedQuery) {
                         });
                     }
 
-                    console.log("[fetchPeople] Manual Role Fetch Debug:");
-                    console.log("IDs:", ids.length);
-                    console.log("Membership Roles Found:", roleMap.size);
-                    console.log("Custom Field Roles Found:", partyRoleMap.size);
-                    // Log a sample if available
-                    if (partyRoleMap.size > 0) {
-                        console.log("Sample CF Role Key:", [...partyRoleMap.keys()][0], "Value:", [...partyRoleMap.values()][0]);
-                    }
-
                     finalData.forEach((p: any) => {
                         // Priority: Membership Role > Custom Fields Role > Null
                         p.ret_role_name = roleMap.get(p.ret_id) || partyRoleMap.get(p.ret_id) || null;
                     });
                 }
-                
+
                 // Log success
                 console.log("[fetchPeople] Roles Merged. Count:", roles?.length);
 

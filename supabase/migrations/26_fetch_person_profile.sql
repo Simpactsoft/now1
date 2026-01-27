@@ -19,7 +19,8 @@ RETURNS TABLE (
     job_title text,
     employer text,
     created_at timestamptz,
-    tags jsonb
+    tags jsonb,
+    custom_fields jsonb
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -32,9 +33,10 @@ BEGIN
         p.display_name,
         p.avatar_url,
         p.type::text,
-        -- Extract email/phone from contact_methods JSONB array (naive extraction for demo)
-        (p.contact_methods->0->>'value')::text as email,
-        (p.contact_methods->1->>'value')::text as phone,
+        -- Extract email using JSON Path (cleaner and safer)
+        jsonb_path_query_first(p.contact_methods, '$[*] ? (@.type == "email").value') #>> '{}' as email,
+        -- Extract phone using JSON Path
+        jsonb_path_query_first(p.contact_methods, '$[*] ? (@.type == "phone").value') #>> '{}' as phone,
         -- Extract location from custom_fields
         (p.custom_fields->>'city')::text as city,
         (p.custom_fields->>'country')::text as country,
@@ -42,6 +44,7 @@ BEGIN
         m.role_name as job_title,
         org.display_name as employer,
         p.created_at,
+        p.tags,
         p.custom_fields
     FROM parties p
     LEFT JOIN party_memberships m ON p.id = m.person_id AND m.tenant_id = arg_tenant_id

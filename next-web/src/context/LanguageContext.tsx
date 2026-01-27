@@ -19,6 +19,13 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     const [language, setLanguageState] = useState<Language>('en');
     const [dir, setDir] = useState<Direction>('ltr');
 
+    const updateDir = (lang: Language) => {
+        const newDir = lang === 'he' ? 'rtl' : 'ltr';
+        setDir(newDir);
+        document.documentElement.dir = newDir;
+        document.documentElement.lang = lang;
+    };
+
     // Initialize from localStorage or default
     useEffect(() => {
         const savedLang = localStorage.getItem('app-language') as Language;
@@ -27,13 +34,6 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
             updateDir(savedLang);
         }
     }, []);
-
-    const updateDir = (lang: Language) => {
-        const newDir = lang === 'he' ? 'rtl' : 'ltr';
-        setDir(newDir);
-        document.documentElement.dir = newDir;
-        document.documentElement.lang = lang;
-    };
 
     const setLanguage = (lang: Language) => {
         setLanguageState(lang);

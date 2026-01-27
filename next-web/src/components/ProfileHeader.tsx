@@ -190,7 +190,8 @@ export default function ProfileHeader({ profile, tenantId }: ProfileHeaderProps)
                             email: profile.email,
                             phone: profile.phone,
                             // If profile has status in custom_fields, pass it here
-                            status: profile.custom_fields?.status
+                            status: profile.custom_fields?.status,
+                            tags: profile.tags
                         }}
                     />
                     <button className="px-4 py-2 bg-secondary text-foreground border border-border font-semibold rounded-lg text-sm hover:bg-secondary/80 transition-colors">

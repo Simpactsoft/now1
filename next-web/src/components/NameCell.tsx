@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useEffect, useRef } from "react";
 import { updatePerson } from "@/app/actions/updatePerson";
-import { Loader2 } from "lucide-react";
+import { Loader2, Pencil } from "lucide-react";
 
 interface NameCellProps {
     firstName: string;
@@ -82,7 +82,7 @@ export function NameCell({ firstName, lastName, personId, tenantId }: NameCellPr
                     onBlur={handleSave}
                     onKeyDown={handleKeyDown}
                     autoFocus
-                    className="w-full px-2 py-1 text-sm font-semibold border border-primary rounded shadow-sm outline-none bg-background"
+                    className={`w-full px-2 py-1 text-sm font-semibold border border-primary rounded shadow-sm outline-none bg-background`}
                 />
                 {pending && (
                     <div className="absolute right-2 top-1/2 -translate-y-1/2">
@@ -101,15 +101,20 @@ export function NameCell({ firstName, lastName, personId, tenantId }: NameCellPr
                 setIsEditing(true);
             }}
             className={`
-                group cursor-pointer -ml-2 px-2 py-1 rounded hover:bg-secondary/50 border border-transparent hover:border-border/50 transition-colors flex items-center min-h-[32px]
+                group cursor-pointer -ml-2 px-2 py-1 rounded hover:bg-accent border border-transparent transition-colors flex items-center min-h-[32px] relative
                 ${pending ? 'opacity-50 pointer-events-none' : ''}
             `}
             title="Click to edit name"
         >
-            <span className="font-semibold text-foreground truncate">
+            {/* Hover Overlay with Icon */}
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Pencil className="w-3.5 h-3.5 text-muted-foreground/70" />
+            </div>
+
+            <span className="relative font-semibold text-foreground truncate select-none pr-6">
                 {value || "Unknown"}
             </span>
             {pending && <Loader2 className="w-3 h-3 ml-2 animate-spin text-muted-foreground" />}
-        </div>
+        </div >
     );
 }

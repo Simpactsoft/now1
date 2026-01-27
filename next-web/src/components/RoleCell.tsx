@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useEffect, useRef } from "react";
 import { updatePerson } from "@/app/actions/updatePerson";
-import { Loader2 } from "lucide-react";
+import { Loader2, Pencil } from "lucide-react";
 
 interface RoleCellProps {
     role: string;
@@ -66,7 +66,7 @@ export function RoleCell({ role, personId, tenantId }: RoleCellProps) {
                     onBlur={handleSave}
                     onKeyDown={handleKeyDown}
                     autoFocus
-                    className="w-full px-2 py-1 text-sm border border-primary rounded shadow-sm outline-none bg-background"
+                    className={`"w-full px-2 py-1 text-sm border border-primary rounded shadow-sm outline-none bg-background"`}
                 />
                 {pending && (
                     <div className="absolute right-2 top-1/2 -translate-y-1/2">
@@ -81,15 +81,20 @@ export function RoleCell({ role, personId, tenantId }: RoleCellProps) {
         <div
             onClick={() => setIsEditing(true)}
             className={`
-                group cursor-pointer px-2 py-1 -ml-2 rounded hover:bg-secondary/50 border border-transparent hover:border-border/50 transition-colors min-h-[28px] flex items-center
+                group cursor-pointer px-2 py-1 -ml-2 rounded hover:bg-accent border border-transparent transition-colors min-h-[28px] flex items-center relative
                 ${pending ? 'opacity-50 pointer-events-none' : ''}
             `}
             title="Click to edit role"
         >
-            <span className={value ? "text-foreground" : "text-muted-foreground italic text-xs"}>
+            {/* Hover Icon */}
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Pencil className="w-3 h-3 text-muted-foreground/70" />
+            </div>
+
+            <span className={`relative ${value ? "text-foreground" : "text-muted-foreground italic text-xs"} select-none pr-5`}>
                 {value || "Add role..."}
             </span>
             {pending && <Loader2 className="w-3 h-3 ml-2 animate-spin text-muted-foreground" />}
-        </div>
+        </div >
     );
 }

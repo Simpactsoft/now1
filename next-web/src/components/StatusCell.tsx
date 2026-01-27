@@ -68,10 +68,25 @@ export function StatusCell({ status, personId, tenantId, statusOptions }: Status
         });
     };
 
+    // Helper: Find matching option value case-insensitively to ensure Select picks it up
+    const getCanonicalValue = (val: string | null | undefined) => {
+        if (!val) return "";
+        const normalizedInput = normalize(val);
+        const match = statusOptions.find(opt => normalize(opt.value) === normalizedInput);
+        return match ? match.value : val; // Return the RAW OPTION VALUE if found, else input
+    };
+
+    const canonicalCurrent = getCanonicalValue(currentStatus);
+
     return (
-        <div className="relative group w-fit">
+        <div className="relative group w-fit rounded p-0.5 -m-0.5 hover:bg-accent border border-transparent transition-colors">
             {/* Display Badge (Use currentStatus) */}
-            <StatusBadge status={currentStatus} tenantId={tenantId} className={pending ? "opacity-50" : ""} />
+            <StatusBadge
+                status={currentStatus}
+                tenantId={tenantId}
+                className={pending ? "opacity-50" : ""}
+                options={statusOptions}
+            />
 
             {/* Loading Indicator */}
             {pending && (
@@ -83,17 +98,19 @@ export function StatusCell({ status, personId, tenantId, statusOptions }: Status
             {/* Invisible Select Overlay */}
             <select
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                value={normalize(currentStatus)} // Select value is normalized for comparison
+                value={canonicalCurrent} // Use the RAW matching value
                 onChange={handleChange}
                 disabled={pending}
                 onClick={(e) => e.stopPropagation()} // Prevent row click
                 title="Change Status"
             >
-                {/* Placeholder option, its value is normalized for comparison, but it's disabled/hidden */}
-                <option value={normalize(currentStatus)} disabled hidden>{currentStatus}</option>
-                {/* Current Value Placeholder if options not loaded */}
+                {/* Fallback option if current status is not in the list */}
+                {!statusOptions.some(o => o.value === canonicalCurrent) && (
+                    <option value={canonicalCurrent} disabled hidden>{currentStatus}</option>
+                )}
+
                 {statusOptions.map(opt => (
-                    <option key={opt.value} value={opt.value}> {/* Option value is RAW code */}
+                    <option key={opt.value} value={opt.value}>
                         {opt.payload?.label_i18n?.[language] || opt.label || opt.value}
                     </option>
                 ))}
