@@ -6,8 +6,11 @@ import AgGridRegistry from "@/lib/ag-grid-registry";
 import DashboardShell from "@/components/DashboardShell";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { LanguageProvider } from "@/context/LanguageContext";
+import { SessionProvider } from "@/context/SessionContext";
 import { cookies } from "next/headers";
 import { getPeopleCount } from "@/app/actions/getPeopleCount";
+import { getCurrentUser } from "@/app/actions/getCurrentUser";
+import { createClient } from "@/lib/supabase/server";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,6 +36,37 @@ export default async function RootLayout({
   const tenantId = cookieStore.get("tenant_id")?.value;
   const peopleCount = tenantId ? await getPeopleCount(tenantId) : 0;
 
+  // [Fix] Fetch User Profile Server-Side (Zero Latency)
+  const user = await getCurrentUser();
+  let userProfile = null;
+
+  if (user) {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("profiles")
+      .select("first_name, last_name, role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (data) {
+      userProfile = {
+        name: `${data.first_name || ""} ${data.last_name || ""}`.trim() || user.email || "User",
+        role: data.role || "User",
+        email: user.email || "",
+      };
+    } else {
+      console.warn('[RootLayout] Profile query returned no data for user:', user.email);
+      userProfile = {
+        name: user.email?.split('@')[0] || "User",
+        role: "User",
+        email: user.email || "",
+      };
+    }
+    console.log('[RootLayout] Constructed Profile:', userProfile);
+  } else {
+    console.warn('[RootLayout] No User found via getCurrentUser');
+  }
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body
@@ -45,11 +79,17 @@ export default async function RootLayout({
           disableTransitionOnChange
         >
           <LanguageProvider>
-            <AgGridRegistry />
-            <DashboardShell currentTenantId={tenantId} peopleCount={peopleCount}>
-              {children}
-            </DashboardShell>
-            <Toaster position="top-right" theme="system" />
+            <SessionProvider user={userProfile}>
+              <AgGridRegistry />
+              <DashboardShell
+                currentTenantId={tenantId}
+                peopleCount={peopleCount}
+                userProfile={userProfile}
+              >
+                {children}
+              </DashboardShell>
+              <Toaster position="top-right" theme="system" />
+            </SessionProvider>
           </LanguageProvider>
         </ThemeProvider>
       </body>

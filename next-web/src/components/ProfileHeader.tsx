@@ -1,13 +1,16 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Mail, Phone, MapPin, Building, Calendar, User } from 'lucide-react';
+import { Mail, Phone, MapPin, Building, Calendar, User, Trash2 } from 'lucide-react';
 import PersonFormDialog from './PersonFormDialog';
 import EditableField from './universal/EditableField';
 import { updatePerson } from '@/app/actions/updatePerson';
+import { deletePerson } from '@/app/actions/deletePerson';
 import { useRouter } from 'next/navigation';
 import { StatusBadge } from './StatusBadge';
 import { useLanguage } from '@/context/LanguageContext';
+import { usePermission } from '@/context/SessionContext';
+import { toast } from 'sonner';
 
 interface ProfileHeaderProps {
     profile: any;
@@ -16,7 +19,8 @@ interface ProfileHeaderProps {
 
 export default function ProfileHeader({ profile, tenantId }: ProfileHeaderProps) {
     const { language } = useLanguage();
-    console.log("ProfileHeader received tenantId:", tenantId);
+    const router = useRouter();
+    const canDelete = usePermission('contacts.delete');
 
     // Status Options State
     const [statusOptions, setStatusOptions] = useState<any[]>([]);
@@ -31,9 +35,23 @@ export default function ProfileHeader({ profile, tenantId }: ProfileHeaderProps)
             .catch(err => console.error("Failed to fetch status options in Header", err));
     }, [tenantId]);
 
-    if (!profile) return null;
+    const handleDelete = async () => {
+        if (!confirm(language === 'he' ? "האם למחוק איש קשר זה? הפעולה אינה הפיכה." : "Are you sure you want to delete this contact? This action cannot be undone.")) return;
 
-    const router = useRouter();
+        try {
+            const res = await deletePerson(profile.id);
+            if (res.success) {
+                toast.success(language === 'he' ? "איש הקשר נמחק" : "Contact deleted");
+                router.push('/dashboard/people'); // Redirect to list
+            } else {
+                toast.error(res.error || (language === 'he' ? "שגיאה במחיקה" : "Failed to delete"));
+            }
+        } catch (e) {
+            toast.error(language === 'he' ? "שגיאה בלתי צפויה" : "Unexpected error");
+        }
+    };
+
+    if (!profile) return null;
 
     // Derive Names
     const fullName = profile.display_name || "";
@@ -73,7 +91,7 @@ export default function ProfileHeader({ profile, tenantId }: ProfileHeaderProps)
             router.refresh();
         } else {
             console.error(res.error);
-            throw new Error(res.error);
+            toast.error(res.error || "Update failed");
         }
     };
 
@@ -112,8 +130,8 @@ export default function ProfileHeader({ profile, tenantId }: ProfileHeaderProps)
                                 </span>
                             )}
                             <div className="relative group flex items-center self-center">
-                                {profile.custom_fields?.status ? (
-                                    <StatusBadge status={profile.custom_fields.status} tenantId={tenantId} />
+                                {(profile.status || profile.custom_fields?.status) ? (
+                                    <StatusBadge status={profile.status || profile.custom_fields.status} tenantId={tenantId} />
                                 ) : (
                                     <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] uppercase font-bold tracking-widest border border-slate-200 whitespace-nowrap">
                                         No Status
@@ -122,7 +140,7 @@ export default function ProfileHeader({ profile, tenantId }: ProfileHeaderProps)
                                 {/* Invisible select for editing */}
                                 <select
                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                    value={(profile.custom_fields?.status || "").toUpperCase()}
+                                    value={(profile.status || profile.custom_fields?.status || "").toUpperCase()}
                                     onChange={(e) => handleUpdate('status', e.target.value)}
                                     onClick={(e) => e.stopPropagation()}
                                 >
@@ -179,7 +197,7 @@ export default function ProfileHeader({ profile, tenantId }: ProfileHeaderProps)
                     </div>
                 </div>
 
-                {/* Quick Actions (Mock) */}
+                {/* Quick Actions */}
                 <div className="flex flex-col gap-3">
                     <PersonFormDialog
                         tenantId={tenantId}
@@ -194,9 +212,19 @@ export default function ProfileHeader({ profile, tenantId }: ProfileHeaderProps)
                             tags: profile.tags
                         }}
                     />
-                    <button className="px-4 py-2 bg-secondary text-foreground border border-border font-semibold rounded-lg text-sm hover:bg-secondary/80 transition-colors">
+                    <button className="px-4 py-2 bg-secondary text-foreground border border-border font-semibold rounded-lg text-sm hover:bg-secondary/80 transition-colors hidden">
                         Log Activity
                     </button>
+
+                    {canDelete && (
+                        <button
+                            onClick={handleDelete}
+                            className="px-4 py-2 bg-destructive/10 text-destructive border border-destructive/20 font-semibold rounded-lg text-sm hover:bg-destructive/20 transition-colors flex items-center justify-center gap-2"
+                        >
+                            <Trash2 size={16} />
+                            <span>{language === 'he' ? 'מחק איש קשר' : 'Delete Contact'}</span>
+                        </button>
+                    )}
                 </div>
             </div>
         </div>

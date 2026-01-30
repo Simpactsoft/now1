@@ -1,31 +1,29 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import Sidebar from "@/components/Sidebar";
+import Sidebar, { UserProfileData } from "@/components/Sidebar";
 
 interface DashboardShellProps {
     children: React.ReactNode;
     currentTenantId?: string;
     peopleCount: number;
+    userProfile?: UserProfileData | null;
 }
 
 export default function DashboardShell({
     children,
     currentTenantId,
     peopleCount,
+    userProfile
 }: DashboardShellProps) {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isMobile, setIsMobile] = useState(false);
 
-    // Initial check for screen size
+    // Initial check for screen size & Auto-Heal Tenant
     useEffect(() => {
         const checkMobile = () => {
             const mobile = window.innerWidth < 1024; // lg breakpoint
             setIsMobile(mobile);
-            // If we switch to mobile, default to closed. If desktop, default to open.
-            // Only set this on initial load or drastic resize? 
-            // Better: Just track isMobile to know behavior, but let user toggle.
-            // On mount:
             if (mobile) setIsSidebarOpen(false);
             else setIsSidebarOpen(true);
         };
@@ -35,13 +33,44 @@ export default function DashboardShell({
         const handleResize = () => {
             const mobile = window.innerWidth < 1024;
             setIsMobile(mobile);
-            // Optional: Auto-close on resize to mobile? Auto-open on resize to desktop?
-            // For now, let's keep it simple.
         };
 
         window.addEventListener("resize", handleResize);
+
+        // [Auto-Heal] Validate Tenant ID
+        const validateTenant = async () => {
+            // Dynamically import to avoid server-side issues in client component if needed, 
+            // but standard import work for Server Actions.
+            const { fetchUserTenants } = await import("@/app/actions/fetchUserTenants");
+            const { setTenantAction } = await import("@/app/actions/setTenant");
+
+            try {
+                const { tenants } = await fetchUserTenants();
+                if (tenants && tenants.length > 0) {
+                    const validIds = tenants.map((t: any) => t.id);
+
+                    // If current cookie is missing OR is NOT in the user's valid list
+                    // (e.g. Stale Admin Cookie)
+                    if (!currentTenantId || !validIds.includes(currentTenantId)) {
+                        console.log("[DashboardShell] Fix: Tenant Mismatch detected.", { current: currentTenantId, valid: validIds });
+                        console.log("[DashboardShell] Auto-switching to:", tenants[0].id);
+
+                        await setTenantAction(tenants[0].id);
+
+                        // Force hard reload to pick up new cookie in Server Components
+                        window.location.reload();
+                    }
+                }
+            } catch (e) {
+                console.error("[DashboardShell] Tenant Validation Failed", e);
+            }
+        };
+
+        // Short delay to allow hydration
+        setTimeout(validateTenant, 1000);
+
         return () => window.removeEventListener("resize", handleResize);
-    }, []);
+    }, [currentTenantId]);
 
     const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
@@ -53,6 +82,7 @@ export default function DashboardShell({
                 isOpen={isSidebarOpen}
                 onToggle={toggleSidebar}
                 isMobile={isMobile}
+                userProfile={userProfile}
             />
 
             {/* Main Content Area */}

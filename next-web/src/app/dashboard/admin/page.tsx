@@ -29,7 +29,20 @@ export default async function AdminPage() {
                     </p>
                 </div>
 
-                <AddTenantDialog />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Team Settings Link */}
+                    <a href="/dashboard/settings/team" className="glass p-6 rounded-2xl border border-white/5 hover:bg-white/5 transition-colors group">
+                        <div className="flex items-center gap-4 mb-2">
+                            <div className="w-10 h-10 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center border border-blue-500/20 group-hover:scale-110 transition-transform">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+                            </div>
+                            <h3 className="text-lg font-semibold text-zinc-200">Team Members</h3>
+                        </div>
+                        <p className="text-sm text-zinc-500">Add users, assign roles (Distributor/Agent), and manage access.</p>
+                    </a>
+
+                    <AddTenantDialog />
+                </div>
             </header>
 
             <TenantsGrid tenants={tenants || []} />

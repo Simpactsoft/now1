@@ -26,8 +26,8 @@ import { translations } from '@/lib/translations';
 const NAV_CONFIG = [
     { key: 'dashboard', href: '/dashboard', icon: LayoutDashboard },
     { key: 'contacts', href: '/dashboard/people', icon: UserCircle },
-    { key: 'employees', href: '/dashboard/employees', icon: Users },
     { key: 'logs', href: '/dashboard/logs', icon: Activity },
+    { key: 'team', href: '/dashboard/settings/team', icon: Users },
     { key: 'infrastructure', href: '/dashboard/infra', icon: Database },
     { key: 'system_admin', href: '/dashboard/admin', icon: ShieldCheck },
     { key: 'settings', href: '/dashboard/settings', icon: Settings },
@@ -38,18 +38,27 @@ import { ThemeSwitcher } from "./ThemeSwitcher";
 
 // ...
 
+// Interface for Profile
+export interface UserProfileData {
+    name: string;
+    role: string;
+    email: string;
+}
+
 export default function Sidebar({
     currentTenantId,
     peopleCount = 0,
     isOpen,
     onToggle,
-    isMobile
+    isMobile,
+    userProfile
 }: {
     currentTenantId?: string,
     peopleCount?: number,
     isOpen: boolean,
     onToggle: () => void,
-    isMobile: boolean
+    isMobile: boolean,
+    userProfile?: UserProfileData | null
 }) {
     const pathname = usePathname();
     const { t, dir } = useLanguage();
@@ -150,7 +159,7 @@ export default function Sidebar({
                 <div className="p-4 mt-auto border-t border-border bg-card/30 space-y-4">
                     {/* Version Display */}
                     <div className="flex justify-center mb-2">
-                        <span className="text-[10px] text-muted-foreground/50 font-mono">v0.2.2</span>
+                        <span className="text-[10px] text-muted-foreground/50 font-mono">v0.2.3</span>
                     </div>
 
                     {/* Theme Switcher Row */}
@@ -166,31 +175,118 @@ export default function Sidebar({
                     </div>
 
                     {/* User Profile */}
-                    <div className="flex items-center gap-3 px-4 py-2 bg-secondary/30 rounded-xl border border-border">
-                        <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center border border-border shrink-0">
-                            <UserCircle size={20} className="text-muted-foreground" />
-                        </div>
-                        <div className="flex flex-col overflow-hidden mr-auto rtl:mr-0 rtl:ml-auto">
-                            <span className="text-sm font-medium text-foreground truncate">{t('admin')}</span>
-                            <span className="text-xs text-muted-foreground truncate">{t('instance')}</span>
-                        </div>
-                        <button
-                            onClick={async () => {
-                                const supabase = createBrowserClient(
-                                    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                                    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-                                );
-                                await supabase.auth.signOut();
-                                window.location.href = '/login';
-                            }}
-                            className="p-1.5 hover:bg-destructive/10 hover:text-destructive text-muted-foreground rounded-lg transition-colors"
-                            title="Log Out"
-                        >
-                            <LogOut size={18} />
-                        </button>
-                    </div>
+                    <UserProfileDisplay initialProfile={userProfile} />
                 </div>
             </div>
         </>
     );
 }
+
+function UserProfileDisplay({ initialProfile }: { initialProfile?: UserProfileData | null }) {
+    const [profile, setProfile] = React.useState<UserProfileData | null>(initialProfile || null);
+    const [error, setError] = React.useState<boolean>(false);
+
+    // Helper to get supabase client
+    const supabase = React.useMemo(() => createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    ), []);
+
+    // Sync initialProfile prop to state (in case of re-renders or hydration)
+    React.useEffect(() => {
+        if (initialProfile) {
+            console.log('[Sidebar] Received initialProfile:', initialProfile);
+            setProfile(initialProfile);
+        }
+    }, [initialProfile]);
+
+    React.useEffect(() => {
+        if (initialProfile) return;
+
+        let mounted = true;
+
+        const fetchProfile = async () => {
+            try {
+                // [FIX] Use Server Action to get user via Cookie (more reliable than client SDK)
+                const { getCurrentUser } = await import('@/app/actions/getCurrentUser');
+                const user = await getCurrentUser();
+
+                if (!mounted) return;
+
+                if (!user) {
+                    console.warn('[Sidebar] No user session found via Server Action');
+                    setProfile({ name: 'Guest', role: 'Visitor', email: '' });
+                    setError(true);
+                    return;
+                }
+
+                // Fetch Profile details using client (since we now have a valid ID)
+                // Use maybeSingle() to avoid 406 errors if 0 rows found
+                const { data, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('first_name, last_name, role')
+                    .eq('id', user.id)
+                    .maybeSingle();
+
+                if (!mounted) return;
+
+                if (profileError) {
+                    console.error('[Sidebar] Profile fetch error:', profileError);
+                }
+
+                if (data) {
+                    setProfile({
+                        name: `${data.first_name || ''} ${data.last_name || ''}`.trim() || user.email || 'User',
+                        role: data.role || 'User',
+                        email: user.email || ''
+                    });
+                } else {
+                    // Fallback if no profile row exists yet
+                    setProfile({
+                        name: user.email?.split('@')[0] || 'User',
+                        role: 'User',
+                        email: user.email || ''
+                    });
+                }
+            } catch (err) {
+                console.error('[Sidebar] Unexpected error:', err);
+                if (mounted) {
+                    setProfile({ name: 'Error', role: 'Unknown', email: '' });
+                    setError(true);
+                }
+            }
+        };
+
+        fetchProfile();
+
+        return () => { mounted = false; };
+    }, [supabase]);
+
+    if (!profile) return <div className="h-12 bg-secondary/30 rounded-xl animate-pulse" />;
+
+    return (
+        <div className="flex items-center gap-3 px-4 py-2 bg-secondary/30 rounded-xl border border-border">
+            <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center border border-border shrink-0 uppercase font-bold text-xs text-muted-foreground">
+                {profile.name ? profile.name[0] : '?'}
+            </div>
+            <div className="flex flex-col overflow-hidden mr-auto rtl:mr-0 rtl:ml-auto min-w-0">
+                <span className="text-sm font-medium text-foreground truncate" title={profile.name}>
+                    {profile.name}
+                    {error && <span className="text-[9px] text-destructive ml-1">(Auth Err)</span>}
+                </span>
+                <span className="text-[10px] text-muted-foreground truncate uppercase">{profile.role}</span>
+            </div>
+            <button
+                onClick={async () => {
+                    await supabase.auth.signOut();
+                    window.location.href = '/login';
+                }}
+                className="p-1.5 hover:bg-destructive/10 hover:text-destructive text-muted-foreground rounded-lg transition-colors shrink-0"
+                title="Log Out"
+            >
+                <LogOut size={16} />
+            </button>
+        </div>
+    );
+}
+

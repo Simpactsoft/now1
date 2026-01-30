@@ -7,17 +7,18 @@ export async function getPeopleCount(tenantId: string) {
 
     const supabase = await createClient();
 
-    // Efficient count using count(*), assuming index on tenant_id + type exists
-    const { count, error } = await supabase
-        .from("cards")
-        .select('*', { count: 'exact', head: true })
-        .eq("tenant_id", tenantId)
-        .eq("type", "person");
+    // Use the secure/optimized RPC
+    const { data, error } = await supabase.rpc('get_people_count', {
+        arg_tenant_id: tenantId,
+        arg_filters: {}
+    });
 
     if (error) {
         console.error("Error fetching people count:", error);
         return 0;
     }
 
-    return count || 0;
+    return data || 0;
+
+
 }
