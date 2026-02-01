@@ -1,46 +1,37 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function fetchUsers(tenantId: string) {
-    try {
-        // Use Admin Client to access auth.users
-        const { createClient: createAdminClient } = require('@supabase/supabase-js');
-        const supabaseAdmin = createAdminClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!,
-            { auth: { persistSession: false } }
-        );
+    const supabase = await createClient();
+    const adminClient = createAdminClient();
 
-        // 1. Fetch Profiles for this Tenant
-        // We start with profiles because that defines "Membership" in this tenant context
-        // (Assuming we want to show only users relevant to this tenant, or checks tenant_id col)
-        const { data: profiles, error: profileError } = await supabaseAdmin
+    try {
+        // 1. RBAC Check
+        const { data: hasPermission, error: permError } = await supabase
+            .rpc('has_permission', { requested_permission: 'users.manage' });
+
+        if (permError || !hasPermission) {
+            return { success: false, error: "Unauthorized" };
+        }
+
+        // 2. Fetch Profiles (Admin Bypass)
+        // We filter by tenant_id to keep multi-tenancy safe even for admins (admin of tenant A shouldn't see tenant B)
+        // Although currently our Admin is Global, in future we might restrict.
+        const { data: profiles, error: fetchError } = await adminClient
             .from('profiles')
-            .select('*')
+            .select('*, tenants ( name )') // Join with tenants to get name
             .eq('tenant_id', tenantId)
             .order('created_at', { ascending: false });
 
-        if (profileError) throw profileError;
+        if (fetchError) {
+            return { success: false, error: fetchError.message };
+        }
 
-        if (!profiles || profiles.length === 0) return { users: [] };
+        return { success: true, users: profiles };
 
-        // 2. Fetch Auth Users (to get email, last_sign_in)
-        // Admin `listUsers` is paginated, but for < 100 users likely fine. 
-        // Better: Map profile IDs to auth IDs.
-        // Actually, we can't search auth.users by ID list easily in one go without looping or getting all.
-        // Optimization: Get all users (if reasonable size) or loop.
-        // For now, let's fetch first 50 users and match? Or just use profiles data if email is synced?
-        // Wait, `profiles` table HAS `email` column (denormalized in 93_erp_foundation_schema.sql).
-        // So we might not *need* auth.users if the email is kept in sync.
-        // Let's verify if `profiles` has email.
-
-        // Let's assume Profile has email (it does in migration 93).
-        // Then we just return profiles.
-        return { users: profiles };
-
-    } catch (error: any) {
-        console.error("fetchUsers Error:", error);
-        return { error: error.message };
+    } catch (err: any) {
+        return { success: false, error: "Failed to fetch users" };
     }
 }

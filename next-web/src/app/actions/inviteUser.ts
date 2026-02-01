@@ -1,76 +1,66 @@
 "use server";
 
-export async function inviteUser(formData: FormData) {
+import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { revalidatePath } from "next/cache";
+
+export async function inviteUser(email: string, role: 'distributor' | 'dealer' | 'agent', tenantId: string) {
+    const supabase = await createClient();
+    const adminClient = createAdminClient();
+
     try {
-        const email = formData.get('email') as string;
-        const role = formData.get('role') as string;
-        const firstName = formData.get('firstName') as string;
-        const lastName = formData.get('lastName') as string;
-        const tenantId = formData.get('tenantId') as string;
-        const password = formData.get('password') as string; // Optional: for direct creation
+        // 1. RBAC Check: Must have 'users.manage'
+        const { data: hasPermission, error: permError } = await supabase
+            .rpc('has_permission', { requested_permission: 'users.manage' });
 
-        if (!email || !tenantId) return { error: "Missing required fields" };
-
-        const { createClient } = require('@supabase/supabase-js');
-        const supabaseAdmin = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!,
-            { auth: { persistSession: false } }
-        );
-
-        // 1. Create Auth User
-        // If password provided, create directly (verified). Else invite.
-        let authUser;
-        let authError;
-
-        if (password) {
-            const res = await supabaseAdmin.auth.admin.createUser({
-                email,
-                password,
-                email_confirm: true,
-                user_metadata: { first_name: firstName, last_name: lastName }
-            });
-            authUser = res.data.user;
-            authError = res.error;
-        } else {
-            // Invite
-            const res = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-                data: { first_name: firstName, last_name: lastName }
-            });
-            authUser = res.data.user;
-            authError = res.error;
+        if (permError || !hasPermission) {
+            return { success: false, error: "Unauthorized: You do not have permission to invite users." };
         }
 
-        if (authError) throw authError;
-        if (!authUser) throw new Error("Failed to create user");
+        // 2. Check if user exists (Optimization to avoid invite error if already active)
+        // Actually, inviteUserByEmail handles existing users by sending a magic link, or returns user.
+        // But we want to Set Role immediately.
 
-        // 2. Create Profile (Critical Step often missed)
-        // We manually insert into 'profiles' to ensure RBAC works immediately.
-        const { error: profileError } = await supabaseAdmin
+        // 3. Invite User (Supabase Auth)
+        const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(email, {
+            data: {
+                tenant_id: tenantId, // Optional metadata
+            }
+        });
+
+        if (inviteError) {
+            console.error("Invite Error:", inviteError);
+            return { success: false, error: inviteError.message };
+        }
+
+        const user = inviteData.user;
+        if (!user) return { success: false, error: "Failed to create user." };
+
+        // 4. Update Profile Role (Public Table)
+        // We use upsert because the 'on_auth_user_created' trigger might not verify/exist, 
+        // or we want to ensure specific fields are set immediately.
+        const { error: profileError } = await adminClient
             .from('profiles')
             .upsert({
-                id: authUser.id,
+                id: user.id,
                 tenant_id: tenantId,
-                role: role || 'agent',
-                first_name: firstName,
-                last_name: lastName,
-                email: email,
-                // org_path will be auto-calculated by trigger if not provided, 
-                // but better to default to root if known? 
-                // Migration 93 triggers on profiles insert to set org_path if parent missing.
+                role: role,
+                email: email, // Sync email to profile
+                first_name: '', // Placeholder
+                last_name: '',   // Placeholder
+                status: 'invited'
             });
 
         if (profileError) {
-            console.error("Profile creation failed, rolling back auth user (manual cleanup required)", profileError);
-            // In real PROD, might want to delete the auth user to keep consistency
-            await supabaseAdmin.auth.admin.deleteUser(authUser.id);
-            throw profileError;
+            console.error("Profile Upsert Failed:", profileError);
+            return { success: false, error: "User invited but failed to assign role." };
         }
 
-        return { success: true, userId: authUser.id };
+        revalidatePath("/dashboard/settings/team");
+        return { success: true };
 
-    } catch (error: any) {
-        console.error("inviteUser Error:", error);
-        return { error: error.message };
+    } catch (err: any) {
+        console.error("Invite Exception:", err);
+        return { success: false, error: "An error occurred." };
     }
 }

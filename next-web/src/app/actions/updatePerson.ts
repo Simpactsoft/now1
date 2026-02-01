@@ -21,15 +21,8 @@ const UpdatePersonSchema = z.object({
 export type UpdatePersonInput = z.infer<typeof UpdatePersonSchema>;
 
 export async function updatePerson(rawInput: any) {
+    // [SECURITY FIX] Use Standard Client (RLS Enforced)
     const supabase = await createClient();
-
-    // [Fix] Use Service Role (Admin) to bypass RLS for writes
-    const { createClient: createAdminClient } = require('@supabase/supabase-js');
-    const supabaseAdmin = createAdminClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!,
-        { auth: { persistSession: false } }
-    );
 
     // 0. Sanitize Input
     const sanitize = (val: any) => typeof val === 'string' ? val.trim() : val;
@@ -46,8 +39,6 @@ export async function updatePerson(rawInput: any) {
     };
 
     // 1. Validate Input
-    console.log("Validating params:", JSON.stringify(params, null, 2));
-
     let result;
     try {
         result = UpdatePersonSchema.safeParse(params);
@@ -66,14 +57,15 @@ export async function updatePerson(rawInput: any) {
 
     try {
         // [Security] Verify Authorization
+        // Note: createClient() already handles auth state, but explicit check is good practice
         const user = (await supabase.auth.getUser()).data.user;
         if (!user) return { success: false, error: "Unauthorized: Not logged in" };
 
         console.log("Authorized access for user:", user.id);
-        console.log("Updating person via direct DB calls (ADMIN MODE)...", { id, customFields, tags });
 
-        // 1. Fetch current data from CARDS only
-        const { data: currentCard, error: fetchError } = await supabaseAdmin
+        // 1. Fetch current data (WITH RLS)
+        // [Race Condition Fix] Store the updated_at we saw
+        const { data: currentCard, error: fetchError } = await supabase
             .from('cards')
             .select('*')
             .eq('id', id)
@@ -81,17 +73,12 @@ export async function updatePerson(rawInput: any) {
 
         if (fetchError) throw new Error(`Fetch Card failed: ${fetchError.message}`);
 
+        const lastKnownUpdatedAt = currentCard.updated_at;
+
         // Logic to construct Display Name
-        // Ideally we split current display_name if firstName/lastName not provided, 
-        // but for now we trust the input or keep existing if not provided.
-        // Actually, simpler logic:
         let newDisplayName = currentCard.display_name;
 
-        // If user provided name parts, update display_name
         if (firstName !== undefined || lastName !== undefined) {
-            // If one is missing, we might want to try to fill it from existing,
-            // but 'display_name' is a single string. 
-            // In a sophisticated app we parsing existing display_name, but here let's just:
             const oldParts = currentCard.display_name.split(' ');
             const oldFirst = oldParts[0] || '';
             const oldLast = oldParts.slice(1).join(' ') || '';
@@ -108,12 +95,9 @@ export async function updatePerson(rawInput: any) {
 
         const status = updatedCustomFields.status || currentCard.status || 'lead';
 
-        // Update Contact Methods (Simple JSONB Merge)
+        // Update Contact Methods
         let currentContactMethods = currentCard.contact_methods || {};
-        // If it's an array (legacy), convert to object? 
-        // Fresh start uses object {email, phone}.
         if (Array.isArray(currentContactMethods)) {
-            // Legacy conversion on the fly just in case
             currentContactMethods = {};
         }
 
@@ -131,34 +115,41 @@ export async function updatePerson(rawInput: any) {
         };
 
         if (tags !== undefined) {
-            // Ensure tags are unique
-            // If input tags replace all, simply assign.
             cardUpdatePayload.tags = tags;
         }
 
-        console.log("updatePerson calling cards update with:", JSON.stringify(cardUpdatePayload, null, 2));
+        console.log("updatePerson calling cards update with (Secure):", JSON.stringify(cardUpdatePayload, null, 2));
 
-        const { error: updateError } = await supabaseAdmin
+        // [Security] Perform Update with Optimistic Locking Window
+        // We enforce that updated_at matches what we fetched seconds ago.
+        const { data: updatedRows, error: updateError } = await supabase
             .from('cards')
             .update(cardUpdatePayload)
-            .eq('id', id);
-        // .eq('tenant_id', tenantId); // Optional: Tenant ID check (RLS disabled anyway)
+            .eq('id', id)
+            .eq('updated_at', lastKnownUpdatedAt) // <--- OPTIMISTIC LOCK
+            .select();
 
         if (updateError) {
-            console.error("Card Update Error:", JSON.stringify(updateError, null, 2));
-            throw new Error(`Card update failed: ${updateError.message}`);
-        } else {
-            console.log("Card Update Success");
+            throw new Error(`Update failed: ${updateError.message}`);
         }
 
-        // [New] Update Role (Job Title) - Kept Logic
+        if (!updatedRows || updatedRows.length === 0) {
+            // OPTIMISTIC LOCK FAIL
+            console.error("Race Condition Detected: Data was updated between Fetch and Write.");
+            // Returning a distinct error allows client (potential future improvement) to retry
+            return { success: false, error: "Data is stale (Concurrent Update). Please refresh." };
+        }
+
+        console.log("Card Update Success (Secure)");
+
+
+        // [New] Update Role (Job Title) - Enforced via RLS now (Migration 204)
         if (customFields.role !== undefined) {
-            // Try Membership Update
-            const { error: roleError, count } = await supabaseAdmin
+            const { error: roleError } = await supabase
                 .from('party_memberships')
                 .update({ role_name: customFields.role })
                 .eq('person_id', id)
-                .eq('tenant_id', tenantId) // Important here
+                .eq('tenant_id', tenantId)
                 .select();
 
             if (roleError) console.error("Role Update Error (Non-Fatal):", roleError);

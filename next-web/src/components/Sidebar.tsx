@@ -15,7 +15,8 @@ import {
     ShieldCheck,
     Menu,
     X,
-    LogOut
+    LogOut,
+    FlaskConical
 } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useLanguage } from '@/context/LanguageContext';
@@ -122,11 +123,17 @@ export default function Sidebar({
                         <TenantSwitcher currentTenantId={currentTenantId} />
                     </div>
 
-                    <p className="text-xs text-muted-foreground uppercase tracking-widest font-semibold mt-4">Research Module</p>
+
                 </div>
 
                 <nav className="flex-1 px-4 space-y-1 mt-4">
-                    {NAV_CONFIG.map((item) => {
+                    {NAV_CONFIG.filter(item => {
+                        // Restricted items
+                        if (['team', 'infrastructure', 'system_admin'].includes(item.key)) {
+                            return userProfile?.role === 'distributor';
+                        }
+                        return true;
+                    }).map((item) => {
                         const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
                         const Icon = item.icon;
                         const label = t(item.key as keyof typeof translations['en']);

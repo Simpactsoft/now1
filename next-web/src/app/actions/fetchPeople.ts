@@ -1,23 +1,13 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-
 import { PaginatedQuerySchema, PaginatedQuery } from '@/lib/schemas';
 
 export async function fetchPeople(params: PaginatedQuery) {
     try {
         const supabase = await createClient();
 
-        // [Fix] Use Service Role (Admin) for manual fetches to ensure we get data regardless of RLS
-        // RPC might return data that standard Select hides if policies mismatch.
-        const { createClient: createAdminClient } = require('@supabase/supabase-js');
-        const supabaseAdmin = createAdminClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!,
-            { auth: { persistSession: false } }
-        );
-
-        console.log("[fetchPeople] Raw Params:", JSON.stringify(params, null, 2));
+        console.log("[fetchPeople] Fetching with Standard Client (RLS Active). Tenant:", params.tenantId);
 
         const { startRow, endRow, sortModel, filterModel, tenantId, query } = params as any;
 
@@ -82,7 +72,6 @@ export async function fetchPeople(params: PaginatedQuery) {
         }
 
         // 1.1 Name Filter (Column Specific)
-        // [User Request] Apply Multi-Value Split (OR logic) for Name, similar to Tags
         if (fm.name) filters.name = parseMultiSelect(fm.name);
 
         if (fm.status) filters.status = parseMultiSelect(fm.status);
@@ -107,16 +96,17 @@ export async function fetchPeople(params: PaginatedQuery) {
         const shouldFetchCount = startRow === 0;
 
         // [Production] Using the optimized RPC (Partitioned + Indexed)
+        // Using standard 'supabase' client to respect RLS
         const dataPromise = supabase.rpc("fetch_people_crm", {
             arg_tenant_id: tenantId,
             arg_start: startRow,
             arg_limit: endRow - startRow,
-            arg_sort_col: sortModel.length > 0 ? sortModel[0].colId : 'created_at',
-            arg_sort_dir: sortModel.length > 0 ? sortModel[0].sort : 'desc',
+            arg_sort_col: sortCol,
+            arg_sort_dir: sortDir,
             arg_filters: filters,
         });
 
-        // Loop: Count is now returned inside the main query (no second RPC needed)
+        // Loop: Count is now returned inside the main query (no second RPC needed usually, but logic kept for structure)
         const countPromise = Promise.resolve({ data: 0, error: null });
 
         const [dataResult, countResult] = await Promise.all([dataPromise, countPromise]);
@@ -136,11 +126,6 @@ export async function fetchPeople(params: PaginatedQuery) {
         let rowCount = (finalData.length > 0) ? (finalData[0].ret_total_count || 0) : 0;
 
         if (finalData.length > 0) {
-            console.log("[fetchPeople] First Row Keys:", Object.keys(finalData[0]));
-
-            // [Demo] Skip secondary fetches, everything is in the view
-
-
             // [Production] Fetch Roles (Optional - can be optimized later)
             try {
                 // Use 'ret_id' (RPC now returns this alias)
@@ -156,73 +141,24 @@ export async function fetchPeople(params: PaginatedQuery) {
                 if (!roleError && roles) {
                     const roleMap = new Map(roles.map((r: any) => [r.person_id, r.role_name]));
 
-                    // Also fetch custom_fields from cards as fallback for standalone contacts
-                    const { data: partyData, error: partyError } = await supabase
-                        .from('cards')
-                        .select('id, custom_fields')
-                        .in('id', ids);
-
-                    const cfMap = new Map(partyData?.map((p: any) => [p.id, p.custom_fields]) || []);
-
+                    // Attach role to data
                     finalData = finalData.map((p: any) => ({
                         ...p,
-                        // Update role_name if found
-                        ret_role_name: roleMap.get(p.ret_id) || p.ret_role_name,
-                        // Ensure custom_fields logic if needed
-                        custom_fields: cfMap.get(p.ret_id) || p.custom_fields
+                        ret_role_name: roleMap.get(p.ret_id) || p.ret_role_name || 'contact'
                     }));
                 }
-                // Log success
-                console.log("[fetchPeople] Roles Merged. Count:", roles?.length);
-
-            } catch (err) {
-                console.warn("Failed to fetch roles", err);
-                // If manual fetch fails, proceed with original data
+            } catch (roleErr) {
+                console.warn("Failed to fetch roles enhancement:", roleErr);
             }
-        } else {
-            console.log("--- [fetchPeople] RPC Success (Empty) ---");
         }
 
         return {
             rowData: finalData,
-            rowCount: rowCount,
-            debugInfo: {
-                timestamp: new Date().toISOString(),
-                params: params,
-                receivedFilterModel: fm,
-                computedFilters: filters,
-                rpcArgs: {
-                    arg_tenant_id: tenantId,
-                    arg_start: startRow,
-                    arg_limit: limit,
-                    arg_sort_col: sortCol,
-                    arg_sort_dir: sortDir,
-                },
-                rpcResultSummary: {
-                    count: finalData.length,
-                    totalCount: rowCount,
-                    firstRowSample: finalData.length > 0 ? {
-                        name: finalData[0].ret_name,
-                        id: finalData[0].ret_id,
-                        status: finalData[0].ret_status,
-                        role: finalData[0].ret_role_name
-                    } : 'No Data'
-                }
-            }
+            rowCount: Number(rowCount)
         };
 
-    } catch (e: any) {
-        console.error("[fetchPeople] CRITICAL ERROR:", e);
-        return {
-            rowData: [],
-            rowCount: 0,
-            error: e.message || "Unknown Server Error",
-            debugInfo: {
-                timestamp: new Date().toISOString(),
-                params: params,
-                error: e.message || e.toString(),
-                stack: e.stack
-            }
-        };
+    } catch (err: any) {
+        console.error("[fetchPeople] Critical Error:", err);
+        return { rowData: [], rowCount: 0, error: "Internal Server Error" };
     }
 }

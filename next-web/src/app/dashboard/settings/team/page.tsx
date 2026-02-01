@@ -1,23 +1,36 @@
-
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 import UserManagement from "@/components/UserManagement";
-import { cookies } from "next/headers";
+import BackButton from "@/components/BackButton";
 
-export const metadata = {
-    title: "Team Management | NOW System",
-};
+export default async function TeamSettingsPage() {
+    const supabase = await createClient();
 
-export default async function TeamPage() {
-    const cookieStore = await cookies();
-    const tenantId = cookieStore.get("tenant_id")?.value;
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        redirect("/login");
+    }
+
+    // Get Profile for Tenant ID
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('tenant_id')
+        .eq('id', user.id)
+        .single();
+
+    if (!profile) {
+        return <div>Access Denied</div>;
+    }
 
     return (
-        <div className="flex flex-col gap-6 max-w-5xl mx-auto p-6">
-            <header className="pb-6 border-b border-border">
-                <h1 className="text-3xl font-bold tracking-tight text-foreground">Team Settings</h1>
-                <p className="text-muted-foreground text-sm">Review, add, and manage your team members.</p>
-            </header>
+        <div className="p-6 max-w-5xl mx-auto">
+            <div className="mb-6 flex items-center gap-4">
+                <BackButton fallbackUrl="/dashboard" label="Back to Dashboard" />
+                <h1 className="text-2xl font-bold">Team Settings</h1>
+            </div>
 
-            <UserManagement tenantId={tenantId} />
+            <UserManagement tenantId={profile.tenant_id} />
         </div>
     );
 }

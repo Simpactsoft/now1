@@ -11,6 +11,7 @@ import { cookies } from "next/headers";
 import { getPeopleCount } from "@/app/actions/getPeopleCount";
 import { getCurrentUser } from "@/app/actions/getCurrentUser";
 import { createClient } from "@/lib/supabase/server";
+import { activateUser } from "@/app/actions/activateUser"; // Added
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -44,15 +45,22 @@ export default async function RootLayout({
     const supabase = await createClient();
     const { data } = await supabase
       .from("profiles")
-      .select("first_name, last_name, role")
+      .select("first_name, last_name, role, status") // Fetch status
       .eq("id", user.id)
       .maybeSingle();
 
     if (data) {
+      // Auto-Activate if invited
+      if (data.status === 'invited') {
+        await activateUser(user.id);
+        data.status = 'active'; // Reflect immediately
+      }
+
       userProfile = {
         name: `${data.first_name || ""} ${data.last_name || ""}`.trim() || user.email || "User",
         role: data.role || "User",
         email: user.email || "",
+        status: data.status
       };
     } else {
       console.warn('[RootLayout] Profile query returned no data for user:', user.email);
