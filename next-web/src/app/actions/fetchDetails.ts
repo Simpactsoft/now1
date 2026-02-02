@@ -80,3 +80,73 @@ export async function fetchPersonDetails(tenantId: string, personId: string) {
         timeline: timelineResult.data || []
     };
 }
+
+export async function fetchOrganizationDetails(tenantId: string, orgId: string) {
+    const supabase = await createClient();
+
+    const [profileResult, timelineResult, directCardResult] = await Promise.all([
+        supabase.rpc("fetch_organization_profile", {
+            arg_tenant_id: tenantId,
+            arg_org_id: orgId
+        }),
+        supabase.rpc("fetch_person_timeline", {
+            arg_tenant_id: tenantId,
+            arg_person_id: orgId,
+            arg_limit: 50
+        }),
+        // [New] Direct Fetch Fallback
+        supabase.from('cards')
+            .select('custom_fields, contact_methods, status')
+            .eq('id', orgId)
+            .eq('tenant_id', tenantId)
+            .maybeSingle()
+    ]);
+
+    if (profileResult.error) {
+        console.error("fetchOrganizationDetails error:", profileResult.error);
+        return { error: profileResult.error.message };
+    }
+
+    const org = profileResult.data?.[0];
+
+    if (!org) return { profile: null, timeline: [] };
+
+    // [New] Merge Logic (Same as Person)
+    // We prefer directCardResult if available (freshest), but fallback to RPC returned raw fields (ret_*) if RLS blocks direct fetch.
+    const rawCustomFields = directCardResult.data?.custom_fields || org.ret_custom_fields;
+    const rawContactMethods = directCardResult.data?.contact_methods || org.ret_contact_methods;
+
+    // Merge Custom Fields
+    if (rawCustomFields) {
+        org.custom_fields = { ...(org.custom_fields || {}), ...rawCustomFields };
+    }
+
+    // Handle Contact Methods (Array or Object)
+    if (Array.isArray(rawContactMethods)) {
+        const emailObj = rawContactMethods.find((m: any) => m.type === 'email');
+        const phoneObj = rawContactMethods.find((m: any) => m.type === 'phone');
+        const websiteObj = rawContactMethods.find((m: any) => m.type === 'website');
+
+        if (emailObj && !org.email) org.email = emailObj.value;
+        if (phoneObj && !org.phone) org.phone = phoneObj.value;
+        if (websiteObj && !org.website) org.website = websiteObj.value;
+    } else if (rawContactMethods && typeof rawContactMethods === 'object') {
+        // Fallback for Legacy Object Format
+        const m = rawContactMethods as any;
+        if (m.email && !org.email) org.email = m.email;
+        if (m.phone && !org.phone) org.phone = m.phone;
+        if (m.website && !org.website) org.website = m.website;
+    }
+
+    // Also check custom_fields for direct values (Priority: Top Level > Custom Fields > Contact Methods)
+    // Actually, usually Top Level (from RPC columns) is already populated from p.custom_fields by the RPC.
+    // But if RPC logic missed it (e.g. website not in top level custom field but in ret_custom_fields due to specific logic), we catch it here.
+    if (!org.email && rawCustomFields?.email) org.email = rawCustomFields.email;
+    if (!org.phone && rawCustomFields?.phone) org.phone = rawCustomFields.phone;
+    if (!org.website && rawCustomFields?.website) org.website = rawCustomFields.website;
+
+    return {
+        profile: org,
+        timeline: timelineResult.data || []
+    };
+}

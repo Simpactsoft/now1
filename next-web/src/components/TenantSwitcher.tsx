@@ -24,20 +24,24 @@ export default function TenantSwitcher({ currentTenantId }: TenantSwitcherProps)
             const supabase = createClient();
             console.log("[TenantSwitcher] Fetching tenants...");
 
-            // Strat 1: Try V2 (New Migration)
-            let { data, error } = await supabase.rpc("get_my_tenants_v2");
+            // Strat 1: Try JSON RPC (New Migration 228)
+            let { data, error } = await supabase.rpc("get_tenants_json");
 
             if (error) {
-                // Strat 2: Try V1 (Legacy / Standard)
-                // console.warn("[TenantSwitcher] V2 failed, trying V1...");
-                const resV1 = await supabase.rpc("get_my_tenants");
-                if (!resV1.error && resV1.data) {
-                    data = resV1.data;
+                console.error("[TenantSwitcher] JSON RPC failed", error);
+
+                // Strat 2: Try V2 (Legacy)
+                const resV2 = await supabase.rpc("get_my_tenants_v2");
+                if (!resV2.error && resV2.data) {
+                    data = resV2.data;
                     error = null;
                 } else {
-                    // Both RPCs failed. This is expected if migration missing + old cache.
-                    // We will rely on Fallback.
-                    // console.debug("RPCs failed, relying on Client Fallback");
+                    // Strat 3: Try V1
+                    const resV1 = await supabase.rpc("get_my_tenants");
+                    if (!resV1.error && resV1.data) {
+                        data = resV1.data;
+                        error = null;
+                    }
                 }
             }
 
@@ -82,6 +86,8 @@ export default function TenantSwitcher({ currentTenantId }: TenantSwitcherProps)
         const newId = e.target.value;
         if (newId) {
             await setTenantAction(newId);
+            // Force hard reload to ensure Server Components pick up the new cookie
+            window.location.reload();
         }
     };
 

@@ -17,9 +17,11 @@ import {
 import * as Popover from "@radix-ui/react-popover";
 import { useLanguage } from "@/context/LanguageContext";
 
+
 interface AddFilterCommandProps {
     onSelectField: (field: string) => void;
     minimal?: boolean;
+    fields?: { id: string; label: string; icon: any }[];
 }
 
 // Moved inside component to access language
@@ -28,17 +30,16 @@ const getAvailableFields = (lang: string) => [
     { id: 'name', label: lang === 'he' ? 'שם' : 'Name', icon: User },
     { id: 'status', label: lang === 'he' ? 'סטטוס' : 'Status', icon: Activity },
     { id: 'role_name', label: lang === 'he' ? 'תפקיד' : 'Role', icon: Briefcase },
-    // { id: 'company_size', label: 'Company Size', icon: Building2 }, // Removed
     { id: 'industry', label: lang === 'he' ? 'תעשייה' : 'Industry', icon: Factory },
     { id: 'joined_year', label: lang === 'he' ? 'שנת הצטרפות' : 'Joined Year', icon: Calendar },
     { id: 'tags', label: lang === 'he' ? 'תגיות' : 'Tags', icon: Tags },
 ];
 
-export default function AddFilterCommand({ onSelectField, minimal = false }: AddFilterCommandProps) {
+export default function AddFilterCommand({ onSelectField, minimal = false, fields }: AddFilterCommandProps) {
     const [open, setOpen] = useState(false);
     const { language } = useLanguage();
 
-    const AVAILABLE_FIELDS = getAvailableFields(language);
+    const AVAILABLE_FIELDS = fields || getAvailableFields(language);
 
     return (
         <Popover.Root open={open} onOpenChange={setOpen}>

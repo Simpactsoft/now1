@@ -40,6 +40,8 @@ interface EntityViewLayoutProps {
     onClearHistory?: () => void;
     // Dynamic Options for Filters (e.g. Statuses)
     filterOptions?: Record<string, any[]>;
+    // Available Filters Configuration
+    availableFilters?: { id: string; label: string; icon: any }[];
     // Render Props for Views
     renderTags: () => React.ReactNode;
     renderGrid: () => React.ReactNode;
@@ -103,6 +105,7 @@ export default function EntityViewLayout({
     onAddHistory,
     onClearHistory,
     filterOptions = {},
+    availableFilters,
     renderTags,
     renderGrid,
     renderCards,
@@ -325,6 +328,7 @@ export default function EntityViewLayout({
                     {/* Add Filter Trigger */}
                     <AddFilterCommand
                         minimal={true}
+                        fields={availableFilters}
                         onSelectField={(field) => {
                             if (field === 'search') {
                                 setIsSearchOpen(true);
@@ -347,7 +351,7 @@ export default function EntityViewLayout({
             </div>
 
             {/* Content Area */}
-            <div className={`transition-all duration-300 min-h-[400px]`}>
+            <div className={`transition-all duration-300 min-h-[100px]`}>
                 {viewMode === 'tags' && renderTags()}
                 {viewMode === 'grid' && renderGrid()}
                 {viewMode === 'cards' && renderCards()}

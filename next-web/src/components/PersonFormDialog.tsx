@@ -16,6 +16,7 @@ interface PersonData {
     phone?: string;
     status?: string;
     role?: string;
+    tags?: string[];
 }
 
 interface Props {
@@ -72,7 +73,7 @@ export default function PersonFormDialog({ tenantId, initialData, trigger }: Pro
                     lastName: initialData.lastName || "",
                     email: initialData.email || "",
                     phone: initialData.phone || "",
-                    status: initialData.status || "",
+                    status: (initialData.status || "").toUpperCase(),
                     role: (initialData as any).role || (initialData as any).job_title || "",
                     tags: (initialData as any).tags || []
                 });

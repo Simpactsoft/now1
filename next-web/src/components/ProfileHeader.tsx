@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Mail, Phone, MapPin, Building, Calendar, User, Trash2 } from 'lucide-react';
+import { Mail, Phone, MapPin, Building, Calendar, User, Trash2, Check, Copy } from 'lucide-react';
 import PersonFormDialog from './PersonFormDialog';
 import EditableField from './universal/EditableField';
 import { updatePerson } from '@/app/actions/updatePerson';
@@ -24,6 +24,7 @@ export default function ProfileHeader({ profile, tenantId }: ProfileHeaderProps)
 
     // Status Options State
     const [statusOptions, setStatusOptions] = useState<any[]>([]);
+    const [isStatusOpen, setIsStatusOpen] = useState(false);
 
     useEffect(() => {
         // Fetch Status Options
@@ -84,6 +85,8 @@ export default function ProfileHeader({ profile, tenantId }: ProfileHeaderProps)
             payload.phone = cleanValue;
         } else if (field === 'status') {
             payload.customFields = { status: value };
+        } else if (field === 'role') {
+            payload.customFields = { role: value };
         }
 
         const res = await updatePerson(payload);
@@ -95,10 +98,19 @@ export default function ProfileHeader({ profile, tenantId }: ProfileHeaderProps)
         }
     };
 
+
+    const handleCopy = (text: string, label: string) => {
+        if (!text) return;
+        navigator.clipboard.writeText(text);
+        toast.success(language === 'he' ? `${label} הועתק` : `${label} copied`);
+    };
+
     return (
-        <div className="bg-card p-8 rounded-3xl border border-border relative overflow-hidden shadow-sm">
-            {/* Background Gradient Blob */}
-            <div className="absolute top-0 right-0 -mr-10 -mt-10 w-64 h-64 bg-brand-primary/20 rounded-full blur-[80px] pointer-events-none" />
+        <div className="bg-card p-8 rounded-3xl border border-border relative shadow-sm">
+            {/* Background Gradient Blob - Wrapped to prevent overflow of content */}
+            <div className="absolute inset-0 rounded-3xl overflow-hidden pointer-events-none">
+                <div className="absolute top-0 right-0 -mr-10 -mt-10 w-64 h-64 bg-brand-primary/20 rounded-full blur-[80px]" />
+            </div>
 
             <div className="flex flex-col md:flex-row gap-8 items-start relative z-10">
                 {/* Avatar */}
@@ -115,84 +127,116 @@ export default function ProfileHeader({ profile, tenantId }: ProfileHeaderProps)
                 {/* Info */}
                 <div className="flex-1 min-w-0">
                     <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-3">
-                            <h1 className="text-3xl font-bold text-foreground tracking-tight flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-3">
+                            <h1 className="text-3xl font-bold text-foreground tracking-tight flex items-center">
                                 <EditableField
                                     value={profile.display_name}
                                     onSave={(val) => handleUpdate('display_name', val)}
-                                    className="hover:underline decoration-dashed underline-offset-4 decoration-primary/30"
+                                    className="hover:underline decoration-dashed underline-offset-4 decoration-primary/30 break-words"
                                     inputClassName="text-2xl font-bold bg-muted/50 border-input text-foreground rounded-lg px-2 py-1 min-w-[200px]"
+                                    isMultiline={true}
                                 />
                             </h1>
                             {profile.type && (
-                                <span className="px-2 py-0.5 rounded-full bg-muted text-[10px] uppercase font-bold tracking-widest text-muted-foreground border border-border">
+                                <span className="px-2 py-0.5 rounded-full bg-muted text-[10px] uppercase font-bold tracking-widest text-muted-foreground border border-border shrink-0">
                                     {profile.type}
                                 </span>
                             )}
-                            <div className="relative group flex items-center self-center">
-                                {(profile.status || profile.custom_fields?.status) ? (
-                                    <StatusBadge status={profile.status || profile.custom_fields.status} tenantId={tenantId} />
-                                ) : (
-                                    <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] uppercase font-bold tracking-widest border border-slate-200 whitespace-nowrap">
-                                        No Status
-                                    </span>
+                            <div className="relative flex items-center self-center shrink-0">
+                                <div onClick={() => setIsStatusOpen(!isStatusOpen)} className="cursor-pointer hover:opacity-80 transition-opacity">
+                                    {(profile.status || profile.custom_fields?.status) ? (
+                                        <StatusBadge status={profile.status || profile.custom_fields.status} tenantId={tenantId} />
+                                    ) : (
+                                        <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] uppercase font-bold tracking-widest border border-slate-200 whitespace-nowrap">
+                                            No Status
+                                        </span>
+                                    )}
+                                </div>
+
+                                {isStatusOpen && (
+                                    <>
+                                        <div className="fixed inset-0 z-40" onClick={() => setIsStatusOpen(false)} />
+                                        <div className={`absolute top-full mt-2 min-w-[160px] bg-card border border-border rounded-xl shadow-xl z-50 py-1 flex flex-col animate-in fade-in zoom-in-95 duration-200 ${language === 'he' ? 'right-0' : 'left-0'}`}>
+                                            <div className="px-3 py-2 text-xs font-semibold text-muted-foreground border-b border-border/50 mb-1">
+                                                {language === 'he' ? 'שנה סטטוס' : 'Change Status'}
+                                            </div>
+                                            {statusOptions.map((opt: any) => {
+                                                const label = opt.payload?.label_i18n?.[language] || opt.label || opt.value;
+                                                const isSelected = (profile.status || profile.custom_fields?.status || "").toUpperCase() === opt.value.toUpperCase();
+                                                return (
+                                                    <button
+                                                        key={opt.value}
+                                                        onClick={() => { handleUpdate('status', opt.value); setIsStatusOpen(false); }}
+                                                        className="text-left px-3 py-2 text-sm hover:bg-muted/50 transition-colors flex items-center gap-2 relative"
+                                                    >
+                                                        {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-primary absolute right-2" />}
+                                                        <StatusBadge status={opt.value} tenantId={tenantId} options={[opt]} className="pointer-events-none" />
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </>
                                 )}
-                                {/* Invisible select for editing */}
-                                <select
-                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                    value={(profile.status || profile.custom_fields?.status || "").toUpperCase()}
-                                    onChange={(e) => handleUpdate('status', e.target.value)}
-                                    onClick={(e) => e.stopPropagation()}
-                                >
-                                    <option value="" disabled>{language === 'he' ? 'שנה סטטוס' : 'Change Status'}</option>
-                                    {statusOptions.map((opt: any) => {
-                                        const label = opt.payload?.label_i18n?.[language] || opt.label || opt.value;
-                                        return (
-                                            <option key={opt.value} value={opt.value}>
-                                                {label}
-                                            </option>
-                                        );
-                                    })}
-                                </select>
                             </div>
                         </div>
-                        <div className="text-lg text-brand-secondary font-medium flex items-center gap-2">
+                        <div className="text-lg text-brand-secondary font-medium flex flex-wrap items-center gap-2">
                             <EditableField
                                 value={profile.job_title || ""}
                                 onSave={(val) => handleUpdate('role', val)}
                                 placeholder="No Active Role"
-                                className="hover:underline decoration-dashed"
+                                className="hover:underline decoration-dashed break-words"
+                                isMultiline={true}
                             />
-                            {profile.employer && <span className="text-muted-foreground">at {profile.employer}</span>}
+                            {profile.employer && <span className="text-muted-foreground shrink-0">at {profile.employer}</span>}
                         </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-                        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                            <Mail size={16} className="text-muted-foreground" />
+                        <div className="group flex items-center gap-3 text-sm text-muted-foreground min-w-0 relative">
+                            <Mail size={16} className="text-muted-foreground shrink-0" />
                             <EditableField
                                 value={profile.email || ""}
                                 onSave={(val) => handleUpdate('email', val)}
                                 type="email"
                                 placeholder="No email"
+                                className="min-w-0"
                             />
+                            {profile.email && (
+                                <button
+                                    onClick={() => handleCopy(profile.email, 'Email')}
+                                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-muted rounded-md text-muted-foreground hover:text-foreground absolute right-0 bg-card/80 backdrop-blur-sm"
+                                    title="Copy Email"
+                                >
+                                    <Copy size={13} />
+                                </button>
+                            )}
                         </div>
-                        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                            <Phone size={16} className="text-muted-foreground" />
+                        <div className="group flex items-center gap-3 text-sm text-muted-foreground min-w-0 relative">
+                            <Phone size={16} className="text-muted-foreground shrink-0" />
                             <EditableField
                                 value={profile.phone || ""}
                                 onSave={(val) => handleUpdate('phone', val)}
                                 type="tel"
                                 placeholder="No phone"
+                                className="min-w-0"
                             />
+                            {profile.phone && (
+                                <button
+                                    onClick={() => handleCopy(profile.phone, 'Phone')}
+                                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-muted rounded-md text-muted-foreground hover:text-foreground absolute right-0 bg-card/80 backdrop-blur-sm"
+                                    title="Copy Phone"
+                                >
+                                    <Copy size={13} />
+                                </button>
+                            )}
                         </div>
-                        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                            <MapPin size={16} className="text-muted-foreground" />
-                            <span>{profile.city ? `${profile.city}, ${profile.country}` : "Location unknown"}</span>
+                        <div className="flex items-center gap-3 text-sm text-muted-foreground min-w-0">
+                            <MapPin size={16} className="text-muted-foreground shrink-0" />
+                            <span className="truncate">{profile.city ? `${profile.city}, ${profile.country}` : "Location unknown"}</span>
                         </div>
-                        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                            <Calendar size={16} className="text-muted-foreground" />
-                            <span>Joined {new Date(profile.created_at).toLocaleDateString()}</span>
+                        <div className="flex items-center gap-3 text-sm text-muted-foreground min-w-0">
+                            <Calendar size={16} className="text-muted-foreground shrink-0" />
+                            <span className="truncate">Joined {new Date(profile.created_at).toLocaleDateString()}</span>
                         </div>
                     </div>
                 </div>
@@ -207,8 +251,10 @@ export default function ProfileHeader({ profile, tenantId }: ProfileHeaderProps)
                             lastName: derivedLastName,
                             email: profile.email,
                             phone: profile.phone,
-                            // If profile has status in custom_fields, pass it here
-                            status: profile.custom_fields?.status,
+                            // Pass status from either source (custom_fields priority, then root)
+                            status: profile.custom_fields?.status || profile.status,
+                            // Pass role from job_title
+                            role: profile.job_title,
                             tags: profile.tags
                         }}
                     />

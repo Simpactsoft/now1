@@ -6,19 +6,27 @@ export async function fetchTotalStats(tenantId: string) {
     try {
         const supabase = await createClient();
 
-        // Count all people visible to this user (Respects RLS)
-        const { count, error } = await supabase
+        // Count People
+        const { count: peopleCount, error: peopleError } = await supabase
             .from('cards')
             .select('*', { count: 'exact', head: true })
-            .eq('tenant_id', tenantId) // Optimization hint for Postgres
+            .eq('tenant_id', tenantId)
             .eq('type', 'person');
 
-        if (error) {
-            console.error("Error fetching total stats:", error);
-            return { totalPeople: 0, error: error.message };
-        }
+        // Count Organizations
+        const { count: orgCount, error: orgError } = await supabase
+            .from('cards')
+            .select('*', { count: 'exact', head: true })
+            .eq('tenant_id', tenantId)
+            .eq('type', 'organization');
 
-        return { totalPeople: count || 0 };
+        if (peopleError) console.error("Error fetching people stats:", peopleError);
+        if (orgError) console.error("Error fetching org stats:", orgError);
+
+        return {
+            totalPeople: peopleCount || 0,
+            totalOrganizations: orgCount || 0
+        };
     } catch (e: any) {
         return { totalPeople: 0, error: e.message };
     }

@@ -37,7 +37,8 @@ export const translations = {
         status: "Status",
         rating: "Rating",
         group: "Group",
-        count: "Count"
+        count: "Count",
+        organizations: "Organizations"
     },
     he: {
         dashboard: "לוח בקרה",
@@ -75,6 +76,7 @@ export const translations = {
         status: "סטטוס",
         rating: "דירוג",
         group: "קבוצה",
-        count: "כמות"
+        count: "כמות",
+        organizations: "ארגונים"
     }
 };

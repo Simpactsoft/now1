@@ -31,24 +31,25 @@ export default function ActionTimeline({ events }: ActionTimelineProps) {
     };
 
     return (
-        <div className="glass p-8 rounded-3xl border border-white/10">
-            <h3 className="text-xl font-bold text-white mb-6">Action Stream</h3>
-            <div className="relative border-l border-white/10 ml-3 space-y-8">
+
+        <div className="bg-card p-4 rounded-3xl border border-border shadow-sm">
+            <h3 className="text-xl font-bold text-foreground mb-3">Action Stream</h3>
+            <div className="relative border-l border-border ml-3 space-y-8">
                 {events.map((event) => (
                     <div key={event.id} className="relative pl-8">
                         {/* Timeline Dot */}
-                        <div className="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-slate-900 border border-white/20 flex items-center justify-center">
-                            <div className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+                        <div className="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-background border border-border flex items-center justify-center">
+                            <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
                         </div>
 
                         {/* Content */}
                         <div className="flex flex-col gap-1">
-                            <div className="flex items-center gap-2 text-sm text-slate-300 font-medium">
+                            <div className="flex items-center gap-2 text-sm text-foreground/80 font-medium">
                                 {getIcon(event.event_type)}
-                                <span className="uppercase tracking-wider text-[10px] text-slate-500">{event.event_type}</span>
+                                <span className="uppercase tracking-wider text-[10px] text-muted-foreground">{event.event_type}</span>
                             </div>
-                            <p className="text-slate-300">{event.event_message}</p>
-                            <span className="text-xs text-slate-600">
+                            <p className="text-muted-foreground">{event.event_message}</p>
+                            <span className="text-xs text-muted-foreground/70">
                                 {new Date(event.created_at).toLocaleString()}
                             </span>
                         </div>
@@ -57,4 +58,5 @@ export default function ActionTimeline({ events }: ActionTimelineProps) {
             </div>
         </div>
     );
+
 }

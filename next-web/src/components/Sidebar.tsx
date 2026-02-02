@@ -16,7 +16,8 @@ import {
     Menu,
     X,
     LogOut,
-    FlaskConical
+    FlaskConical,
+    Building2
 } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useLanguage } from '@/context/LanguageContext';
@@ -27,6 +28,7 @@ import { translations } from '@/lib/translations';
 const NAV_CONFIG = [
     { key: 'dashboard', href: '/dashboard', icon: LayoutDashboard },
     { key: 'contacts', href: '/dashboard/people', icon: UserCircle },
+    { key: 'organizations', href: '/dashboard/organizations', icon: Building2 },
     { key: 'logs', href: '/dashboard/logs', icon: Activity },
     { key: 'team', href: '/dashboard/settings/team', icon: Users },
     { key: 'infrastructure', href: '/dashboard/infra', icon: Database },

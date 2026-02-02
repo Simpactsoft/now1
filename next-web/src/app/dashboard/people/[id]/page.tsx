@@ -59,40 +59,41 @@ export default async function PersonProfilePage({ params }: PageProps) {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Left Column: Stats / Meta */}
+                {/* Left Column: Stats / Meta */}
                 <div className="space-y-6">
-                    <div className="glass p-6 rounded-2xl border border-white/10">
-                        <h3 className="font-bold text-white mb-4">Quick Stats</h3>
+                    <div className="bg-card p-4 rounded-2xl border border-border shadow-sm">
+                        <h3 className="font-bold text-foreground mb-3">Quick Stats</h3>
                         <div className="grid grid-cols-2 gap-4">
-                            <div className="p-3 bg-white/5 rounded-xl">
-                                <span className="block text-xs text-slate-500 uppercase">Logins</span>
-                                <span className="block text-xl font-bold text-white">24</span>
+                            <div className="p-3 bg-muted/50 rounded-xl border border-border/50">
+                                <span className="block text-xs text-muted-foreground uppercase">Logins</span>
+                                <span className="block text-xl font-bold text-foreground">24</span>
                             </div>
-                            <div className="p-3 bg-white/5 rounded-xl">
-                                <span className="block text-xs text-slate-500 uppercase">Risk Score</span>
-                                <span className="block text-xl font-bold text-emerald-400">Low</span>
+                            <div className="p-3 bg-muted/50 rounded-xl border border-border/50">
+                                <span className="block text-xs text-muted-foreground uppercase">Risk Score</span>
+                                <span className="block text-xl font-bold text-emerald-500">Low</span>
                             </div>
                         </div>
                     </div>
 
-                    <div className="glass p-6 rounded-2xl border border-white/10">
-                        <h3 className="font-bold text-white mb-4">Tags</h3>
+                    <div className="bg-card p-4 rounded-2xl border border-border shadow-sm">
+                        <h3 className="font-bold text-foreground mb-3">Tags</h3>
                         <div className="flex flex-wrap gap-2">
                             {profile.tags && Object.keys(profile.tags).map(key => (
-                                <span key={key} className="px-3 py-1 bg-brand-primary/20 text-brand-primary text-xs rounded-lg font-medium border border-brand-primary/20">
+                                <span key={key} className="px-3 py-1 bg-brand-primary/10 text-brand-primary text-xs rounded-lg font-medium border border-brand-primary/20">
                                     {key}: {profile.tags[key]}
                                 </span>
                             ))}
-                            {!profile.tags && <span className="text-slate-500 text-sm">No tags found</span>}
+                            {!profile.tags && <span className="text-muted-foreground text-sm">No tags found</span>}
                         </div>
                     </div>
 
-                    {/* Custom Fields (Dynamic) */}
-                    {attributes && attributes.length > 0 && (
+                    {/* Custom Fields (Dynamic) - Removed per user request */}
+                    {/* {attributes && attributes.length > 0 && (
                         <CustomFieldsCard
                             attributes={attributes}
                             customFields={profile.custom_fields || {}}
                         />
-                    )}
+                    )} */}
                 </div>
 
                 {/* Right Column: Timeline */}

@@ -13,6 +13,7 @@ interface EditableFieldProps {
     inputClassName?: string; // Class for the input
     placeholder?: string;
     style?: React.CSSProperties; // Pass through styles
+    isMultiline?: boolean;
 }
 
 export default function EditableField({
@@ -23,7 +24,8 @@ export default function EditableField({
     className = "",
     inputClassName = "",
     placeholder,
-    style
+    style,
+    isMultiline = false
 }: EditableFieldProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [tempValue, setTempValue] = useState(value);
@@ -123,7 +125,7 @@ export default function EditableField({
             title="Click to edit"
             style={style}
         >
-            <span className="truncate">{optimisticValue || <span className="text-slate-500 italic">Empty</span>}</span>
+            <span className={isMultiline ? "break-words whitespace-normal" : "truncate"}>{optimisticValue || <span className="text-slate-500 italic">Empty</span>}</span>
             <Pencil className="w-3 h-3 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
         </div>
     );
