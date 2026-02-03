@@ -8,6 +8,7 @@ import { ChevronLeft } from "lucide-react";
 import Link from "next/link"; // Kept for error state link
 import { getTenantAttributes } from "@/app/actions/attributes";
 import CustomFieldsCard from "@/components/people/CustomFieldsCard";
+import RelationshipManager from "@/components/RelationshipManager";
 
 export const dynamic = "force-dynamic";
 
@@ -96,8 +97,15 @@ export default async function PersonProfilePage({ params }: PageProps) {
                     )} */}
                 </div>
 
-                {/* Right Column: Timeline */}
-                <div className="lg:col-span-2">
+                {/* Right Column: Timeline & Relationships */}
+                <div className="lg:col-span-2 space-y-8">
+                    {/* Relationships Section */}
+                    <RelationshipManager
+                        tenantId={tenantId}
+                        entityId={id}
+                        entityType="person"
+                    />
+
                     <ActionTimeline events={timeline} />
                 </div>
             </div>

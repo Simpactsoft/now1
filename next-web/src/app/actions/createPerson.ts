@@ -37,7 +37,17 @@ export async function createPerson(params: CreatePersonInput) {
             arg_email: email || null,
             arg_phone: phone || null,
             arg_custom_fields: customFields || {},
-            arg_tags: tags || []
+            arg_tags: tags || [],
+            arg_organization_id: null
+        });
+
+        console.log("createPerson: RPC Arguments:", {
+            arg_tenant_id: tenantId,
+            arg_first_name: firstName,
+            arg_last_name: lastName,
+            arg_email: email || null,
+            arg_phone: phone || null,
+            arg_organization_id: null
         });
 
         if (!error) {

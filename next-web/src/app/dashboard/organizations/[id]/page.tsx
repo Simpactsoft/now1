@@ -1,6 +1,7 @@
 
 import { cookies } from "next/headers";
 import OrganizationHeader from "@/components/OrganizationHeader";
+import RelationshipManager from "@/components/RelationshipManager";
 import ActionTimeline from "@/components/ActionTimeline";
 import { fetchOrganizationDetails } from "@/app/actions/fetchDetails";
 import BackButton from "@/components/BackButton";
@@ -84,8 +85,15 @@ export default async function OrganizationProfilePage({ params }: PageProps) {
                     </div>
                 </div>
 
-                {/* Right Column: Timeline */}
-                <div className="lg:col-span-2">
+                {/* Right Column: Timeline & Relationships */}
+                <div className="lg:col-span-2 space-y-8">
+                    {/* Relationships Section */}
+                    <RelationshipManager
+                        tenantId={tenantId}
+                        entityId={id}
+                        entityType="organization"
+                    />
+
                     <ActionTimeline events={timeline} />
                 </div>
             </div>

@@ -23,12 +23,24 @@ interface Props {
     tenantId: string;
     initialData?: PersonData; // If present, it's Edit mode
     trigger?: React.ReactNode;
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
+    onSuccess?: (res?: any) => void;
+    defaultName?: string;
 }
 
-export default function PersonFormDialog({ tenantId, initialData, trigger }: Props) {
+export default function PersonFormDialog({ tenantId, initialData, trigger, open, onOpenChange, onSuccess, defaultName }: Props) {
     const { language } = useLanguage();
     const isEditMode = !!initialData?.id;
-    const [isOpen, setIsOpen] = useState(false);
+    const [internalOpen, setInternalOpen] = useState(false);
+
+    // Controlled vs Uncontrolled logic
+    const isControlled = open !== undefined;
+    const isOpen = isControlled ? open : internalOpen;
+    const setIsOpen = (val: boolean) => {
+        if (!isControlled) setInternalOpen(val);
+        onOpenChange?.(val);
+    };
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [mounted, setMounted] = useState(false);
@@ -78,10 +90,22 @@ export default function PersonFormDialog({ tenantId, initialData, trigger }: Pro
                     tags: (initialData as any).tags || []
                 });
             } else {
-                setFormData({ firstName: "", lastName: "", email: "", phone: "", status: "", role: "", tags: [] });
+                // Parse defaultName if provided
+                let defFirst = "";
+                let defLast = "";
+                if (defaultName) {
+                    const parts = defaultName.trim().split(" ");
+                    if (parts.length > 0) {
+                        defFirst = parts[0];
+                        if (parts.length > 1) {
+                            defLast = parts.slice(1).join(" ");
+                        }
+                    }
+                }
+                setFormData({ firstName: defFirst, lastName: defLast, email: "", phone: "", status: "", role: "", tags: [] });
             }
         }
-    }, [isOpen, initialData]);
+    }, [isOpen, initialData, defaultName]);
 
     // Fetch Status Options (Once per session or on open)
     useEffect(() => {
@@ -140,16 +164,21 @@ export default function PersonFormDialog({ tenantId, initialData, trigger }: Pro
                 setIsOpen(false);
                 if (!isEditMode) {
                     // Clear form on create success
-                    setFormData({ firstName: "", lastName: "", email: "", phone: "", status: "", role: "" });
+                    setFormData({ firstName: "", lastName: "", email: "", phone: "", status: "", role: "", tags: [] });
 
-                    // Highlight newly created person
+                    // Highlight newly created person (Optional, maybe specific to page)
                     const params = new URLSearchParams(searchParams.toString());
                     if (res.data?.id) {
                         params.set('created', res.data.id);
-                        router.replace(`${pathname}?${params.toString()}`);
+                        // Only replace URL if we are on the main list page, otherwise it might be disruptive
+                        if (pathname.includes('/people')) {
+                            router.replace(`${pathname}?${params.toString()}`);
+                        }
                     }
+                    onSuccess?.(res);
                 } else {
                     router.refresh();
+                    onSuccess?.(res);
                 }
             } else {
                 setError(res.error || "Operation failed");

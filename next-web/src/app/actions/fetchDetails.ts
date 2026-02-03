@@ -62,6 +62,11 @@ export async function fetchPersonDetails(tenantId: string, personId: string) {
 
             if (emailObj) profile.email = emailObj.value;
             if (phoneObj) profile.phone = phoneObj.value;
+        } else if (cardData.contact_methods && typeof cardData.contact_methods === 'object') {
+            // Handle Flat Object format (e.g. { phone: "...", email: "..." })
+            const m = cardData.contact_methods as any;
+            if (m.email) profile.email = m.email;
+            if (m.phone) profile.phone = m.phone;
         }
 
         // Priority: Membership Role > Custom Fields Role

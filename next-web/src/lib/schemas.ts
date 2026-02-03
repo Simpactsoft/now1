@@ -7,7 +7,7 @@ export const PaginatedQuerySchema = z.object({
         colId: z.string(),
         sort: z.enum(['asc', 'desc'])
     })).optional().default([]),
-    filterModel: z.record(z.any()).optional().default({}),
+    filterModel: z.record(z.string(), z.any()).optional().default({}),
     tenantId: z.string().min(1, "Tenant ID is required"),
     query: z.string().optional()
 });
@@ -18,7 +18,7 @@ export const CreatePersonSchema = z.object({
     email: z.string().email("Invalid email").optional().or(z.literal("")),
     phone: z.string().optional(),
     tenantId: z.string().min(1, "Tenant ID is required"),
-    customFields: z.record(z.any()).optional(), // Flexible JSON for attributes
+    customFields: z.record(z.string(), z.any()).optional(), // Flexible JSON for attributes
     tags: z.array(z.string()).optional()
 });
 
