@@ -143,7 +143,7 @@ export default function ProfileHeader({ profile, tenantId }: ProfileHeaderProps)
                                 </span>
                             )}
                             <div className="relative flex items-center self-center shrink-0">
-                                <div onClick={() => setIsStatusOpen(!isStatusOpen)} className="cursor-pointer hover:opacity-80 transition-opacity">
+                                <div onClick={() => setIsStatusOpen(!isStatusOpen)} className="cursor-pointer hover:opacity-80 transition-opacity flex items-center">
                                     {(profile.status || profile.custom_fields?.status) ? (
                                         <StatusBadge status={profile.status || profile.custom_fields.status} tenantId={tenantId} />
                                     ) : (

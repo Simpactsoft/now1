@@ -11,25 +11,21 @@ import {
     GetRowIdParams
 } from "ag-grid-community";
 // CSS Imports handled by lib/ag-grid-registry.ts globally
-// import "ag-grid-community/styles/ag-grid.css";
-// import "ag-grid-community/styles/ag-theme-alpine.css";
-// Note: In v35 the styles might be different or all-in-one, but assuming standard imports work or are handled globally 
-// effectively if included in globals.css. If not, these might be needed.
-// Actually layout.tsx imports globals.css, and registry might handle modules.
-// Let's assume standard setup or that these imports are harmless duplicates if already globally present.
 
 import { StatusBadge } from "./StatusBadge";
+import { updateOrganization } from "@/app/actions/updateOrganization";
 import { updatePerson } from "@/app/actions/updatePerson";
 import { useLanguage } from "@/context/LanguageContext";
 import { Loader2 } from "lucide-react";
 import { useTheme } from "next-themes";
+import { cn } from "@/lib/utils";
 
 interface PeopleAgGridProps {
     people: any[];
     loading: boolean;
     hasMore: boolean;
     loadMore: () => void;
-    onPersonClick: (id: string, event: any) => void;
+    onPersonClick: (id: string, type?: string, event?: any) => void;
     highlightId: string | null;
     tenantId: string;
     statusOptions: any[];
@@ -43,29 +39,15 @@ export default function PeopleAgGrid({
     onPersonClick,
     highlightId,
     tenantId,
-    statusOptions
-}: PeopleAgGridProps) {
+    statusOptions,
+    className
+}: PeopleAgGridProps & { className?: string }) {
     const { language } = useLanguage();
     const { theme } = useTheme(); // Get current theme
     const gridRef = useRef<AgGridReact>(null);
 
     // Dynamic Theme Class
     const themeClass = theme === 'dark' ? 'ag-theme-quartz-dark' : 'ag-theme-quartz';
-
-    // Status Options State
-    // const [statusOptions, setStatusOptions] = useState<any[]>([]); // Removed internal state
-
-    // Fetch Status Options - Removed, passed via props
-    /*
-    useEffect(() => {
-        fetch(`/api/options?code=PERSON_STATUS&tenantId=${tenantId}`)
-            .then(res => res.json())
-            .then(json => {
-                if (json.data) setStatusOptions(json.data);
-            })
-            .catch(err => console.error("Failed to fetch status options", err));
-    }, [tenantId]);
-    */
 
     // Update Handler
     const onCellValueChanged = useCallback(async (event: CellValueChangedEvent) => {
@@ -74,8 +56,9 @@ export default function PeopleAgGrid({
         const data = event.data;
         const field = event.colDef.field;
         const id = data.id || data.ret_id;
+        const type = data.type || data.ret_type; // 'person' or 'organization'
 
-        console.log(`[PeopleAgGrid] Updating ${field} for ${id} to:`, event.newValue);
+        console.log(`[PeopleAgGrid] Updating ${field} for ${id} (${type}) to:`, event.newValue);
 
         const payload: any = {
             id,
@@ -85,9 +68,13 @@ export default function PeopleAgGrid({
         const val = (event.newValue || "").trim();
 
         if (field === 'display_name' || field === 'ret_name') {
-            const parts = val.split(' ');
-            payload.firstName = parts[0];
-            payload.lastName = parts.slice(1).join(' ') || "";
+            if (type === 'organization') {
+                payload.displayName = val;
+            } else {
+                const parts = val.split(' ');
+                payload.firstName = parts[0];
+                payload.lastName = parts.slice(1).join(' ') || "";
+            }
         } else if (field === 'ret_status') {
             payload.customFields = { status: val };
         } else if (field === 'ret_role_name') {
@@ -99,7 +86,13 @@ export default function PeopleAgGrid({
         }
 
         try {
-            const res = await updatePerson(payload);
+            let res;
+            if (type === 'organization') {
+                res = await updateOrganization(payload);
+            } else {
+                res = await updatePerson(payload);
+            }
+
             if (!res.success) {
                 console.error("Update failed:", res.error);
                 // Ideally revert here
@@ -137,7 +130,8 @@ export default function PeopleAgGrid({
                             onClick={(e) => {
                                 e.stopPropagation();
                                 const id = params.data.id || params.data.ret_id;
-                                onPersonClick(id, e);
+                                const type = params.data.type || params.data.ret_type;
+                                onPersonClick(id, type, e);
                             }}
                             className="w-full h-full flex items-center justify-center text-muted-foreground hover:text-primary transition-colors opacity-50 hover:opacity-100"
                             title="View Profile"
@@ -154,7 +148,6 @@ export default function PeopleAgGrid({
                 pinned: 'left',
                 sortable: false,
                 filter: false,
-                // Force string/text type to avoid object inference warnings if data is mixed
                 cellDataType: 'text'
             },
             {
@@ -182,7 +175,7 @@ export default function PeopleAgGrid({
                 headerName: language === 'he' ? "סטטוס" : "Status",
                 width: 140,
                 editable: true,
-                cellDataType: 'text', // Force text type to avoid object inference
+                cellDataType: 'text',
                 cellRenderer: (params: ICellRendererParams) => {
                     if (!params.value) return <span className="opacity-50">-</span>;
                     return <StatusBadge status={params.value} tenantId={tenantId} />;
@@ -204,15 +197,15 @@ export default function PeopleAgGrid({
                 headerName: language === 'he' ? "תפקיד" : "Role",
                 flex: 1.5,
                 editable: true,
-                valueParser: (params) => params.newValue, // Allow empty
+                valueParser: (params: any) => params.newValue,
                 cellDataType: 'text'
             },
             {
-                field: "email", // Need to ensure data has email (might be in contact_methods)
+                field: "email",
                 headerName: "Email",
                 flex: 1.5,
                 editable: true,
-                hide: true, // Hidden by default to save space, user can enable? Or show?
+                hide: true,
                 cellDataType: 'text'
             },
             {
@@ -260,13 +253,12 @@ export default function PeopleAgGrid({
         sortable: true,
         filter: true,
         resizable: true,
-        suppressMovable: true // Simplify UX
+        suppressMovable: true
     }), []);
 
     // Load More on Scroll
     const onBodyScroll = useCallback((event: any) => {
         const api = event.api;
-        // api.getModel() sometimes causes issues if model not ready, use getDisplayedRowCount
         const rowCount = api.getDisplayedRowCount();
         if (rowCount === 0) return;
 
@@ -278,7 +270,7 @@ export default function PeopleAgGrid({
 
 
     return (
-        <div className={`w-full h-[600px] ${themeClass} border border-border rounded-xl overflow-hidden shadow-sm bg-card`}>
+        <div className={cn(`w-full h-[600px] ${themeClass} border border-border rounded-xl overflow-hidden shadow-sm bg-card`, className)}>
             <AgGridReact
                 ref={gridRef}
                 rowData={people}

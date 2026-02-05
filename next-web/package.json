@@ -1,7 +1,5 @@
 {
-  "name": "next-web",
-  "version": "0.2.5",
-  "private": true,
+  "version": "0.2.6",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Mail, Phone, MapPin, Building, Globe, Trash2, Copy } from 'lucide-react';
+import { Mail, Phone, MapPin, Building, Globe, Trash2, Copy, Pencil } from 'lucide-react';
+import OrganizationFormDialog from './OrganizationFormDialog';
 import EditableField from './universal/EditableField';
 import { updateOrganization } from '@/app/actions/updateOrganization';
 import { useRouter } from 'next/navigation';
@@ -51,6 +52,9 @@ export default function OrganizationHeader({ profile, tenantId }: OrganizationHe
         else if (field === 'industry') payload.customFields = { industry: value };
         else if (field === 'city') payload.customFields = { city: value }; // Simple update if needed
 
+        console.log("[OrganizationHeader] Sending Update Payload:", payload);
+
+
         const res = await updateOrganization(payload);
         if (res.success) {
             router.refresh();
@@ -97,8 +101,11 @@ export default function OrganizationHeader({ profile, tenantId }: OrganizationHe
                                     isMultiline={true}
                                 />
                             </h1>
+                            <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[10px] uppercase font-bold tracking-widest border border-blue-100 shrink-0">
+                                {language === 'he' ? 'ארגון' : 'Organization'}
+                            </span>
                             <div className="relative flex items-center self-center shrink-0">
-                                <div onClick={() => setIsStatusOpen(!isStatusOpen)} className="cursor-pointer hover:opacity-80 transition-opacity">
+                                <div onClick={() => setIsStatusOpen(!isStatusOpen)} className="cursor-pointer hover:opacity-80 transition-opacity flex items-center">
                                     {(profile.status || profile.custom_fields?.status) ? (
                                         <StatusBadge status={profile.status || profile.custom_fields.status} tenantId={tenantId} />
                                     ) : (
@@ -173,7 +180,7 @@ export default function OrganizationHeader({ profile, tenantId }: OrganizationHe
                             {profile.email && (
                                 <button
                                     onClick={() => handleCopy(profile.email, 'Email')}
-                                    className="p-1.5 hover:bg-muted rounded-md absolute right-0 bg-card/80 border border-border/10 shadow-sm"
+                                    className="p-1.5 hover:bg-muted rounded-md absolute right-0 bg-card/80 border border-border/10 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
                                 >
                                     <Copy size={13} />
                                 </button>
@@ -192,7 +199,7 @@ export default function OrganizationHeader({ profile, tenantId }: OrganizationHe
                             {profile.phone && (
                                 <button
                                     onClick={() => handleCopy(profile.phone, 'Phone')}
-                                    className="p-1.5 hover:bg-muted rounded-md absolute right-0 bg-card/80 border border-border/10 shadow-sm"
+                                    className="p-1.5 hover:bg-muted rounded-md absolute right-0 bg-card/80 border border-border/10 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
                                 >
                                     <Copy size={13} />
                                 </button>
@@ -207,6 +214,45 @@ export default function OrganizationHeader({ profile, tenantId }: OrganizationHe
                             </span>
                         </div>
                     </div>
+                </div>
+
+                {/* Quick Actions */}
+                <div className="flex flex-col gap-3">
+                    <OrganizationFormDialog
+                        tenantId={tenantId}
+                        initialData={{
+                            id: profile.id,
+                            name: profile.display_name,
+                            industry: profile.industry || profile.custom_fields?.industry,
+                            companySize: profile.company_size || profile.custom_fields?.company_size,
+                            website: profile.website,
+                            phone: profile.phone,
+                            email: profile.email,
+                            status: profile.status || profile.custom_fields?.status
+                        }}
+                        trigger={
+                            <button className="px-4 py-2 bg-white text-black font-semibold rounded-lg text-sm hover:bg-slate-200 transition-colors flex items-center gap-2">
+                                <Pencil size={16} />
+                                {language === 'he' ? 'ערוך פרופיל' : 'Edit Profile'}
+                            </button>
+                        }
+                        onSuccess={() => router.refresh()}
+                    />
+
+                    {canDelete && (
+                        <button
+                            onClick={() => {
+                                if (confirm(language === 'he' ? "האם למחוק ארגון זה?" : "Are you sure you want to delete this organization?")) {
+                                    // TODO: Implement delete organization action
+                                    toast.error("Delete not implemented yet");
+                                }
+                            }}
+                            className="px-4 py-2 bg-destructive/10 text-destructive border border-destructive/20 font-semibold rounded-lg text-sm hover:bg-destructive/20 transition-colors flex items-center justify-center gap-2"
+                        >
+                            <Trash2 size={16} />
+                            <span>{language === 'he' ? 'מחק ארגון' : 'Delete Organization'}</span>
+                        </button>
+                    )}
                 </div>
             </div>
         </div>

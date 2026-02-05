@@ -69,17 +69,27 @@ export async function updatePerson(rawInput: any) {
             .from('cards')
             .select('*')
             .eq('id', id)
-            .single();
+            .eq('id', id);
+        // .single(); // DEBUGGING: Removed single() to debug "Cannot coerce" error
 
-        if (fetchError) throw new Error(`Fetch Card failed: ${fetchError.message}`);
+        if (fetchError) throw new Error(`Fetch Card query failed: ${fetchError.message}`);
 
-        const lastKnownUpdatedAt = currentCard.updated_at;
+        if (!currentCard || currentCard.length === 0) {
+            return { success: false, error: "Card not found (0 rows)" };
+        }
+
+        if (currentCard.length > 1) {
+            console.warn(`[WARNING] Multiple cards found for ID ${id}: ${currentCard.length} rows`);
+        }
+
+        const cardData = currentCard[0]; // Take the first one
+        const lastKnownUpdatedAt = cardData.updated_at;
 
         // Logic to construct Display Name
-        let newDisplayName = currentCard.display_name;
+        let newDisplayName = cardData.display_name;
 
         if (firstName !== undefined || lastName !== undefined) {
-            const oldParts = currentCard.display_name.split(' ');
+            const oldParts = cardData.display_name.split(' ');
             const oldFirst = oldParts[0] || '';
             const oldLast = oldParts.slice(1).join(' ') || '';
 
@@ -89,14 +99,14 @@ export async function updatePerson(rawInput: any) {
         }
 
         const updatedCustomFields = {
-            ...(currentCard.custom_fields || {}),
+            ...(cardData.custom_fields || {}),
             ...customFields
         };
 
-        const status = updatedCustomFields.status || currentCard.status || 'lead';
+        const status = updatedCustomFields.status || cardData.status || 'lead';
 
         // Update Contact Methods
-        let currentContactMethods = currentCard.contact_methods || {};
+        let currentContactMethods = cardData.contact_methods || {};
         if (Array.isArray(currentContactMethods)) {
             currentContactMethods = {};
         }

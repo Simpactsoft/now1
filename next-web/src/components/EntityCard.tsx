@@ -1,6 +1,5 @@
-"use client";
-
-import { Building, User, Mail, Phone, MapPin, MoreHorizontal, Edit, Trash2, Copy } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Building, User, Mail, Phone, MapPin, MoreHorizontal, Edit, Trash2, Copy, Link as LinkIcon } from 'lucide-react';
 import { StatusBadge } from './StatusBadge';
 import { useLanguage } from '@/context/LanguageContext';
 
@@ -21,25 +20,40 @@ interface EntityCardProps {
     tenantId: string;
     onEdit?: (id: string) => void;
     onDelete?: (id: string) => void;
+    onNavigate?: (id: string) => void;
 }
 
-export default function EntityCard({ entity, tenantId, onEdit, onDelete }: EntityCardProps) {
+export default function EntityCard({ entity, tenantId, onEdit, onDelete, onNavigate }: EntityCardProps) {
     const { language } = useLanguage();
+    const [showMenu, setShowMenu] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setShowMenu(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     return (
-        <div className="group bg-card hover:bg-muted/30 border border-border rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden flex flex-col h-full">
+        <div className="group bg-card hover:bg-muted/30 border border-border rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-300 relative flex flex-col h-full">
             {/* Top Gradient Accent (Optional) */}
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-brand-primary/50 to-brand-secondary/50 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-brand-primary/50 to-brand-secondary/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-t-xl" />
 
             {/* Header: Icon + Name + Menu */}
             <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-inner ${entity.type === 'organization' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'
-                        }`}>
+                    <div
+                        className={`w-12 h-12 rounded-full flex items-center justify-center shadow-inner cursor-pointer hover:opacity-80 transition-opacity ${entity.type === 'organization' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}`}
+                        onClick={() => onNavigate?.(entity.id)}
+                    >
                         {entity.type === 'organization' ? <Building size={20} /> : <User size={20} />}
                     </div>
                     <div>
-                        <h3 className="font-bold text-foreground line-clamp-1 text-lg group-hover:text-primary transition-colors cursor-pointer" onClick={() => onEdit?.(entity.id)}>
+                        <h3 className="font-bold text-foreground line-clamp-1 text-lg group-hover:text-primary transition-colors cursor-pointer" onClick={() => onNavigate?.(entity.id)}>
                             {entity.displayName}
                         </h3>
                         <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
@@ -47,15 +61,45 @@ export default function EntityCard({ entity, tenantId, onEdit, onDelete }: Entit
                         </p>
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 relative" ref={menuRef}>
                     {entity.status && (
                         <div className="scale-90 origin-right">
                             <StatusBadge status={entity.status} tenantId={tenantId} />
                         </div>
                     )}
-                    <button className="text-muted-foreground hover:text-foreground p-1 rounded-md hover:bg-slate-100 transition-colors">
+                    <button
+                        onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
+                        className={`text-muted-foreground hover:text-foreground p-1 rounded-md hover:bg-slate-100 transition-colors ${showMenu ? 'bg-slate-100 text-foreground' : ''}`}
+                    >
                         <MoreHorizontal size={18} />
                     </button>
+
+                    {showMenu && (
+                        <div className="absolute top-full right-0 mt-1 w-36 bg-popover border border-border rounded-lg shadow-lg z-10 py-1 animate-in fade-in zoom-in-95 duration-100">
+                            {onEdit && (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setShowMenu(false); onEdit(entity.id); }}
+                                    className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground flex items-center gap-2"
+                                >
+                                    <Edit size={14} />
+                                    <span>{language === 'he' ? 'ערוך' : 'Edit'}</span>
+                                </button>
+                            )}
+                            {onDelete && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setShowMenu(false);
+                                        if (confirm(language === 'he' ? 'האם אתה בטוח?' : 'Are you sure?')) onDelete(entity.id);
+                                    }}
+                                    className="w-full text-left px-3 py-2 text-sm hover:bg-destructive/10 text-destructive hover:text-destructive flex items-center gap-2"
+                                >
+                                    <Trash2 size={14} />
+                                    <span>{language === 'he' ? 'נתק' : 'Unlink'}</span>
+                                </button>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
 

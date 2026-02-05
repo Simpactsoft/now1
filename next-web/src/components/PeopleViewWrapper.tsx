@@ -196,9 +196,13 @@ function PeopleViewContent({ tenantId }: PeopleViewWrapperProps) {
         }
     }, []);
 
-    const handlePersonClick = (id: string) => {
+    const handlePersonClick = (id: string, type?: string) => {
         sessionStorage.setItem('lastClickedPersonId', id);
-        router.push(`/dashboard/people/${id}`);
+        if (type === 'organization') {
+            router.push(`/dashboard/organizations/${id}`);
+        } else {
+            router.push(`/dashboard/people/${id}`);
+        }
     };
 
     // Helper: Convert FilterCondition[] -> API Object
@@ -379,7 +383,7 @@ function PeopleViewContent({ tenantId }: PeopleViewWrapperProps) {
                             <SimpleProfileCard
                                 key={`${id}-${idx}`}
                                 person={person}
-                                onClick={() => handlePersonClick(id)}
+                                onClick={() => handlePersonClick(id, person.type || person.ret_type)}
                                 isHighlighted={isHighlighted}
                             />
                         );

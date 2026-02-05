@@ -32,29 +32,67 @@ export async function fetchRelationshipsAction(tenantId: string, entityId: strin
             data = adminData;
         }
 
-        // Transform to frontend format
-        const relationships = (data || []).map((r: any) => ({
+        // Transform to frontend format (Basic)
+        const basicRelationships = (data || []).map((r: any) => ({
             id: r.rel_id,
             target: {
                 id: r.target_id,
                 name: r.target_name,
                 type: r.target_type,
-                avatarUrl: null
+                avatarUrl: null // Placeholder
             },
             type: {
                 id: r.rel_type_id,
                 name: r.rel_type
-            }
+            },
+            metadata: r.metadata // Map metadata
         }));
 
-        return { data: relationships };
+        // Enrich with Full Card Data (Admin Client to bypass RLS for visibility consistency)
+        if (basicRelationships.length > 0) {
+            const adminClient = getAdminClient();
+            const ids = basicRelationships.map((r: any) => r.target.id);
+            const { data: cardsData, error: cardsError } = await adminClient
+                .from('cards')
+                .select('*')
+                .in('id', ids)
+                .eq('tenant_id', tenantId); // Security: Enforce tenant boundary
+
+            if (!cardsError && cardsData) {
+                // Return enriched objects compatible with SimplePeopleTable
+                const enriched = cardsData.map((card: any) => {
+                    const rel = basicRelationships.find((r: any) => r.target.id === card.id);
+                    return {
+                        ...card,
+                        ret_id: card.id,
+                        ret_name: card.display_name,
+                        ret_avatar_url: card.avatar_url,
+                        ret_status: card.status || card.custom_fields?.status,
+                        ret_role_name: rel?.type.name, // Relationship Type as Role
+                        ret_tags: card.tags,
+                        ret_last_interaction: card.last_interaction_at,
+                        // Robust Contact Methods extraction (matches fetchDetails logic)
+                        email: card.contact_methods?.email || (typeof card.contact_methods === 'object' ? (card.contact_methods as any).email : ''),
+                        phone: card.contact_methods?.phone || (typeof card.contact_methods === 'object' ? (card.contact_methods as any).phone : ''),
+                        // Preserve Relationship Metadata
+                        relationshipId: rel?.id,
+                        relationshipType: rel?.type,
+                        metadata: rel?.metadata // Include Metadata
+                    };
+                });
+                return { data: enriched };
+            }
+        }
+
+        return { data: [] }; // No relationships found
     } catch (e: any) {
         console.error("fetchRelationships error", e);
         return { error: e.message };
     }
 }
 
-export async function addRelationshipAction(tenantId: string, sourceId: string, targetId: string, typeName: string) {
+// Update Add Action to accept Metadata
+export async function addRelationshipAction(tenantId: string, sourceId: string, targetId: string, typeName: string, metadata: any = {}) {
     const supabase = await createServerClient();
 
     // RPC Logic
@@ -63,7 +101,8 @@ export async function addRelationshipAction(tenantId: string, sourceId: string, 
             p_tenant_id: tenantId,
             p_source_id: sourceId,
             p_target_id: targetId,
-            p_type_name: typeName
+            p_type_name: typeName,
+            p_metadata: metadata
         });
 
         if (error) throw error;
@@ -85,7 +124,7 @@ export async function addRelationshipAction(tenantId: string, sourceId: string, 
     }
 }
 
-export async function removeRelationshipAction(relId: string) {
+export async function removeRelationshipAction(tenantId: string, relId: string) {
     const supabase = await createServerClient();
 
     try {
@@ -97,6 +136,12 @@ export async function removeRelationshipAction(relId: string) {
         console.error("Standard remove failed. Trying Service Role...", e);
         try {
             const adminClient = getAdminClient();
+            const { error: err2 } = await adminClient
+                .from('entity_relationships')
+                .delete()
+                .eq('id', relId)
+                .eq('tenant_id', tenantId); // Security: Enforce tenant boundary
+
             if (err2) throw err2;
             revalidatePath('/dashboard');
             return { success: true };
@@ -106,14 +151,15 @@ export async function removeRelationshipAction(relId: string) {
     }
 }
 
-export async function updateRelationshipAction(tenantId: string, relId: string, typeName: string) {
+export async function updateRelationshipAction(tenantId: string, relId: string, typeName: string, metadata: any = null) {
     const supabase = await createServerClient();
 
     const execute = async (client: any) => {
         const { data, error } = await client.rpc('update_entity_relationship', {
             p_tenant_id: tenantId,
             p_rel_id: relId,
-            p_type_name: typeName
+            p_type_name: typeName,
+            p_metadata: metadata
         });
 
         if (error) throw error;

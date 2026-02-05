@@ -7,7 +7,8 @@ import { cn } from "@/lib/utils";
 import { useDebounce } from "@/hooks/useDebounce";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import PersonFormDialog from "@/components/PersonFormDialog";
-// import OrganizationFormDialog from "@/components/OrganizationFormDialog"; // To be implemented/imported
+// Custom imports
+import OrganizationFormDialog from "@/components/OrganizationFormDialog";
 
 interface Entity {
     id: string;
@@ -186,20 +187,48 @@ export default function EntityPicker({
                 defaultName={searchTerm}
                 onSuccess={(res: any) => {
                     setShowCreatePerson(false);
-                    if (res?.data?.id) {
+                    // Handle both wrapped {data: {...}} and direct {...} responses
+                    const id = res?.data?.id || res?.id;
+                    const name = res?.data?.display_name || res?.display_name || res?.data?.firstName ? `${res?.data?.firstName} ${res?.data?.lastName}` : "";
+
+                    if (id) {
                         const newEntity: Entity = {
-                            id: res.data.id,
-                            name: res.data.display_name,
+                            id: id,
+                            name: name || 'New Person',
                             type: 'person',
-                            details: res.data.email || 'Newly created'
+                            details: res?.data?.email || res?.email || 'Newly created'
                         };
                         onChange(newEntity);
                         setSearchTerm("");
                     }
                 }}
+                trigger={<></>}
             />
 
-            {/* OrganizationFormDialog would go here */}
+            <OrganizationFormDialog
+                open={showCreateOrg}
+                onOpenChange={setShowCreateOrg}
+                tenantId={tenantId}
+                defaultName={searchTerm}
+                onSuccess={(res: any) => {
+                    setShowCreateOrg(false);
+                    // Handle both wrapped {data: {...}} and direct {...} responses from RPC
+                    const id = res?.data?.id || res?.id;
+                    const name = res?.data?.display_name || res?.display_name || res?.data?.name || res?.name;
+
+                    if (id) {
+                        const newEntity: Entity = {
+                            id: id,
+                            name: name || 'New Organization',
+                            type: 'organization',
+                            details: 'Newly created'
+                        };
+                        onChange(newEntity);
+                        setSearchTerm("");
+                    }
+                }}
+                trigger={<></>}
+            />
         </div>
     );
 }
