@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { addRelationshipAction, removeRelationshipAction, fetchRelationshipsAction, updateRelationshipAction } from "@/app/actions/relationships";
 import { createClient } from "@/lib/supabase/client";
-import { getDefinitionForType, RELATIONSHIP_SCHEMA, FieldDefinition, getAvailableRoles } from "@/lib/relationshipSchema";
+import { getDefinitionForType, RELATIONSHIP_SCHEMA, FieldDefinition, getAvailableRoles, RelationshipMetadata } from "@/lib/relationshipSchema";
 
 // Reusable Components
 import SimplePeopleTable from "@/components/SimplePeopleTable";
@@ -124,8 +124,10 @@ export default function RelationshipManager({ tenantId, entityId, entityType }: 
         setLoading(false);
     };
 
+    // ... existing imports
+
     const [selectedEntity, setSelectedEntity] = useState<any>(null);
-    const [metadata, setMetadata] = useState<any>({});
+    const [metadata, setMetadata] = useState<RelationshipMetadata>({});
     const [editingRel, setEditingRel] = useState<any>(null);
 
     // Derived Schema

@@ -1,6 +1,9 @@
 
 export type FieldType = 'text' | 'number' | 'date' | 'boolean' | 'rating' | 'picklist' | 'currency';
 
+export type MetadataValue = string | number | boolean | null | undefined;
+export type RelationshipMetadata = Record<string, MetadataValue>;
+
 export interface FieldDefinition {
     key: string;
     label: string;
@@ -108,7 +111,12 @@ export const RELATIONSHIP_PAIRS: {
         { forward: 'Company', reverse: 'Advisor', type: 'Governance', sourceTypes: ['organization'], targetTypes: ['person'] },
 
         // Partnership (B2B)
-        { forward: 'Partner', reverse: 'Partner', type: 'Default', sourceTypes: ['organization'], targetTypes: ['organization'] }
+        { forward: 'Partner', reverse: 'Partner', type: 'Default', sourceTypes: ['organization'], targetTypes: ['organization'] },
+
+        // Person to Person
+        { forward: 'Colleague', reverse: 'Colleague', type: 'Professional', sourceTypes: ['person'], targetTypes: ['person'] },
+        { forward: 'Family', reverse: 'Family', type: 'Default', sourceTypes: ['person'], targetTypes: ['person'] },
+        { forward: 'Friend', reverse: 'Friend', type: 'Default', sourceTypes: ['person'], targetTypes: ['person'] }
     ];
 
 export const getAvailableRoles = (sourceType: 'person' | 'organization', targetType: 'person' | 'organization'): string[] => {
@@ -130,13 +138,6 @@ export const getAvailableRoles = (sourceType: 'person' | 'organization', targetT
             roles.add(pair.forward);
         }
     });
-
-    // Special Person-Person cases not covered above
-    if (sourceType === 'person' && targetType === 'person') {
-        roles.add('Colleague');
-        roles.add('Family');
-        roles.add('Friend');
-    }
 
     return Array.from(roles);
 };

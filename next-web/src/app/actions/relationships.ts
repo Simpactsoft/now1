@@ -113,14 +113,8 @@ export async function addRelationshipAction(tenantId: string, sourceId: string, 
     try {
         return await execute(supabase);
     } catch (e: any) {
-        console.error("Standard add failed. Trying Service Role...", e);
-        try {
-            const adminClient = getAdminClient();
-            return await execute(adminClient);
-        } catch (e2: any) {
-            console.error("Admin add failed", e2);
-            return { error: `Admin Fallback Failed: ${e2.message}` };
-        }
+        console.error("Add relationship failed", e);
+        return { error: e.message };
     }
 }
 
@@ -133,21 +127,8 @@ export async function removeRelationshipAction(tenantId: string, relId: string) 
         revalidatePath('/dashboard');
         return { success: true };
     } catch (e: any) {
-        console.error("Standard remove failed. Trying Service Role...", e);
-        try {
-            const adminClient = getAdminClient();
-            const { error: err2 } = await adminClient
-                .from('entity_relationships')
-                .delete()
-                .eq('id', relId)
-                .eq('tenant_id', tenantId); // Security: Enforce tenant boundary
-
-            if (err2) throw err2;
-            revalidatePath('/dashboard');
-            return { success: true };
-        } catch (e2: any) {
-            return { error: e2.message };
-        }
+        console.error("Remove relationship failed", e);
+        return { error: e.message };
     }
 }
 
@@ -170,12 +151,7 @@ export async function updateRelationshipAction(tenantId: string, relId: string, 
     try {
         return await execute(supabase);
     } catch (e: any) {
-        console.error("Standard update failed. Trying Service Role...", e);
-        try {
-            const adminClient = getAdminClient();
-            return await execute(adminClient);
-        } catch (e2: any) {
-            return { error: e2.message };
-        }
+        console.error("Update relationship failed", e);
+        return { error: e.message };
     }
 }
