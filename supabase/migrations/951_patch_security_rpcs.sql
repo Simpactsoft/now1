@@ -1,4 +1,3 @@
-
 -- Migration: 951_patch_security_rpcs.sql
 -- Description: Security Patch for Entity Relationship RPCs.
 -- Fixes Critical Vulnerability: Missing tenant isolation checks in SECURITY DEFINER functions.
@@ -18,7 +17,8 @@ RETURNS TABLE (
     target_id UUID,
     target_name TEXT,
     target_type TEXT,
-    target_contact_methods JSONB
+    target_contact_methods JSONB,
+    metadata JSONB
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -27,13 +27,11 @@ DECLARE
     v_tenant_id UUID;
 BEGIN
     -- SECURITY CHECK: Verify user belongs to the same tenant as the requested entity
-    -- We can get the tenant_id from the entity (cards table) and check if the current user (auth.uid()) is in that tenant.
     SELECT c.tenant_id INTO v_tenant_id
     FROM cards c
     WHERE c.id = p_entity_id;
     
     IF v_tenant_id IS NULL THEN
-        -- Entity doesn't exist, return empty or error. Safer to generic error.
         RETURN;
     END IF;
 
@@ -56,7 +54,8 @@ BEGIN
         c.id as target_id,
         c.display_name as target_name,
         c.type as target_type,
-        c.contact_methods as target_contact_methods
+        c.contact_methods as target_contact_methods,
+        er.metadata as metadata
     FROM entity_relationships er
     JOIN relationship_types rt ON er.type_id = rt.id
     JOIN cards c ON er.target_id = c.id
@@ -73,7 +72,8 @@ BEGIN
         c.id as target_id,
         c.display_name as target_name,
         c.type as target_type,
-        c.contact_methods as target_contact_methods
+        c.contact_methods as target_contact_methods,
+        er.metadata as metadata
     FROM entity_relationships er
     JOIN relationship_types rt ON er.type_id = rt.id
     JOIN cards c ON er.source_id = c.id
