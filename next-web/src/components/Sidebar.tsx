@@ -17,7 +17,10 @@ import {
     X,
     LogOut,
     FlaskConical,
-    Building2
+    Building2,
+    FileText,
+    Plus,
+    Package
 } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useLanguage } from '@/context/LanguageContext';
@@ -29,11 +32,13 @@ const NAV_CONFIG = [
     { key: 'dashboard', href: '/dashboard', icon: LayoutDashboard },
     { key: 'contacts', href: '/dashboard/people', icon: UserCircle },
     { key: 'organizations', href: '/dashboard/organizations', icon: Building2 },
+    { key: 'products', href: '/dashboard/products', icon: Package },
     { key: 'logs', href: '/dashboard/logs', icon: Activity },
     { key: 'team', href: '/dashboard/settings/team', icon: Users },
     { key: 'infrastructure', href: '/dashboard/infra', icon: Database },
     { key: 'system_admin', href: '/dashboard/admin', icon: ShieldCheck },
     { key: 'settings', href: '/dashboard/settings', icon: Settings },
+    { key: 'quotes', href: '/dashboard/sales/quotes', icon: FileText },
 ] as const;
 
 import TenantSwitcher from "./TenantSwitcher";
@@ -142,25 +147,43 @@ export default function Sidebar({
                         const showCount = item.key === 'contacts' && peopleCount > 0;
 
                         return (
-                            <Link
+                            <div
                                 key={item.href}
-                                href={item.href}
-                                className={`flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 group ${isActive
+                                className={`group flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 relative ${isActive
                                     ? 'bg-brand-primary/10 text-primary border border-brand-primary/20'
                                     : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
                                     }`}
                             >
-                                <div className="flex items-center gap-3">
+                                <Link
+                                    href={item.href}
+                                    className="flex items-center gap-3 flex-1 min-w-0"
+                                >
                                     <Icon size={20} className={isActive ? 'text-primary' : 'group-hover:text-primary transition-colors'} />
-                                    <span className="font-medium text-sm">{label}</span>
+                                    <span className="font-medium text-sm truncate">{label}</span>
                                     {showCount && (
                                         <span className="text-[10px] bg-secondary border border-border px-1.5 py-0.5 rounded-full text-muted-foreground tabular-nums">
                                             {Intl.NumberFormat('en-US', { notation: "compact", maximumFractionDigits: 1 }).format(peopleCount)}
                                         </span>
                                     )}
+                                </Link>
+
+                                <div className="flex items-center gap-2 shrink-0 z-10">
+                                    {item.key === 'quotes' && (
+                                        <Link
+                                            href="/dashboard/sales/quotes"
+                                            className="p-1 hover:bg-brand-primary/10 hover:text-brand-primary rounded-md transition-colors opacity-0 group-hover:opacity-100"
+                                            title="Create New Quote"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                // Force reload or state reset if needed
+                                            }}
+                                        >
+                                            <Plus size={16} />
+                                        </Link>
+                                    )}
+                                    {isActive && item.key !== 'quotes' && <ChevronIcon size={14} className="text-brand-primary" />}
                                 </div>
-                                {isActive && <ChevronIcon size={14} className="text-brand-primary" />}
-                            </Link>
+                            </div>
                         );
                     })}
                 </nav>

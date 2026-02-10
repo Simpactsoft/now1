@@ -1,6 +1,6 @@
 "use client";
 
-import "ag-grid-community/styles/ag-grid.css";
+// Using Theming API - removed legacy ag-grid.css
 import "ag-grid-community/styles/ag-theme-quartz.css";
 
 import { ModuleRegistry } from "ag-grid-community";

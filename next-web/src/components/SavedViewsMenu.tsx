@@ -3,18 +3,33 @@
 import * as React from "react";
 import { Bookmark, Save, Trash2, Edit2, Check, X, MoreHorizontal, Plus, ListFilter } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
-import { useViewConfig } from "@/components/universal/ViewConfigContext";
 import { getSavedViews, saveView, deleteView, renameView, SavedView } from "@/app/actions/savedViews";
 
 interface SavedViewsMenuProps {
     tenantId: string;
-    minimal?: boolean;     // If true, renders icon only
-    className?: string;    // Allow custom styling
-    trigger?: React.ReactNode; // [NEW] Allow custom trigger
+    minimal?: boolean;
+    className?: string;
+    trigger?: React.ReactNode;
+    // Config values — injected by the parent (EntityViewLayout or legacy wrapper)
+    configOverride?: {
+        filters: any[];
+        sort?: any[];
+        sorting?: any[];
+        viewMode: string;
+        searchTerm: string;
+        restoreState?: (state: any, savedView?: { id: string; name: string }) => void;
+        dispatch?: (action: any) => void;
+    };
 }
 
-export default function SavedViewsMenu({ tenantId, minimal = false, className = "", trigger }: SavedViewsMenuProps) {
-    const { filters, sort, viewMode, searchTerm, dispatch } = useViewConfig();
+export default function SavedViewsMenu({ tenantId, minimal = false, className = "", trigger, configOverride }: SavedViewsMenuProps) {
+    const filters = configOverride?.filters ?? [];
+    const sort = configOverride?.sort ?? configOverride?.sorting ?? [];
+    const viewMode = configOverride?.viewMode ?? 'tags';
+    const searchTerm = configOverride?.searchTerm ?? '';
+    const dispatch = configOverride?.dispatch;
+    const restoreState = configOverride?.restoreState;
+
     const [open, setOpen] = React.useState(false);
     const [views, setViews] = React.useState<SavedView[]>([]);
     const [loading, setLoading] = React.useState(false);
@@ -64,16 +79,28 @@ export default function SavedViewsMenu({ tenantId, minimal = false, className = 
         const { config } = view;
         if (!config) return;
 
-        dispatch({
-            type: 'RESTORE_STATE',
-            payload: {
-                viewMode: config.viewMode,
-                sort: config.sort,
-                filters: config.filters.map((f: any) => ({ ...f, defaultOpen: false })),
-                searchTerm: config.searchTerm || ''
-            },
-            savedView: { id: view.id, name: view.name }
-        });
+        if (restoreState) {
+            restoreState(
+                {
+                    viewMode: config.viewMode,
+                    sorting: config.sort,
+                    filters: config.filters.map((f: any) => ({ ...f, defaultOpen: false })),
+                    searchTerm: config.searchTerm || '',
+                },
+                { id: view.id, name: view.name }
+            );
+        } else if (dispatch) {
+            dispatch({
+                type: 'RESTORE_STATE',
+                payload: {
+                    viewMode: config.viewMode,
+                    sort: config.sort,
+                    filters: config.filters.map((f: any) => ({ ...f, defaultOpen: false })),
+                    searchTerm: config.searchTerm || ''
+                },
+                savedView: { id: view.id, name: view.name }
+            });
+        }
         setOpen(false);
     };
 

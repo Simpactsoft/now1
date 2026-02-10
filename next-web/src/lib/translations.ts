@@ -11,6 +11,8 @@ export const translations = {
         team: "Team Settings",
         people_v2: "People Explorer (V2)",
         settings: "Settings",
+        quotes: 'Quotes',
+        theme: 'Theme',
         searchPlaceholder: "Search people...",
         admin: "Administrator",
         instance: "Small Instance",
@@ -38,7 +40,8 @@ export const translations = {
         rating: "Rating",
         group: "Group",
         count: "Count",
-        organizations: "Organizations"
+        organizations: "Organizations",
+        products: "Products"
     },
     he: {
         dashboard: "לוח בקרה",
@@ -50,6 +53,8 @@ export const translations = {
         team: "ניהול צוות",
         people_v2: "חוקר נתונים (V2)",
         settings: "הגדרות",
+        quotes: 'הצעות מחיר',
+        theme: 'ערכת נושא',
         searchPlaceholder: "חפש אנשים...",
         admin: "מנהל מערכת",
         instance: "פרופיל קטן",
@@ -77,6 +82,7 @@ export const translations = {
         rating: "דירוג",
         group: "קבוצה",
         count: "כמות",
-        organizations: "ארגונים"
+        organizations: "ארגונים",
+        products: "פריטים"
     }
 };

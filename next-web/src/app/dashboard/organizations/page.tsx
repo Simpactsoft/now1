@@ -1,6 +1,5 @@
 
 import { createClient } from "@/lib/supabase/server";
-import { ViewConfigProvider } from "@/components/universal/ViewConfigContext";
 import OrganizationViewWrapper from "@/components/OrganizationViewWrapper";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
@@ -23,9 +22,6 @@ export default async function OrganizationsPage() {
         .eq("id", user.id)
         .single();
 
-    // Example restricted access
-    // if (profile?.role !== 'distributor') redirect('/dashboard');
-
     const cookieStore = await cookies();
     const cookieTenantId = cookieStore.get("tenant_id")?.value;
 
@@ -34,12 +30,11 @@ export default async function OrganizationsPage() {
 
     return (
         <div className="h-[calc(100vh-65px)] w-full bg-background flex flex-col overflow-hidden">
-            <ViewConfigProvider initialViewMode="grid" persistenceKey="org_view_config">
-                <OrganizationViewWrapper
-                    user={user}
-                    tenantId={activeTenantId}
-                />
-            </ViewConfigProvider>
+            <OrganizationViewWrapper
+                user={user}
+                tenantId={activeTenantId}
+            />
         </div>
     );
 }
+

@@ -1,22 +1,35 @@
 
-import { fetchPeople } from "@/app/actions/fetchPeople";
-import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
 
-export async function GET() {
-    // Simulate what the Grid sends
-    const params = {
-        tenantId: "00000000-0000-0000-0000-000000000002", // The ID we saw in screenshot
-        startRow: 0,
-        endRow: 10,
-        sortModel: [],
-        filterModel: {}
-    };
+export async function GET(req: NextRequest) {
+    const supabase = await createClient();
+    const cookieStore = await cookies();
 
-    const result = await fetchPeople(params as any);
+    let tenantId = req.nextUrl.searchParams.get("tenantId");
+    if (!tenantId) {
+        tenantId = cookieStore.get("tenant_id")?.value || "";
+    }
+
+    if (!tenantId) {
+        return NextResponse.json({ error: "No Tenant ID found in cookies or params" });
+    }
+
+    // Call RPC directly like route.ts
+    const { data: rpcData, error: rpcError } = await supabase.rpc("fetch_people_crm", {
+        arg_tenant_id: tenantId,
+        arg_start: 0,
+        arg_limit: 10,
+        arg_sort_col: "created_at",
+        arg_sort_dir: "desc",
+        arg_filters: {}, // Empty filters
+    });
 
     return NextResponse.json({
-        debug_check: "Checking if RET_NAME is present",
-        rowCount: result.rowCount,
-        first_10_rows: result.rowData
+        tenantId,
+        rpcError,
+        rpcDataCount: rpcData?.length,
+        firstRow: rpcData?.[0]
     });
 }

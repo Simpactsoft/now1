@@ -111,7 +111,7 @@ export default function EntityViewLayout({
     renderCards,
     onDebugSql
 }: EntityViewLayoutProps) {
-    const { viewMode, filters, dispatch, searchTerm, activeSavedView, isModified } = useViewConfig();
+    const { viewMode, filters, sort, dispatch, searchTerm, activeSavedView, isModified } = useViewConfig();
     const inputRef = useRef<HTMLInputElement>(null);
     const [showHistory, setShowHistory] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -216,6 +216,13 @@ export default function EntityViewLayout({
                     `}>
                         <SavedViewsMenu
                             tenantId={tenantId}
+                            configOverride={{
+                                filters,
+                                sort,
+                                viewMode,
+                                searchTerm,
+                                dispatch,
+                            }}
                             trigger={
                                 <button className="flex items-center gap-1.5 text-xs font-medium px-1 outline-none">
                                     {activeSavedView ? (

@@ -1,10 +1,8 @@
 "use client";
 
-import { useMemo, useState, useEffect, useCallback, useRef } from "react";
-import { AgGridReact } from "ag-grid-react";
+import { useMemo, useCallback } from "react";
 import {
     ColDef,
-    GridReadyEvent,
     CellValueChangedEvent,
     ICellRendererParams,
     ValueFormatterParams,
@@ -16,9 +14,7 @@ import { StatusBadge } from "./StatusBadge";
 import { updateOrganization } from "@/app/actions/updateOrganization";
 import { updatePerson } from "@/app/actions/updatePerson";
 import { useLanguage } from "@/context/LanguageContext";
-import { Loader2 } from "lucide-react";
-import { useTheme } from "next-themes";
-import { cn } from "@/lib/utils";
+import EntityAgGrid from "@/components/EntityAgGrid";
 
 interface PeopleAgGridProps {
     people: any[];
@@ -43,11 +39,8 @@ export default function PeopleAgGrid({
     className
 }: PeopleAgGridProps & { className?: string }) {
     const { language } = useLanguage();
-    const { theme } = useTheme(); // Get current theme
-    const gridRef = useRef<AgGridReact>(null);
 
-    // Dynamic Theme Class
-    const themeClass = theme === 'dark' ? 'ag-theme-quartz-dark' : 'ag-theme-quartz';
+    // Update Handler
 
     // Update Handler
     const onCellValueChanged = useCallback(async (event: CellValueChangedEvent) => {
@@ -270,22 +263,14 @@ export default function PeopleAgGrid({
 
 
     return (
-        <div className={cn(`w-full h-[600px] ${themeClass} border border-border rounded-xl overflow-hidden shadow-sm bg-card`, className)}>
-            <AgGridReact
-                ref={gridRef}
-                rowData={people}
-                columnDefs={columnDefs}
-                defaultColDef={defaultColDef}
-                getRowId={(params: GetRowIdParams) => params.data.id || params.data.ret_id}
-                onCellValueChanged={onCellValueChanged}
-                onBodyScroll={onBodyScroll}
-                rowSelection={{ mode: 'singleRow', enableClickSelection: false }}
-            />
-            {loading && (
-                <div className="absolute bottom-4 right-4 bg-background/80 p-2 rounded-full shadow-lg border border-border animate-pulse z-10">
-                    <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                </div>
-            )}
-        </div>
+        <EntityAgGrid
+            rowData={people}
+            columnDefs={columnDefs}
+            loading={loading}
+            onCellValueChanged={onCellValueChanged}
+            onBodyScroll={onBodyScroll}
+            getRowId={(params: GetRowIdParams) => params.data.id || params.data.ret_id}
+            className={className}
+        />
     );
 }

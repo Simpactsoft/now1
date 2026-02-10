@@ -1,12 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { X } from "lucide-react";
-import EntityViewLayout from "@/components/entity-view/EntityViewLayout";
-import { useEntityView } from "@/components/entity-view/useEntityView";
-import { ColumnDef } from "@/components/entity-view/types";
+import { useState, useEffect, useMemo } from "react";
+import { X, Package } from "lucide-react";
+import { useEntityView, EntityViewLayout, ColumnDef } from "@/components/entity-view";
 import { EntityTreeGrid } from "@/components/entity-view/EntityTreeGrid";
-import { EntityAgGrid } from "@/components/entity-view/EntityAgGrid";
 
 interface BomTreeNode {
     item_id: string;
@@ -48,10 +45,9 @@ export default function BomDialog({ productId, productName, isOpen, onClose }: B
                 }
 
                 setBomData(result.data.tree || []);
-                setTotalCost(result.data.totalCost || 0);
-                console.log('BOM Data fetched:', result.data.tree?.length, 'items', result.data.tree);
-            } catch (err) {
-                console.error("Error fetching BOM:", err);
+                setTotalCost(result.data.total_cost || 0);
+            } catch (error) {
+                console.error("Error fetching BOM:", error);
             } finally {
                 setLoading(false);
             }
@@ -60,16 +56,17 @@ export default function BomDialog({ productId, productName, isOpen, onClose }: B
         fetchBomData();
     }, [productId, isOpen]);
 
-    // Entity View Hook - automatically syncs with bomData via initialData
+    // Entity View Hook
     const entityView = useEntityView<BomTreeNode>({
         entityType: "bom",
         initialData: bomData,
         initialViewMode: "tree",
+        initialPageSize: 10000,
         getItemId: (item) => item.item_id,
     });
 
     // Column Definitions
-    const columns: ColumnDef<BomTreeNode>[] = [
+    const columns = useMemo<ColumnDef<BomTreeNode>[]>(() => [
         {
             field: "sku",
             headerName: "SKU",
@@ -112,18 +109,18 @@ export default function BomDialog({ productId, productName, isOpen, onClose }: B
                 </span>
             ),
         },
-    ];
+    ], []);
 
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-background rounded-xl shadow-2xl max-w-7xl w-full max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+            <div className="relative w-full max-w-7xl max-h-[90vh] bg-card border border-border rounded-lg shadow-2xl flex flex-col">
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-border">
+                <div className="flex items-center justify-between p-4 border-b border-border">
                     <div>
-                        <h2 className="text-2xl font-bold">Bill of Materials</h2>
-                        <p className="text-sm text-muted-foreground mt-1">{productName}</p>
+                        <h2 className="text-xl font-semibold text-foreground">Bill of Materials</h2>
+                        <p className="text-sm text-muted-foreground">{productName}</p>
                     </div>
                     <button
                         onClick={onClose}
@@ -133,135 +130,113 @@ export default function BomDialog({ productId, productName, isOpen, onClose }: B
                     </button>
                 </div>
 
-                {/* Content - Entity View Layout */}
-                <div className="flex-1 overflow-auto p-6">
+                {/* EntityViewLayout */}
+                <div className="flex-1 overflow-hidden">
                     <EntityViewLayout<BomTreeNode>
                         entityType="bom"
-                        columns={columns}
                         tenantId="00000000-0000-0000-0000-000000000000"
+                        columns={columns}
                         config={{
-                            // Spread all properties from entityView to ensure nothing is missing
                             ...entityView,
-                            // Ensure setFilters is compatible (config expects it, but hook doesn't have it)
-                            setFilters: (filters: any[]) => {
-                                // Clear existing and add new
-                                entityView.clearFilters();
-                                filters.forEach(filter => entityView.addFilter(filter));
-                            },
+                            data: bomData,
+                            filteredData: bomData,
+                            loading,
                         }}
-                        availableViewModes={["tags", "grid", "cards", "tree"]}
-                        defaultViewMode="grid"
+                        availableViewModes={['tree', 'tags', 'cards']}
+                        defaultViewMode="tree"
                         renderTags={(props) => (
-                            <div className="flex flex-wrap gap-2">
+                            <div className="flex flex-wrap gap-2 p-4">
                                 {props.data.map((item) => (
                                     <button
                                         key={item.item_id}
                                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors cursor-pointer border border-primary/20"
-                                        onClick={() => props.onTagClick?.(item)}
                                     >
                                         <span className="font-semibold">{item.sku}</span>
                                         <span className="text-muted-foreground">·</span>
                                         <span className="truncate max-w-[200px]">{item.name}</span>
                                         {item.is_assembly && (
-                                            <span className="text-xs bg-blue-500/20 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded">
-                                                Assembly
-                                            </span>
+                                            <Package className="w-3.5 h-3.5 text-blue-500" />
                                         )}
                                     </button>
                                 ))}
                             </div>
                         )}
                         renderCards={(props) => (
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
                                 {props.data.map((item) => (
                                     <div
                                         key={item.item_id}
-                                        className="p-5 border border-border rounded-lg bg-card hover:shadow-lg transition-shadow cursor-pointer"
-                                        onClick={() => props.onCardClick?.(item)}
+                                        className="p-4 border border-border rounded-lg hover:shadow-md transition-shadow cursor-pointer bg-card"
                                     >
-                                        <div className="flex items-start justify-between mb-3">
-                                            <div className="flex-1">
-                                                <div className="font-bold text-lg">{item.name}</div>
-                                                <div className="text-sm text-muted-foreground font-mono">{item.sku}</div>
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div>
+                                                <h4 className="font-semibold">{item.sku}</h4>
+                                                <p className="text-sm text-muted-foreground">{item.name}</p>
                                             </div>
-                                            <span className={`text-xs px-2 py-1 rounded-full ${item.is_assembly
-                                                ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
-                                                : "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
-                                                }`}>
-                                                {item.is_assembly ? "Assembly" : "Part"}
-                                            </span>
+                                            {item.is_assembly && (
+                                                <Package className="w-5 h-5 text-blue-500" />
+                                            )}
                                         </div>
-                                        <div className="text-xs text-muted-foreground mb-3">
-                                            {item.path}
-                                        </div>
-                                        <div className="grid grid-cols-3 gap-4 pt-3 border-t border-border">
+                                        <div className="grid grid-cols-2 gap-2 text-sm">
                                             <div>
-                                                <div className="text-xs text-muted-foreground">Quantity</div>
-                                                <div className="font-semibold">{item.quantity}</div>
+                                                <span className="text-muted-foreground">Qty:</span>
+                                                <span className="ml-1 font-medium">{item.quantity}</span>
                                             </div>
                                             <div>
-                                                <div className="text-xs text-muted-foreground">Unit Cost</div>
-                                                <div className="font-semibold">₪{item.unit_cost.toLocaleString()}</div>
+                                                <span className="text-muted-foreground">Unit:</span>
+                                                <span className="ml-1 font-medium">₪{item.unit_cost?.toLocaleString()}</span>
                                             </div>
-                                            <div>
-                                                <div className="text-xs text-muted-foreground">Total</div>
-                                                <div className="font-semibold text-primary">₪{item.extended_cost.toLocaleString()}</div>
+                                            <div className="col-span-2">
+                                                <span className="text-muted-foreground">Total:</span>
+                                                <span className="ml-1 font-semibold">₪{item.extended_cost?.toLocaleString()}</span>
                                             </div>
                                         </div>
                                     </div>
                                 ))}
                             </div>
                         )}
-                        renderGrid={(props) => {
-                            console.log('[BomDialog renderGrid] props:', props);
-                            return (
-                                <div className="w-full h-[500px] flex flex-col">
-                                    <EntityAgGrid
-                                        {...props}
-                                        showPagination={false}
-                                        className="flex-1"
-                                    />
-                                </div>
-                            );
-                        }}
-                        renderTree={(props) => {
-                            console.log('[BomDialog renderTree] props:', props);
-                            return (
-                                <div className="w-full h-[500px] flex flex-col">
-                                    <EntityTreeGrid
-                                        {...props}
-                                        getDataPath={(item: BomTreeNode) => item.path.split(' > ')}
-                                        autoGroupColumnDef={{
-                                            headerName: 'Component Hierarchy',
-                                            minWidth: 300,
-                                            cellRendererParams: {
-                                                suppressCount: false,
-                                            }
-                                        }}
-                                        className="flex-1"
-                                    />
-                                </div>
-                            );
-                        }}
+                        renderTree={(props) => (
+                            <div className="w-full h-[500px] flex flex-col p-4">
+                                <EntityTreeGrid
+                                    data={props.data}
+                                    columns={columns}
+                                    loading={props.loading}
+                                    selectedIds={props.selectedIds}
+                                    onSelectionChange={props.onSelectionChange}
+                                    getDataPath={(item: BomTreeNode) => {
+                                        const parts = item.path.split(' > ');
+                                        return parts.length > 1 ? parts.slice(1) : parts;
+                                    }}
+                                    autoGroupColumnDef={{
+                                        headerName: 'Component Hierarchy',
+                                        minWidth: 300,
+                                        cellRendererParams: {
+                                            suppressCount: false,
+                                        }
+                                    }}
+                                    className="flex-1"
+                                />
+                            </div>
+                        )}
                     />
                 </div>
 
                 {/* Footer */}
                 <div className="p-4 border-t border-border flex justify-between items-center">
-                    <div className="text-sm">
-                        <span className="text-muted-foreground">Total BOM Cost: </span>
-                        <span className="text-lg font-bold text-primary">₪{totalCost.toLocaleString()}</span>
-                    </div>
-                    <div className="flex gap-2">
-                        <button
-                            onClick={onClose}
-                            className="px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors"
-                        >
-                            Close
-                        </button>
-                        <button className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
-                            Export BOM
-                        </button>
+                    <button
+                        onClick={() => { }}
+                        className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
+                    >
+                        Export BOM
+                    </button>
+                    <button
+                        onClick={onClose}
+                        className="px-4 py-2 bg-muted text-muted-foreground rounded-lg hover:bg-muted/80 transition-colors"
+                    >
+                        Close
+                    </button>
+                    <div className="text-sm font-medium">
+                        Total BOM Cost: <span className="text-primary">₪{totalCost.toLocaleString()}</span>
                     </div>
                 </div>
             </div>
