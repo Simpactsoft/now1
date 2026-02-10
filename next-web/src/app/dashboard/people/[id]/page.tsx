@@ -50,7 +50,7 @@ export default async function PersonProfilePage({ params }: PageProps) {
     }
 
     return (
-        <div className="flex flex-col gap-8 max-w-5xl mx-auto">
+        <div className="flex flex-col gap-8 px-6">
             {/* Breadcrumb / Back */}
             <div className="flex items-center gap-4">
                 <BackButton label="Back to Contacts" />

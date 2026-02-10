@@ -46,7 +46,7 @@ export default async function OrganizationProfilePage({ params }: PageProps) {
     }
 
     return (
-        <div className="flex flex-col gap-8 max-w-5xl mx-auto p-6 md:p-8">
+        <div className="flex flex-col gap-8 p-6 md:p-8">
             {/* Breadcrumb / Back */}
             <div className="flex items-center gap-4">
                 <BackButton label="Back to Organizations" />
