@@ -99,15 +99,23 @@ function EntityAgGridInner<T = any>(props: EntityAgGridProps<T>) {
     }, [columns]);
 
     // ---- Default col def ----
+    // CRITICAL: filter must be false in AG Grid v32 to prevent initialization crashes
+    // See: AG Grid v32 regression with "new" column menu
     const defaultColDef = useMemo<ColDef>(() => ({
         sortable: true,
-        filter: true,
+        filter: false, // ✅ FIXED: Was true, caused v32 crashes
         resizable: true,
         suppressMovable: true,
     }), []);
 
     // ---- Grid Ready ----
     const onGridReady = useCallback((params: GridReadyEvent) => {
+        // API Guardrail: Check if grid still exists before calling API methods
+        if (!params.api || (params.api as any).destroyCalled) {
+            console.warn('[EntityAgGrid] Grid API is destroyed, skipping setup');
+            return;
+        }
+
         if (sorting.length > 0) {
             const sortModel = sorting.map((s) => ({
                 colId: String(s.colId),
@@ -120,6 +128,11 @@ function EntityAgGridInner<T = any>(props: EntityAgGridProps<T>) {
 
     // ---- Selection ----
     const handleSelectionChanged = useCallback((event: any) => {
+        // API Guardrail: Prevent "destroyed grid" errors
+        if (!event.api || (event.api as any).destroyCalled) {
+            console.warn('[EntityAgGrid] Grid destroyed during selection change');
+            return;
+        }
         const selectedRows = event.api.getSelectedRows();
         const ids = selectedRows.map((row: any) => getRowId(row));
         onSelectionChange(ids);
@@ -127,6 +140,11 @@ function EntityAgGridInner<T = any>(props: EntityAgGridProps<T>) {
 
     // ---- Sort ----
     const handleSortChanged = useCallback((event: any) => {
+        // API Guardrail: Prevent stale API calls
+        if (!event.api || (event.api as any).destroyCalled) {
+            console.warn('[EntityAgGrid] Grid destroyed during sort change');
+            return;
+        }
         const sortModel = event.api.getColumnState()
             .filter((col: any) => col.sort)
             .map((col: any) => ({
