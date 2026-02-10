@@ -1,11 +1,306 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Package, MoreHorizontal, Edit, Trash2, Copy, ChevronDown, ChevronUp } from 'lucide-react';
+import { Package, MoreHorizontal, Edit, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useLanguage } from '@/context/LanguageContext';
 import { EntityTreeGrid } from '@/components/entity-view/EntityTreeGrid';
 import { ColumnDef } from '@/components/entity-view';
+
+interface ProductCardProps {
+    product: {
+        id: string;
+        sku: string;
+        name: string;
+        status?: string;
+        cost_price?: number;
+        list_price?: number;
+        product_type?: string;
+        track_inventory?: boolean;
+        custom_fields?: Record<string, any>;
+    };
+    tenantId: string;
+    onEdit?: (id: string) => void;
+    onDelete?: (id: string) => void;
+}
+
+interface BomTreeNode {
+    item_id: string;
+    component_id: string;
+    sku: string;
+    name: string;
+    level: number;
+    quantity: number;
+    unit_cost: number;
+    extended_cost: number;
+    is_assembly: boolean;
+    path: string;
+    custom_fields?: Record<string, any>;
+}
+
+export default function ProductCard({ product, tenantId, onEdit, onDelete }: ProductCardProps) {
+    const { language } = useLanguage();
+    const [showMenu, setShowMenu] = useState(false);
+    const [showBom, setShowBom] = useState(true);
+    const [bomData, setBomData] = useState<BomTreeNode[]>([]);
+    const [totalCost, setTotalCost] = useState(0);
+    const [loading, setLoading] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    // Fetch BOM data
+    useEffect(() => {
+        if (!product.id) return;
+
+        const fetchBomData = async () => {
+            setLoading(true);
+            try {
+                const response = await fetch(`/api/bom/${product.id}?version=1.0`);
+                const result = await response.json();
+
+                if (!response.ok) {
+                    console.error("Failed to fetch BOM:", result.error);
+                    setBomData([]);
+                    return;
+                }
+
+                setBomData(result.data.tree || []);
+                setTotalCost(result.data.total_cost || 0);
+            } catch (error) {
+                console.error("Error fetching BOM:", error);
+                setBomData([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchBomData();
+    }, [product.id]);
+
+    // Calculate enriched BOM data with subtotals
+    const enrichedBomData = useMemo(() => {
+        if (!bomData.length) return [];
+
+        const itemsByParentPath = new Map<string, BomTreeNode[]>();
+        bomData.forEach(item => {
+            const pathParts = item.path.split(' > ');
+            if (pathParts.length > 1) {
+                const parentPath = pathParts.slice(0, -1).join(' > ');
+                if (!itemsByParentPath.has(parentPath)) {
+                    itemsByParentPath.set(parentPath, []);
+                }
+                itemsByParentPath.get(parentPath)!.push(item);
+            }
+        });
+
+        return bomData.map(item => {
+            const children = itemsByParentPath.get(item.path) || [];
+            if (children.length > 0) {
+                const subtotal_qty = children.reduce((sum, child) => sum + child.quantity, 0);
+                const subtotal_cost = children.reduce((sum, child) => sum + child.extended_cost, 0);
+                return {
+                    ...item,
+                    quantity: subtotal_qty,
+                    extended_cost: subtotal_cost,
+                };
+            }
+            return item;
+        });
+    }, [bomData]);
+
+    // BOM columns
+    const bomColumns = useMemo<ColumnDef<BomTreeNode>[]>(() => [
+        {
+            field: "sku",
+            headerName: "SKU",
+            minWidth: 150,
+        },
+        {
+            field: "name",
+            headerName: "Component",
+            minWidth: 250,
+            flex: 1,
+        },
+        {
+            field: "quantity",
+            headerName: "Qty",
+            width: 100,
+            aggFunc: "sum",
+        },
+        {
+            field: "unit_cost",
+            headerName: "Unit Cost",
+            width: 120,
+            valueFormatter: (params) => params.value ? `₪${params.value.toLocaleString()}` : '',
+        },
+        {
+            field: "extended_cost",
+            headerName: "Extended Cost",
+            width: 150,
+            valueFormatter: (params) => params.value ? `₪${params.value.toLocaleString()}` : '',
+            aggFunc: "sum",
+        },
+    ], []);
+
+    // Click outside handler
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setShowMenu(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    return (
+        <div className="bg-card border border-border rounded-xl shadow-sm">
+            {/* Header */}
+            <div className="p-6 border-b border-border">
+                <div className="flex items-start justify-between">
+                    <div>
+                        <h1 className="text-3xl font-bold text-foreground">{product.name}</h1>
+                        <p className="text-sm text-muted-foreground mt-1">SKU: {product.sku}</p>
+                    </div>
+                    <div className="flex items-center gap-2 relative" ref={menuRef}>
+                        {product.status && (
+                            <StatusBadge status={product.status} tenantId={tenantId} />
+                        )}
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
+                            className={`text-muted-foreground hover:text-foreground p-2 rounded-md hover:bg-muted transition-colors ${showMenu ? 'bg-muted text-foreground' : ''}`}
+                        >
+                            <MoreHorizontal size={20} />
+                        </button>
+
+                        {showMenu && (
+                            <div className="absolute top-full right-0 mt-1 w-36 bg-popover border border-border rounded-lg shadow-lg z-10 py-1">
+                                {onEdit && (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); setShowMenu(false); onEdit(product.id); }}
+                                        className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground flex items-center gap-2"
+                                    >
+                                        <Edit size={14} />
+                                        <span>{language === 'he' ? 'ערוך' : 'Edit'}</span>
+                                    </button>
+                                )}
+                                {onDelete && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setShowMenu(false);
+                                            if (confirm(language === 'he' ? 'האם אתה בטוח?' : 'Are you sure?')) onDelete(product.id);
+                                        }}
+                                        className="w-full text-left px-3 py-2 text-sm hover:bg-destructive/10 text-destructive hover:text-destructive flex items-center gap-2"
+                                    >
+                                        <Trash2 size={14} />
+                                        <span>{language === 'he' ? 'מחק' : 'Delete'}</span>
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* Product Details */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 border-b border-border">
+                {/* Pricing */}
+                <div className="space-y-3">
+                    <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Pricing</h2>
+                    <div className="space-y-2">
+                        {product.cost_price !== undefined && (
+                            <div className="flex justify-between">
+                                <span className="text-sm text-muted-foreground">Cost Price:</span>
+                                <span className="text-sm font-medium">₪{product.cost_price.toLocaleString()}</span>
+                            </div>
+                        )}
+                        {product.list_price !== undefined && (
+                            <div className="flex justify-between">
+                                <span className="text-sm text-muted-foreground">List Price:</span>
+                                <span className="text-sm font-bold">₪{product.list_price.toLocaleString()}</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Inventory */}
+                <div className="space-y-3">
+                    <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Inventory</h2>
+                    <div className="space-y-2">
+                        {product.track_inventory !== undefined && (
+                            <div className="flex justify-between">
+                                <span className="text-sm text-muted-foreground">Track Inventory:</span>
+                                <span className="text-sm">{product.track_inventory ? 'Yes' : 'No'}</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Type */}
+                {product.product_type && (
+                    <div className="space-y-3">
+                        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Type</h2>
+                        <div className="space-y-2">
+                            <div className="flex justify-between">
+                                <span className="text-sm text-muted-foreground">Product Type:</span>
+                                <span className="text-sm">{product.product_type}</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* BOM Section */}
+            {enrichedBomData.length > 0 && (
+                <div className="p-6">
+                    <button
+                        onClick={() => setShowBom(!showBom)}
+                        className="flex items-center justify-between w-full text-left mb-4 group"
+                    >
+                        <div className="flex items-center gap-2">
+                            <Package size={20} className="text-muted-foreground" />
+                            <h2 className="text-lg font-semibold">Bill of Materials</h2>
+                            <span className="text-sm text-muted-foreground">({enrichedBomData.length} items)</span>
+                        </div>
+                        {showBom ? <ChevronUp size={20} className="text-muted-foreground" /> : <ChevronDown size={20} className="text-muted-foreground" />}
+                    </button>
+
+                    {showBom && (
+                        <div className="border border-border rounded-lg" style={{ height: '500px' }}>
+                            <EntityTreeGrid
+                                data={enrichedBomData}
+                                columns={bomColumns}
+                                loading={loading}
+                                selectedIds={new Set()}
+                                onSelectionChange={() => { }}
+                                getDataPath={(item: BomTreeNode) => {
+                                    const parts = item.path.split(' > ');
+                                    return parts.length > 1 ? parts.slice(1) : parts;
+                                }}
+                                autoGroupColumnDef={{
+                                    headerName: 'Component Hierarchy',
+                                    minWidth: 300,
+                                    cellRendererParams: {
+                                        suppressCount: false,
+                                    }
+                                }}
+                                className="h-full"
+                            />
+                        </div>
+                    )}
+
+                    {showBom && totalCost > 0 && (
+                        <div className="mt-4 pt-4 border-t border-border flex justify-between items-center">
+                            <span className="text-sm font-semibold text-muted-foreground">Total BOM Cost:</span>
+                            <span className="text-lg font-bold">₪{totalCost.toLocaleString()}</span>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
 
 interface ProductCardProps {
     product: {
