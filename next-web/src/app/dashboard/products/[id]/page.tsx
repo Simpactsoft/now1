@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { redirect, notFound } from "next/navigation";
-import ProductCard from "@/components/products/ProductCard";
+import ProductCardWrapper from "@/components/products/ProductCardWrapper";
 
 export const dynamic = "force-dynamic";
 
@@ -53,17 +53,9 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
 
     return (
         <div className="container mx-auto p-6 max-w-5xl">
-            <ProductCard
+            <ProductCardWrapper
                 product={productData}
                 tenantId={tenantId}
-                onEdit={(id) => {
-                    // TODO: Implement edit functionality
-                    console.log("Edit product:", id);
-                }}
-                onDelete={(id) => {
-                    // TODO: Implement delete functionality
-                    console.log("Delete product:", id);
-                }}
             />
         </div>
     );
