@@ -56,10 +56,44 @@ export default function BomDialog({ productId, productName, isOpen, onClose }: B
         fetchBomData();
     }, [productId, isOpen]);
 
+    // Calculate subtotals for assemblies
+    const enrichedBomData = useMemo(() => {
+        if (!bomData.length) return [];
+
+        // Create a map to find children by parent path
+        const itemsByParentPath = new Map<string, BomTreeNode[]>();
+        bomData.forEach(item => {
+            const pathParts = item.path.split(' > ');
+            if (pathParts.length > 1) {
+                const parentPath = pathParts.slice(0, -1).join(' > ');
+                if (!itemsByParentPath.has(parentPath)) {
+                    itemsByParentPath.set(parentPath, []);
+                }
+                itemsByParentPath.get(parentPath)!.push(item);
+            }
+        });
+
+        // Calculate subtotals for each item
+        return bomData.map(item => {
+            const children = itemsByParentPath.get(item.path) || [];
+            if (children.length > 0) {
+                // This is an assembly with children - calculate subtotals
+                const subtotal_qty = children.reduce((sum, child) => sum + child.quantity, 0);
+                const subtotal_cost = children.reduce((sum, child) => sum + child.extended_cost, 0);
+                return {
+                    ...item,
+                    quantity: subtotal_qty,
+                    extended_cost: subtotal_cost,
+                };
+            }
+            return item;
+        });
+    }, [bomData]);
+
     // Entity View Hook
     const entityView = useEntityView<BomTreeNode>({
         entityType: "bom",
-        initialData: bomData,
+        initialData: enrichedBomData,
         initialViewMode: "tree",
         initialPageSize: 10000,
         getItemId: (item) => item.item_id,
@@ -83,6 +117,7 @@ export default function BomDialog({ productId, productName, isOpen, onClose }: B
             field: "quantity",
             headerName: "Qty",
             width: 100,
+            aggFunc: "sum",
         },
         {
             field: "unit_cost",
@@ -95,6 +130,7 @@ export default function BomDialog({ productId, productName, isOpen, onClose }: B
             headerName: "Extended Cost",
             width: 150,
             valueFormatter: (value) => `₪${value?.toLocaleString()}`,
+            aggFunc: "sum",
         },
         {
             field: "is_assembly",
@@ -138,8 +174,8 @@ export default function BomDialog({ productId, productName, isOpen, onClose }: B
                         columns={columns}
                         config={{
                             ...entityView,
-                            data: bomData,
-                            filteredData: bomData,
+                            data: enrichedBomData,
+                            filteredData: enrichedBomData,
                             loading,
                         }}
                         availableViewModes={['tree', 'tags', 'cards']}
