@@ -102,6 +102,18 @@ export default function BomDialog({ productId, productName, isOpen, onClose }: B
     // Column Definitions
     const columns = useMemo<ColumnDef<BomTreeNode>[]>(() => [
         {
+            field: "image",
+            headerName: "",
+            width: 60,
+            cellRenderer: (params: any) => {
+                const imageUrl = params.data?.custom_fields?.image_url;
+                if (imageUrl) {
+                    return `<img src="${imageUrl}" alt="${params.data?.name}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px;" />`;
+                }
+                return '';
+            },
+        },
+        {
             field: "sku",
             headerName: "SKU",
             minWidth: 150,
