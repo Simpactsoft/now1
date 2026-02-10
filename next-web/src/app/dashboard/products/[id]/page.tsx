@@ -52,7 +52,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
     };
 
     return (
-        <div className="container mx-auto p-6 max-w-5xl">
+        <div className="container mx-auto p-6">
             <ProductCardWrapper
                 product={productData}
                 tenantId={tenantId}

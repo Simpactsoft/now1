@@ -235,9 +235,9 @@ export default function ProductCard({ product, tenantId, onEdit, onDelete }: Pro
                 </div>
             </div>
 
-            {/* Product Details Card */}
-            <div className="bg-card border border-border rounded-xl shadow-sm p-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Product Details Card - Compact Width */}
+            <div className="bg-card border border-border rounded-xl shadow-sm p-6 max-w-2xl">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Pricing */}
                     <div className="space-y-3">
                         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Pricing</h2>
