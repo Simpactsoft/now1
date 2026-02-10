@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Package, MoreHorizontal, Edit, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Package, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useLanguage } from '@/context/LanguageContext';
-import { EntityTreeGrid } from '@/components/entity-view/EntityTreeGrid';
-import { ColumnDef } from '@/components/entity-view';
+import { useEntityView, EntityViewLayout, ColumnDef } from '@/components/entity-view';
 
 interface ProductCardProps {
     product: {
@@ -41,7 +40,6 @@ interface BomTreeNode {
 export default function ProductCard({ product, tenantId, onEdit, onDelete }: ProductCardProps) {
     const { language } = useLanguage();
     const [showMenu, setShowMenu] = useState(false);
-    const [showBom, setShowBom] = useState(true);
     const [bomData, setBomData] = useState<BomTreeNode[]>([]);
     const [totalCost, setTotalCost] = useState(0);
     const [loading, setLoading] = useState(false);
@@ -107,12 +105,34 @@ export default function ProductCard({ product, tenantId, onEdit, onDelete }: Pro
         });
     }, [bomData]);
 
+    // Entity View Hook
+    const entityView = useEntityView<BomTreeNode>({
+        entityType: "bom",
+        initialData: enrichedBomData,
+        initialViewMode: "tree",
+        initialPageSize: 10000,
+        getItemId: (item) => item.item_id,
+    });
+
     // BOM columns
     const bomColumns = useMemo<ColumnDef<BomTreeNode>[]>(() => [
+        {
+            field: "image",
+            headerName: "",
+            width: 60,
+            cellRenderer: (params: any) => {
+                const imageUrl = params.data?.custom_fields?.image_url;
+                if (imageUrl) {
+                    return `<img src="${imageUrl}" alt="${params.data?.name}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px;" />`;
+                }
+                return '';
+            },
+        },
         {
             field: "sku",
             headerName: "SKU",
             minWidth: 150,
+            pinned: "left",
         },
         {
             field: "name",
@@ -130,14 +150,27 @@ export default function ProductCard({ product, tenantId, onEdit, onDelete }: Pro
             field: "unit_cost",
             headerName: "Unit Cost",
             width: 120,
-            valueFormatter: (params) => params.value ? `₪${params.value.toLocaleString()}` : '',
+            valueFormatter: (value) => `₪${value?.toLocaleString()}`,
         },
         {
             field: "extended_cost",
             headerName: "Extended Cost",
             width: 150,
-            valueFormatter: (params) => params.value ? `₪${params.value.toLocaleString()}` : '',
+            valueFormatter: (value) => `₪${value?.toLocaleString()}`,
             aggFunc: "sum",
+        },
+        {
+            field: "is_assembly",
+            headerName: "Type",
+            width: 120,
+            cellRenderer: ({ value }) => (
+                <span className={`text-xs px-2 py-0.5 rounded-full ${value
+                    ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+                    : "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+                    }`}>
+                    {value ? "Assembly" : "Part"}
+                </span>
+            ),
         },
     ], []);
 
@@ -153,9 +186,9 @@ export default function ProductCard({ product, tenantId, onEdit, onDelete }: Pro
     }, []);
 
     return (
-        <div className="bg-card border border-border rounded-xl shadow-sm">
-            {/* Header */}
-            <div className="p-6 border-b border-border">
+        <div className="space-y-4">
+            {/* Header Card */}
+            <div className="bg-card border border-border rounded-xl shadow-sm p-6">
                 <div className="flex items-start justify-between">
                     <div>
                         <h1 className="text-3xl font-bold text-foreground">{product.name}</h1>
@@ -202,99 +235,136 @@ export default function ProductCard({ product, tenantId, onEdit, onDelete }: Pro
                 </div>
             </div>
 
-            {/* Product Details */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 border-b border-border">
-                {/* Pricing */}
-                <div className="space-y-3">
-                    <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Pricing</h2>
-                    <div className="space-y-2">
-                        {product.cost_price !== undefined && (
-                            <div className="flex justify-between">
-                                <span className="text-sm text-muted-foreground">Cost Price:</span>
-                                <span className="text-sm font-medium">₪{product.cost_price.toLocaleString()}</span>
-                            </div>
-                        )}
-                        {product.list_price !== undefined && (
-                            <div className="flex justify-between">
-                                <span className="text-sm text-muted-foreground">List Price:</span>
-                                <span className="text-sm font-bold">₪{product.list_price.toLocaleString()}</span>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Inventory */}
-                <div className="space-y-3">
-                    <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Inventory</h2>
-                    <div className="space-y-2">
-                        {product.track_inventory !== undefined && (
-                            <div className="flex justify-between">
-                                <span className="text-sm text-muted-foreground">Track Inventory:</span>
-                                <span className="text-sm">{product.track_inventory ? 'Yes' : 'No'}</span>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Type */}
-                {product.product_type && (
+            {/* Product Details Card */}
+            <div className="bg-card border border-border rounded-xl shadow-sm p-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Pricing */}
                     <div className="space-y-3">
-                        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Type</h2>
+                        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Pricing</h2>
                         <div className="space-y-2">
-                            <div className="flex justify-between">
-                                <span className="text-sm text-muted-foreground">Product Type:</span>
-                                <span className="text-sm">{product.product_type}</span>
-                            </div>
+                            {product.cost_price !== undefined && (
+                                <div className="flex justify-between">
+                                    <span className="text-sm text-muted-foreground">Cost Price:</span>
+                                    <span className="text-sm font-medium">₪{product.cost_price.toLocaleString()}</span>
+                                </div>
+                            )}
+                            {product.list_price !== undefined && (
+                                <div className="flex justify-between">
+                                    <span className="text-sm text-muted-foreground">List Price:</span>
+                                    <span className="text-sm font-bold">₪{product.list_price.toLocaleString()}</span>
+                                </div>
+                            )}
                         </div>
                     </div>
-                )}
+
+                    {/* Inventory */}
+                    <div className="space-y-3">
+                        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Inventory</h2>
+                        <div className="space-y-2">
+                            {product.track_inventory !== undefined && (
+                                <div className="flex justify-between">
+                                    <span className="text-sm text-muted-foreground">Track Inventory:</span>
+                                    <span className="text-sm">{product.track_inventory ? 'Yes' : 'No'}</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Type */}
+                    {product.product_type && (
+                        <div className="space-y-3">
+                            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Type</h2>
+                            <div className="space-y-2">
+                                <div className="flex justify-between">
+                                    <span className="text-sm text-muted-foreground">Product Type:</span>
+                                    <span className="text-sm">{product.product_type}</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
 
-            {/* BOM Section */}
+            {/* BOM Card */}
             {enrichedBomData.length > 0 && (
-                <div className="p-6">
-                    <button
-                        onClick={() => setShowBom(!showBom)}
-                        className="flex items-center justify-between w-full text-left mb-4 group"
-                    >
+                <div className="bg-card border border-border rounded-xl shadow-sm">
+                    <div className="p-4 border-b border-border">
                         <div className="flex items-center gap-2">
                             <Package size={20} className="text-muted-foreground" />
                             <h2 className="text-lg font-semibold">Bill of Materials</h2>
                             <span className="text-sm text-muted-foreground">({enrichedBomData.length} items)</span>
                         </div>
-                        {showBom ? <ChevronUp size={20} className="text-muted-foreground" /> : <ChevronDown size={20} className="text-muted-foreground" />}
-                    </button>
+                        {totalCost > 0 && (
+                            <p className="text-sm text-muted-foreground mt-1">
+                                Total Cost: <span className="font-semibold">₪{totalCost.toLocaleString()}</span>
+                            </p>
+                        )}
+                    </div>
 
-                    {showBom && (
-                        <div className="border border-border rounded-lg" style={{ height: '500px' }}>
-                            <EntityTreeGrid
-                                data={enrichedBomData}
-                                columns={bomColumns}
-                                loading={loading}
-                                selectedIds={new Set()}
-                                onSelectionChange={() => { }}
-                                getDataPath={(item: BomTreeNode) => {
-                                    const parts = item.path.split(' > ');
-                                    return parts.length > 1 ? parts.slice(1) : parts;
-                                }}
-                                autoGroupColumnDef={{
-                                    headerName: 'Component Hierarchy',
-                                    minWidth: 300,
-                                    cellRendererParams: {
-                                        suppressCount: false,
-                                    }
-                                }}
-                                className="h-full"
-                            />
-                        </div>
-                    )}
-
-                    {showBom && totalCost > 0 && (
-                        <div className="mt-4 pt-4 border-t border-border flex justify-between items-center">
-                            <span className="text-sm font-semibold text-muted-foreground">Total BOM Cost:</span>
-                            <span className="text-lg font-bold">₪{totalCost.toLocaleString()}</span>
-                        </div>
-                    )}
+                    {/* EntityViewLayout with Tree/Tags/Cards */}
+                    <div style={{ height: '600px' }}>
+                        <EntityViewLayout<BomTreeNode>
+                            entityType="bom"
+                            tenantId={tenantId}
+                            columns={bomColumns}
+                            config={{
+                                ...entityView,
+                                data: enrichedBomData,
+                                filteredData: enrichedBomData,
+                                loading,
+                            }}
+                            availableViewModes={['tree', 'tags', 'cards']}
+                            defaultViewMode="tree"
+                            renderTags={(props) => (
+                                <div className="flex flex-wrap gap-2 p-4">
+                                    {props.data.map((item) => (
+                                        <button
+                                            key={item.item_id}
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors cursor-pointer border border-primary/20"
+                                        >
+                                            <Package size={14} />
+                                            <span>{item.name}</span>
+                                            <span className="text-xs opacity-70">×{item.quantity}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                            renderCards={(props) => (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+                                    {props.data.map((item) => (
+                                        <div
+                                            key={item.item_id}
+                                            className="bg-background border border-border rounded-lg p-4 hover:shadow-md transition-shadow"
+                                        >
+                                            <div className="flex items-start gap-3">
+                                                {item.custom_fields?.image_url && (
+                                                    <img
+                                                        src={item.custom_fields.image_url}
+                                                        alt={item.name}
+                                                        className="w-12 h-12 object-cover rounded"
+                                                    />
+                                                )}
+                                                <div className="flex-1 min-w-0">
+                                                    <h3 className="font-semibold text-sm truncate">{item.name}</h3>
+                                                    <p className="text-xs text-muted-foreground">{item.sku}</p>
+                                                    <div className="mt-2 space-y-1">
+                                                        <div className="flex justify-between text-xs">
+                                                            <span className="text-muted-foreground">Qty:</span>
+                                                            <span className="font-medium">{item.quantity}</span>
+                                                        </div>
+                                                        <div className="flex justify-between text-xs">
+                                                            <span className="text-muted-foreground">Cost:</span>
+                                                            <span className="font-medium">₪{item.extended_cost.toLocaleString()}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        />
+                    </div>
                 </div>
             )}
         </div>
