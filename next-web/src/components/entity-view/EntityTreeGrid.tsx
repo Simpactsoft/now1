@@ -10,6 +10,8 @@ import { themeQuartz } from 'ag-grid-community';
 import { cn } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
 import { ColumnDef, TreeRenderProps } from "./types";
+import { useLanguage } from "@/context/LanguageContext";
+
 
 // ==================== Props ====================
 
@@ -40,6 +42,9 @@ function EntityTreeGridInner<T = any>(props: EntityTreeGridProps<T>) {
         onGridReady,
         className = "",
     } = props;
+
+    const { language } = useLanguage();
+    const isRtl = language === 'he';
 
     console.log('EntityTreeGrid received data:', data?.length, 'items', data);
 
@@ -144,7 +149,7 @@ function EntityTreeGridInner<T = any>(props: EntityTreeGridProps<T>) {
     }
 
     return (
-        <div className={cn("flex flex-col h-full", className)}>
+        <div className={cn("flex flex-col h-full", className)} dir={isRtl ? 'rtl' : 'ltr'}>
             <div className="flex-1 ag-theme-quartz">
                 <AgGridReact
                     theme={themeQuartz}
@@ -164,12 +169,14 @@ function EntityTreeGridInner<T = any>(props: EntityTreeGridProps<T>) {
                     animateRows={true}
                     enableCellTextSelection={true}
                     suppressRowClickSelection={true}
+                    enableRtl={isRtl}
                     className="w-full h-full"
                 />
             </div>
         </div>
     );
 }
+
 
 // ==================== Export with React.memo ====================
 
