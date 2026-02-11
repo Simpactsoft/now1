@@ -303,8 +303,10 @@ export default function ProductCard({ product, tenantId, onEdit, onDelete }: Pro
                     </div>
 
                     {/* EntityViewLayout with Tree/Tags/Cards */}
+                    {/* CRITICAL: key forces re-mount when data changes, fixing initial empty state */}
                     <div style={{ height: '600px' }}>
                         <EntityViewLayout<BomTreeNode>
+                            key={`bom-${enrichedBomData.length}-${loading}`}
                             entityType="bom"
                             tenantId={tenantId}
                             columns={bomColumns}
