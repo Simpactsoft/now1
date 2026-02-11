@@ -260,7 +260,20 @@ export default function EntityViewLayout<T = any>({
                 if (renderTags) return renderTags({ ...commonProps, onTagClick: onRowClick });
                 return null;
         }
-    }, [config, columns, onRowClick, renderGrid, renderCards, renderTags, renderTree]);
+    }, [
+        config.viewMode,
+        config.filteredData,
+        config.data,
+        config.loading,
+        config.selectedIds,
+        config.setSelectedIds,
+        columns,
+        onRowClick,
+        renderGrid,
+        renderCards,
+        renderTags,
+        renderTree
+    ]);
 
     return (
         <div className={`flex flex-col gap-4 w-full h-full ${className}`}>
