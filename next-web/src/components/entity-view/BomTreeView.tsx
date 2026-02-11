@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { ChevronRight, ChevronDown } from "lucide-react";
+import { ChevronRight, ChevronDown, ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ColumnDef } from "./types";
 
@@ -131,6 +131,9 @@ function BomTreeViewInner<T = any>(props: BomTreeViewProps<T>) {
         );
     }
 
+    // Detect RTL from document direction
+    const isRtl = typeof document !== 'undefined' && document.dir === 'rtl';
+
     return (
         <div className={cn("flex flex-col h-full overflow-auto", className)}>
             {/* Header */}
@@ -186,6 +189,8 @@ function BomTreeViewInner<T = any>(props: BomTreeViewProps<T>) {
                                     >
                                         {isExpanded ? (
                                             <ChevronDown className="w-4 h-4" />
+                                        ) : isRtl ? (
+                                            <ChevronLeft className="w-4 h-4" />
                                         ) : (
                                             <ChevronRight className="w-4 h-4" />
                                         )}
