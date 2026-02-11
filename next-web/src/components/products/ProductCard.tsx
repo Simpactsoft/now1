@@ -123,7 +123,22 @@ export default function ProductCard({ product, tenantId, onEdit, onDelete }: Pro
         });
 
         console.log('[ProductCard] enrichedBomData result:', result.length, 'items');
-        console.log('[ProductCard] First 3 enriched:', result.slice(0, 3).map(i => ({ sku: i.sku, name: i.name, qty: i.quantity })));
+        console.log('[ProductCard] First 3 enriched:', result.slice(0, 3).map(i => ({ sku: i.sku, name: i.name, level: i.level, path: i.path })));
+        console.log('[ProductCard] ALL enriched data:', result.map(i => ({
+            id: i.item_id,
+            sku: i.sku,
+            name: i.name,
+            level: i.level,
+            path: i.path
+        })));
+
+        // Check for duplicate IDs
+        const ids = result.map(i => i.item_id);
+        const duplicates = ids.filter((id, index) => ids.indexOf(id) !== index);
+        if (duplicates.length > 0) {
+            console.error('[ProductCard] ⚠️ DUPLICATE IDs FOUND:', duplicates);
+        }
+
         return result;
     }, [bomData]);
 
