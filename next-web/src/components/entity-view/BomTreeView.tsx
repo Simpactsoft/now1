@@ -26,6 +26,18 @@ interface TreeNode<T> {
     children: TreeNode<T>[];
 }
 
+interface BomTreeItem {
+    is_assembly?: boolean;
+    name?: string;
+    sku?: string;
+    // Add other BOM-specific fields as needed
+}
+
+// ==================== Constants ====================
+
+const BOM_INDENT_PX = 24;      // Indentation per tree level
+const BOM_CELL_PADDING_PX = 12; // Cell padding for component column
+
 // ==================== Component ====================
 
 function BomTreeViewInner<T = any>(props: BomTreeViewProps<T>) {
@@ -251,12 +263,12 @@ function BomTreeViewInner<T = any>(props: BomTreeViewProps<T>) {
                                             <div
                                                 className={cn(
                                                     "truncate",
-                                                    (node.item as any).is_assembly && "font-semibold"
+                                                    (node.item as BomTreeItem).is_assembly && "font-semibold"
                                                 )}
                                                 style={{
-                                                    marginLeft: `${depth * 24}px`,
-                                                    paddingLeft: '12px',
-                                                    paddingRight: '12px',
+                                                    marginLeft: `${depth * BOM_INDENT_PX}px`,
+                                                    paddingLeft: `${BOM_CELL_PADDING_PX}px`,
+                                                    paddingRight: `${BOM_CELL_PADDING_PX}px`,
                                                 }}
                                             >
                                                 {typeof content === 'string' ? (
