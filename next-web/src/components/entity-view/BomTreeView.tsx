@@ -87,7 +87,7 @@ function BomTreeViewInner<T = any>(props: BomTreeViewProps<T>) {
         });
 
         return rootNodes;
-    }, [data, getItemId, getLevel, getPath]);
+    }, [data, data.length, getItemId, getLevel, getPath]);
 
     // Flatten tree into visible rows based on expand state
     const visibleRows = useMemo(() => {
