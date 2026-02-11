@@ -150,6 +150,16 @@ export default function ProductCard({ product, tenantId, onEdit, onDelete }: Pro
         initialViewMode: "tree",
         initialPageSize: 10000,
         getItemId: (item) => item.item_id,
+        // Custom search filter for BOM data
+        searchFilter: (item, searchTerm) => {
+            const query = searchTerm.toLowerCase();
+            return (
+                item.name?.toLowerCase().includes(query) ||
+                item.sku?.toLowerCase().includes(query) ||
+                item.path?.toLowerCase().includes(query) ||
+                false
+            );
+        },
     });
 
     console.log('[ProductCard] entityView state:', {

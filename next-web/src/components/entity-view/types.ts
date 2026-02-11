@@ -254,6 +254,9 @@ export interface UseEntityViewOptions<T> {
     serverSide?: boolean;
     onFetchData?: (params: FetchDataParams) => Promise<FetchDataResult<T>>;
     getItemId?: (item: T) => string;
+    debounceMs?: number;
+    // Custom search filter - if provided, overrides default Object.values() search
+    searchFilter?: (item: T, searchTerm: string) => boolean;
 }
 
 export interface FetchDataParams {

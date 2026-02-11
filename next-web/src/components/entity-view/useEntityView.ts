@@ -263,11 +263,17 @@ export function useEntityView<T = any>(options: UseEntityViewOptions<T>): Entity
         // Search
         if (viewState.searchTerm) {
             const query = viewState.searchTerm.toLowerCase();
-            result = result.filter((item) =>
-                Object.values(item as any).some((value) =>
-                    String(value ?? '').toLowerCase().includes(query)
-                )
-            );
+            if (options.searchFilter) {
+                // Use custom search filter if provided
+                result = result.filter((item) => options.searchFilter!(item, viewState.searchTerm));
+            } else {
+                // Default search: check all object values
+                result = result.filter((item) =>
+                    Object.values(item as any).some((value) =>
+                        String(value ?? '').toLowerCase().includes(query)
+                    )
+                );
+            }
         }
 
         // Filters
