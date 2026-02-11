@@ -222,11 +222,23 @@ function BomTreeViewInner<T = any>(props: BomTreeViewProps<T>) {
                                 // Special rendering for Component column
                                 const isComponentColumn = col.field === 'name' || col.field === 'component';
 
+                                if (isComponentColumn) {
+                                    console.log('🎨 Component column:', {
+                                        name: (node.item as any).name,
+                                        depth,
+                                        paddingLeft: `${depth * 24 + 12}px`,
+                                        isAssembly: (node.item as any).is_assembly,
+                                        fontWeight: (node.item as any).is_assembly ? 600 : 400
+                                    });
+                                }
+
                                 return (
                                     <div
                                         key={idx}
                                         className={cn(
-                                            "px-3 py-2 text-sm truncate",
+                                            "py-2 text-sm truncate",
+                                            // Remove px-3 for component column to allow custom paddingLeft
+                                            !isComponentColumn && "px-3",
                                             col.cellClass
                                         )}
                                         style={{
@@ -237,6 +249,7 @@ function BomTreeViewInner<T = any>(props: BomTreeViewProps<T>) {
                                             // Visual hierarchy for component column
                                             ...(isComponentColumn && {
                                                 paddingLeft: `${depth * 24 + 12}px`,
+                                                paddingRight: '12px',
                                                 fontWeight: (node.item as any).is_assembly ? 600 : 400
                                             })
                                         }}
