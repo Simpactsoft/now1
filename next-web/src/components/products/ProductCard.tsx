@@ -61,6 +61,8 @@ export default function ProductCard({ product, tenantId, onEdit, onDelete }: Pro
                     return;
                 }
 
+                console.log('[ProductCard] BOM API returned:', result.data.tree?.length, 'items');
+                console.log('[ProductCard] First 3 items:', result.data.tree?.slice(0, 3));
                 setBomData(result.data.tree || []);
                 setTotalCost(result.data.total_cost || 0);
             } catch (error) {
@@ -76,7 +78,12 @@ export default function ProductCard({ product, tenantId, onEdit, onDelete }: Pro
 
     // Calculate enriched BOM data with subtotals
     const enrichedBomData = useMemo(() => {
-        if (!bomData.length) return [];
+        console.log('[ProductCard] enrichedBomData calculating with bomData:', bomData.length, 'items');
+
+        if (!bomData.length) {
+            console.log('[ProductCard] bomData is empty, returning []');
+            return [];
+        }
 
         const itemsByParentPath = new Map<string, BomTreeNode[]>();
         bomData.forEach(item => {
@@ -90,7 +97,7 @@ export default function ProductCard({ product, tenantId, onEdit, onDelete }: Pro
             }
         });
 
-        return bomData.map(item => {
+        const result = bomData.map(item => {
             const children = itemsByParentPath.get(item.path) || [];
             if (children.length > 0) {
                 const subtotal_qty = children.reduce((sum, child) => sum + child.quantity, 0);
@@ -103,6 +110,10 @@ export default function ProductCard({ product, tenantId, onEdit, onDelete }: Pro
             }
             return item;
         });
+
+        console.log('[ProductCard] enrichedBomData result:', result.length, 'items');
+        console.log('[ProductCard] First 3 enriched:', result.slice(0, 3).map(i => ({ sku: i.sku, name: i.name, qty: i.quantity })));
+        return result;
     }, [bomData]);
 
     // Entity View Hook
