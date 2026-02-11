@@ -106,21 +106,14 @@ export default function ProductCard({ product, tenantId, onEdit, onDelete }: Pro
     }, [bomData]);
 
     // Entity View Hook
+    // initialData is reactive - useEntityView watches it and calls setData internally (line 149-153)
     const entityView = useEntityView<BomTreeNode>({
         entityType: "bom",
-        initialData: [], // Start empty
+        initialData: enrichedBomData, // Reactive! Hook will update when this changes
         initialViewMode: "tree",
         initialPageSize: 10000,
         getItemId: (item) => item.item_id,
     });
-
-    // Sync enrichedBomData with entityView whenever it updates
-    useEffect(() => {
-        if (enrichedBomData.length > 0) {
-            console.log('[ProductCard] Updating entity view data with', enrichedBomData.length, 'items');
-            entityView.setData(enrichedBomData);
-        }
-    }, [enrichedBomData]); // Re-run when bomData changes
 
     // BOM columns
     const bomColumns = useMemo<ColumnDef<BomTreeNode>[]>(() => [
