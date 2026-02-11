@@ -137,7 +137,7 @@ function BomTreeViewInner<T = any>(props: BomTreeViewProps<T>) {
     return (
         <div className={cn("flex flex-col h-full overflow-auto", className)}>
             {/* Header */}
-            <div className="flex items-center bg-muted/50 border-b sticky top-0 z-10">
+            <div className="flex items-center bg-muted/50 border-b border-border/50 sticky top-0 z-10">
                 <div className="w-12 flex-shrink-0" /> {/* Spacer for expand button */}
                 {columns.map((col, idx) => (
                     <div
@@ -169,7 +169,7 @@ function BomTreeViewInner<T = any>(props: BomTreeViewProps<T>) {
                         <div
                             key={node.id}
                             className={cn(
-                                "flex items-center border-b hover:bg-accent/50 cursor-pointer transition-colors",
+                                "flex items-center border-b border-border/50 hover:bg-accent/50 cursor-pointer transition-colors",
                                 isSelected && "bg-accent"
                             )}
                             onClick={() => handleRowClick(node)}
