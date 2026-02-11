@@ -108,11 +108,19 @@ export default function ProductCard({ product, tenantId, onEdit, onDelete }: Pro
     // Entity View Hook
     const entityView = useEntityView<BomTreeNode>({
         entityType: "bom",
-        initialData: enrichedBomData,
+        initialData: [], // Start empty
         initialViewMode: "tree",
         initialPageSize: 10000,
         getItemId: (item) => item.item_id,
     });
+
+    // Sync enrichedBomData with entityView whenever it updates
+    useEffect(() => {
+        if (enrichedBomData.length > 0) {
+            console.log('[ProductCard] Updating entity view data with', enrichedBomData.length, 'items');
+            entityView.setData(enrichedBomData);
+        }
+    }, [enrichedBomData]); // Re-run when bomData changes
 
     // BOM columns
     const bomColumns = useMemo<ColumnDef<BomTreeNode>[]>(() => [
