@@ -251,7 +251,7 @@ export default function EntityViewLayout<T = any>({
                         getLevel={(item: any) => item.level || 0}
                         getPath={(item: any) => item.path || item.name || ''}
                         onRowClick={onRowClick}
-                        selectedIds={selectedIds}
+                        selectedIds={config.selectedIds}
                         className="flex-1"
                     />
                 );
