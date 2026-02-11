@@ -263,6 +263,7 @@ export function useEntityView<T = any>(options: UseEntityViewOptions<T>): Entity
         // Search
         if (viewState.searchTerm) {
             const query = viewState.searchTerm.toLowerCase();
+
             if (options.searchFilter) {
                 // Use custom search filter if provided
                 result = result.filter((item) => options.searchFilter!(item, viewState.searchTerm));

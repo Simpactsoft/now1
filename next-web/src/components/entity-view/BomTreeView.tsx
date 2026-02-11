@@ -43,8 +43,12 @@ function BomTreeViewInner<T = any>(props: BomTreeViewProps<T>) {
     // Track expanded nodes
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
-    // Build tree structure from flat data
+    // Build tree structure from flat BOM data
     const treeNodes = useMemo(() => {
+        if (data.length === 0) {
+            return [];
+        }
+
         const nodeMap = new Map<string, TreeNode<T>>();
         const rootNodes: TreeNode<T>[] = [];
 
@@ -64,6 +68,7 @@ function BomTreeViewInner<T = any>(props: BomTreeViewProps<T>) {
         });
 
         // Second pass: build parent-child relationships
+        // Only build relationships for items that exist in filtered data
         data.forEach(item => {
             const id = getItemId(item);
             const node = nodeMap.get(id)!;
@@ -74,13 +79,14 @@ function BomTreeViewInner<T = any>(props: BomTreeViewProps<T>) {
                 rootNodes.push(node);
             } else {
                 // Find parent by matching path
+                // Parent might not exist if filtered out by search
                 const parentPath = pathParts.slice(0, -1).join(' > ');
                 const parent = Array.from(nodeMap.values()).find(n => n.path === parentPath);
 
                 if (parent) {
                     parent.children.push(node);
                 } else {
-                    // If no parent found, treat as root
+                    // Parent filtered out - treat this as root
                     rootNodes.push(node);
                 }
             }

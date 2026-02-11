@@ -361,7 +361,8 @@ export default function ProductCard({ product, tenantId, onEdit, onDelete }: Pro
                             config={{
                                 ...entityView,
                                 data: enrichedBomData,
-                                filteredData: enrichedBomData,
+                                // CRITICAL: Use entityView.filteredData for search to work!
+                                filteredData: entityView.filteredData,
                                 loading,
                             }}
                             availableViewModes={['tree', 'tags', 'cards']}
