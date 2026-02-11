@@ -152,7 +152,8 @@ export default function EntityViewLayout<T = any>({
     const filteredCount = config.filteredData.length;
 
     // ---- Render the active view ----
-    const renderCurrentView = useCallback(() => {
+    // Simple inline rendering - no useCallback/useMemo to avoid dependency hell
+    const renderCurrentView = () => {
         const commonProps = {
             data: config.filteredData,
             loading: config.loading,
@@ -248,20 +249,7 @@ export default function EntityViewLayout<T = any>({
                 if (renderTags) return renderTags({ ...commonProps, onTagClick: onRowClick });
                 return null;
         }
-    }, [
-        config.viewMode,
-        config.filteredData.length,  // Use length to avoid reference changes
-        config.data.length,           // Use length to avoid reference changes
-        config.loading,
-        config.selectedIds.length,    // Use length for array
-        config.setSelectedIds,
-        columns,
-        onRowClick,
-        renderGrid,
-        renderCards,
-        renderTags,
-        renderTree
-    ]);
+    };
 
     return (
         <div className={`flex flex-col gap-4 w-full h-full ${className}`}>
