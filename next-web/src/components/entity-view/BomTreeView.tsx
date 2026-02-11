@@ -236,9 +236,8 @@ function BomTreeViewInner<T = any>(props: BomTreeViewProps<T>) {
                                     <div
                                         key={idx}
                                         className={cn(
-                                            "py-2 text-sm truncate",
-                                            // Remove px-3 for component column to allow custom paddingLeft
-                                            !isComponentColumn && "px-3",
+                                            "py-2 text-sm",
+                                            !isComponentColumn && "px-3 truncate",
                                             col.cellClass
                                         )}
                                         style={{
@@ -246,18 +245,32 @@ function BomTreeViewInner<T = any>(props: BomTreeViewProps<T>) {
                                             minWidth: col.minWidth,
                                             maxWidth: col.maxWidth,
                                             flex: col.flex,
-                                            // Visual hierarchy for component column
-                                            ...(isComponentColumn && {
-                                                paddingLeft: `${depth * 24 + 12}px`,
-                                                paddingRight: '12px',
-                                                fontWeight: (node.item as any).is_assembly ? 600 : 400
-                                            })
                                         }}
-                                        dangerouslySetInnerHTML={
-                                            typeof content === 'string' ? { __html: content } : undefined
-                                        }
                                     >
-                                        {typeof content !== 'string' ? content : null}
+                                        {isComponentColumn ? (
+                                            <div
+                                                style={{
+                                                    paddingLeft: `${depth * 24 + 12}px`,
+                                                    paddingRight: '12px',
+                                                    fontWeight: (node.item as any).is_assembly ? 600 : 400,
+                                                }}
+                                                className="truncate"
+                                            >
+                                                {typeof content === 'string' ? (
+                                                    <span dangerouslySetInnerHTML={{ __html: content }} />
+                                                ) : (
+                                                    content
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <>
+                                                {typeof content === 'string' ? (
+                                                    <span dangerouslySetInnerHTML={{ __html: content }} />
+                                                ) : (
+                                                    content
+                                                )}
+                                            </>
+                                        )}
                                     </div>
                                 );
                             })}
