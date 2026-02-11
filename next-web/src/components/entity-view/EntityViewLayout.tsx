@@ -29,6 +29,7 @@ import AddFilterCommand from "@/components/universal/AddFilterCommand";
 import { EntityViewLayoutProps, ViewMode, GridRenderProps, CardsRenderProps, TagsRenderProps, TreeRenderProps } from "./types";
 import { EntityAgGrid } from "./EntityAgGrid";
 import { EntityTreeGrid } from "./EntityTreeGrid";
+import { BomTreeView } from "./BomTreeView";
 
 // ==================== Responsive Mobile Menu ====================
 
@@ -241,14 +242,17 @@ export default function EntityViewLayout<T = any>({
                         autoGroupColumnDef: undefined,
                     });
                 }
-                // Default: use EntityTreeGrid
+                // Use custom BomTreeView for proper parent node display
                 return (
-                    <EntityTreeGrid
-                        {...commonProps}
+                    <BomTreeView
+                        data={config.filteredData}
                         columns={columns}
+                        getItemId={(item: any) => String(item.item_id || item.id)}
+                        getLevel={(item: any) => item.level || 0}
+                        getPath={(item: any) => item.path || item.name || ''}
                         onRowClick={onRowClick}
-                        onSelectionChange={config.setSelectedIds}
-                        getDataPath={(item: any) => item.path?.split(' > ') || [item.name || 'Unnamed']}
+                        selectedIds={selectedIds}
+                        className="flex-1"
                     />
                 );
 
