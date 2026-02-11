@@ -249,12 +249,15 @@ function BomTreeViewInner<T = any>(props: BomTreeViewProps<T>) {
                                     >
                                         {isComponentColumn ? (
                                             <div
+                                                className={cn(
+                                                    "truncate",
+                                                    (node.item as any).is_assembly && "font-semibold"
+                                                )}
                                                 style={{
-                                                    paddingLeft: `${depth * 24 + 12}px`,
+                                                    marginLeft: `${depth * 24}px`,
+                                                    paddingLeft: '12px',
                                                     paddingRight: '12px',
-                                                    fontWeight: (node.item as any).is_assembly ? 600 : 400,
                                                 }}
-                                                className="truncate"
                                             >
                                                 {typeof content === 'string' ? (
                                                     <span dangerouslySetInnerHTML={{ __html: content }} />
