@@ -152,6 +152,13 @@ export default function ProductCard({ product, tenantId, onEdit, onDelete }: Pro
         getItemId: (item) => item.item_id,
     });
 
+    console.log('[ProductCard] entityView state:', {
+        searchTerm: entityView.searchTerm,
+        dataLength: enrichedBomData.length,
+        filteredLength: entityView.filteredData.length,
+        sampleItem: enrichedBomData[0]
+    });
+
     // BOM columns
     const bomColumns = useMemo<ColumnDef<BomTreeNode>[]>(() => [
         {
