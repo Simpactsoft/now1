@@ -152,24 +152,16 @@ export default function ProductCard({ product, tenantId, onEdit, onDelete }: Pro
         getItemId: (item) => item.item_id,
         // Custom search filter for BOM data
         searchFilter: (item, searchTerm) => {
-            console.log('🔍 searchFilter called!', { searchTerm, item: item.name });
             const query = searchTerm.toLowerCase();
-            const matches = (
+            return (
                 item.name?.toLowerCase().includes(query) ||
                 item.sku?.toLowerCase().includes(query) ||
                 item.path?.toLowerCase().includes(query) ||
                 false
             );
-            console.log('🔍 Match result:', matches);
-            return matches;
         },
     });
 
-    console.log('🎯 [ProductCard] RENDERING!', {
-        searchTerm: entityView.searchTerm,
-        dataLength: enrichedBomData.length,
-        filteredLength: entityView.filteredData.length,
-    });
 
     // BOM columns
     const bomColumns = useMemo<ColumnDef<BomTreeNode>[]>(() => [

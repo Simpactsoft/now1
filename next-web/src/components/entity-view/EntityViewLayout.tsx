@@ -232,8 +232,10 @@ export default function EntityViewLayout<T = any>({
                     });
                 }
                 // Use custom BomTreeView for proper parent node display
+                // Key forces remount when filtered data changes (for search)
                 return (
                     <BomTreeView
+                        key={`tree-${config.searchTerm}-${config.filteredData.length}`}
                         data={config.filteredData}
                         columns={columns}
                         getItemId={(item: any) => String(item.item_id || item.id)}
