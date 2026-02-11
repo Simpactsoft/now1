@@ -159,18 +159,6 @@ export default function EntityViewLayout<T = any>({
             selectedIds: config.selectedIds,
         };
 
-        console.log('[EntityViewLayout] commonProps:', {
-            dataLength: commonProps.data?.length,
-            data: commonProps.data,
-            loading: commonProps.loading
-        });
-
-        console.log('[EntityViewLayout] renderCurrentView:', {
-            viewMode: config.viewMode,
-            dataLength: config.data.length,
-            filteredDataLength: config.filteredData.length,
-            loading: config.loading
-        });
 
         switch (config.viewMode) {
             case "grid":
@@ -262,10 +250,10 @@ export default function EntityViewLayout<T = any>({
         }
     }, [
         config.viewMode,
-        config.filteredData,
-        config.data,
+        config.filteredData.length,  // Use length to avoid reference changes
+        config.data.length,           // Use length to avoid reference changes
         config.loading,
-        config.selectedIds,
+        config.selectedIds.length,    // Use length for array
         config.setSelectedIds,
         columns,
         onRowClick,
