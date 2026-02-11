@@ -190,6 +190,19 @@ export default function ProductCard({ product, tenantId, onEdit, onDelete }: Pro
             flex: 1,
         },
         {
+            field: "is_assembly",
+            headerName: "Type",
+            width: 120,
+            cellRenderer: ({ value }) => (
+                <span className={`text-xs px-2 py-0.5 rounded-full ${value
+                    ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+                    : "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+                    }`}>
+                    {value ? "Assembly" : "Part"}
+                </span>
+            ),
+        },
+        {
             field: "quantity",
             headerName: "Qty",
             width: 100,
@@ -207,19 +220,6 @@ export default function ProductCard({ product, tenantId, onEdit, onDelete }: Pro
             width: 150,
             valueFormatter: (value) => `₪${value?.toLocaleString()}`,
             aggFunc: "sum",
-        },
-        {
-            field: "is_assembly",
-            headerName: "Type",
-            width: 120,
-            cellRenderer: ({ value }) => (
-                <span className={`text-xs px-2 py-0.5 rounded-full ${value
-                    ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
-                    : "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
-                    }`}>
-                    {value ? "Assembly" : "Part"}
-                </span>
-            ),
         },
     ], []);
 

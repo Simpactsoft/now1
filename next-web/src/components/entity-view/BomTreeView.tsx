@@ -219,6 +219,9 @@ function BomTreeViewInner<T = any>(props: BomTreeViewProps<T>) {
                                     content = value != null ? String(value) : '';
                                 }
 
+                                // Special rendering for Component column
+                                const isComponentColumn = col.field === 'name' || col.field === 'component';
+
                                 return (
                                     <div
                                         key={idx}
@@ -231,6 +234,11 @@ function BomTreeViewInner<T = any>(props: BomTreeViewProps<T>) {
                                             minWidth: col.minWidth,
                                             maxWidth: col.maxWidth,
                                             flex: col.flex,
+                                            // Visual hierarchy for component column
+                                            ...(isComponentColumn && {
+                                                paddingLeft: `${depth * 24 + 12}px`,
+                                                fontWeight: (node.item as any).is_assembly ? 600 : 400
+                                            })
                                         }}
                                         dangerouslySetInnerHTML={
                                             typeof content === 'string' ? { __html: content } : undefined
