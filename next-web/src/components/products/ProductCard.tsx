@@ -85,8 +85,19 @@ export default function ProductCard({ product, tenantId, onEdit, onDelete }: Pro
             return [];
         }
 
+        // CRITICAL FIX: Remove root node (level 0) - it shows as invisible row in AG Grid
+        const workingData = bomData
+            .filter(item => item.level > 0)  // Remove root
+            .map(item => ({
+                ...item,
+                level: item.level - 1,  // Adjust levels down
+                path: item.path.split(' > ').slice(1).join(' > ') || item.name,  // Remove first path segment
+            }));
+
+        console.log('[ProductCard] Filtered from', bomData.length, 'to', workingData.length, '(removed root)');
+
         const itemsByParentPath = new Map<string, BomTreeNode[]>();
-        bomData.forEach(item => {
+        workingData.forEach(item => {
             const pathParts = item.path.split(' > ');
             if (pathParts.length > 1) {
                 const parentPath = pathParts.slice(0, -1).join(' > ');
@@ -97,7 +108,7 @@ export default function ProductCard({ product, tenantId, onEdit, onDelete }: Pro
             }
         });
 
-        const result = bomData.map(item => {
+        const result = workingData.map(item => {
             const children = itemsByParentPath.get(item.path) || [];
             if (children.length > 0) {
                 const subtotal_qty = children.reduce((sum, child) => sum + child.quantity, 0);

@@ -158,6 +158,8 @@ function EntityTreeGridInner<T = any>(props: EntityTreeGridProps<T>) {
                     defaultColDef={defaultColDef}
                     autoGroupColumnDef={defaultAutoGroupColumnDef}
                     treeData={true}
+                    groupDisplayType="singleColumn"
+                    showOpenedGroup={true}
                     getDataPath={getDataPath}
                     getRowId={(params) => getRowId(params.data)}
                     rowSelection={rowSelection}
