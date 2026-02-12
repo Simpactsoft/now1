@@ -12,3 +12,6 @@ export function createAdminClient() {
         }
     );
 }
+
+// Alias for consistency
+export const getAdminClient = createAdminClient;
