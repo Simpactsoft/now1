@@ -1,6 +1,5 @@
-
--- Migration: 228_get_tenants_json_rpc.sql
--- Description: New JSON-returning RPC to bypass 400 Bad Request issues.
+-- Migration: 229_fix_union_type_mismatch.sql
+-- Description: Fix UNION type mismatch in get_tenants_json by using 'distributor' for super admin
 
 CREATE OR REPLACE FUNCTION get_tenants_json()
 RETURNS json
@@ -19,13 +18,14 @@ BEGIN
     SELECT email INTO current_user_email FROM auth.users WHERE id = current_user_id;
 
     -- *** SUPER ADMIN CHECK ***
+    -- Note: Using 'distributor' as role since app_role enum is: 'distributor', 'dealer', 'agent', 'customer'
     IF current_user_email = 'sales@impactsoft.co.il' THEN
         SELECT json_agg(t) INTO result FROM (
             SELECT 
                 id,
                 name,
                 slug,
-                'system_admin'::app_role as role
+                'distributor'::app_role as role
             FROM public.tenants
             ORDER BY name ASC
         ) t;

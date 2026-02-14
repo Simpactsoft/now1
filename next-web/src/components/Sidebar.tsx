@@ -20,7 +20,8 @@ import {
     Building2,
     FileText,
     Plus,
-    Package
+    Package,
+    Sliders
 } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useLanguage } from '@/context/LanguageContext';
@@ -33,6 +34,7 @@ const NAV_CONFIG = [
     { key: 'contacts', href: '/dashboard/people', icon: UserCircle },
     { key: 'organizations', href: '/dashboard/organizations', icon: Building2 },
     { key: 'products', href: '/dashboard/products', icon: Package },
+    { key: 'cpq', href: '/dashboard/cpq', icon: Sliders },
     { key: 'logs', href: '/dashboard/logs', icon: Activity },
     { key: 'team', href: '/dashboard/settings/team', icon: Users },
     { key: 'infrastructure', href: '/dashboard/infra', icon: Database },

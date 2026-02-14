@@ -1,7 +1,6 @@
 "use server";
 
-// TEMPORARY: Using admin client
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { validateConfiguration } from "./validation-actions";
 import { calculatePrice, type PriceCalculation } from "./pricing-actions";
@@ -9,6 +8,13 @@ import { calculatePrice, type PriceCalculation } from "./pricing-actions";
 // ============================================================================
 // TYPES
 // ============================================================================
+
+export interface PriceBreakdownItem {
+    optionId: string;
+    optionName: string;
+    modifierType: "add" | "multiply" | "percent";
+    modifierAmount: number;
+}
 
 export interface Configuration {
     id: string;
@@ -23,13 +29,22 @@ export interface Configuration {
     quantity: number;
     status: "draft" | "completed" | "quoted" | "ordered" | "expired";
     shareToken: string | null;
-    priceBreakdown: any;
+    priceBreakdown: PriceBreakdownItem[];
     notes: string | null;
     inventoryReservationStatus: "none" | "soft" | "hard";
     inventoryReservationId: string | null;
     createdAt: string;
     updatedAt: string;
 }
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
+const DEFAULT_PAGE_SIZE = 20;
+const MAX_PAGE_SIZE = 100;
+const PRICE_STALE_THRESHOLD_MS = 24 * 60 * 60 * 1000; // 24 hours
+const PRICE_DIFFERENCE_THRESHOLD = 0.01; // $0.01
 
 // ============================================================================
 // ACTIONS
@@ -52,7 +67,8 @@ export async function saveConfiguration(params: {
     error?: string;
 }> {
     try {
-        const supabase = createAdminClient();
+
+        const supabase = await createClient();
         const quantity = params.quantity || 1;
 
         // 1. Validate configuration
@@ -68,7 +84,28 @@ export async function saveConfiguration(params: {
             };
         }
 
-        // 2. Calculate price
+        // 2. Validate tenant access (defense in depth beyond RLS)
+        const { data: template, error: templateError } = await supabase
+            .from('cpq_templates')
+            .select('tenant_id')
+            .eq('id', params.templateId)
+            .single();
+
+        if (templateError || !template) {
+            return { success: false, error: 'Template not found' };
+        }
+
+        // Verify user's tenant matches template's tenant (admins bypass this)
+        if (user) {
+            const userTenantId = user.app_metadata?.tenant_id;
+            const isAdmin = user.app_metadata?.app_role === 'admin' || user.app_metadata?.app_role === 'super_admin';
+
+            if (!isAdmin && template.tenant_id !== userTenantId) {
+                return { success: false, error: 'Template not found' };
+            }
+        }
+
+        // 3. Calculate price
         const priceResult = await calculatePrice({
             templateId: params.templateId,
             selectedOptions: params.selectedOptions,
@@ -104,16 +141,15 @@ export async function saveConfiguration(params: {
         if (user) {
             configData.user_id = user.id;
         } else {
-            // Anonymous - use session ID from cookie or generate
-            configData.session_id = "anon-" + Date.now();
+            // Anonymous - use cryptographically secure session ID
+            const { randomUUID } = await import('crypto');
+            configData.session_id = `anon-${randomUUID()}`;
         }
 
         if (params.generateShareToken) {
-            // Generate share token
-            const token = Buffer.from(
-                Math.random().toString(36).substring(2, 15) +
-                Math.random().toString(36).substring(2, 15)
-            ).toString("base64").substring(0, 12);
+            // Generate cryptographically secure share token
+            const { randomBytes } = await import('crypto');
+            const token = randomBytes(9).toString('base64url'); // 12 chars
             configData.share_token = token;
         }
 
@@ -167,7 +203,8 @@ export async function getConfiguration(configurationId: string): Promise<{
     error?: string;
 }> {
     try {
-        const supabase = createAdminClient();
+
+        const supabase = await createClient();
 
         const { data, error } = await supabase
             .from("configurations")
@@ -179,33 +216,38 @@ export async function getConfiguration(configurationId: string): Promise<{
             return { success: false, error: "Configuration not found" };
         }
 
-        // Recalculate price (prices may have changed)
-        const priceResult = await calculatePrice({
-            templateId: data.template_id,
-            selectedOptions: data.selected_options,
-            quantity: data.quantity,
-        });
+        // Recalculate price only if data is stale (>24 hours old)
+        const configAge = Date.now() - new Date(data.updated_at).getTime();
 
-        if (priceResult.success && priceResult.data) {
-            // Update stored price if different
-            const newPrice = priceResult.data.total;
-            if (Math.abs(newPrice - parseFloat(data.total_price)) > 0.01) {
-                await supabase
-                    .from("configurations")
-                    .update({
-                        base_price: priceResult.data.basePrice,
-                        options_total: priceResult.data.optionsTotal,
-                        discount_amount: priceResult.data.discountAmount,
-                        total_price: priceResult.data.total,
-                        price_breakdown: priceResult.data.breakdown,
-                    })
-                    .eq("id", configurationId);
+        if (configAge > PRICE_STALE_THRESHOLD_MS) {
+            // Stale data - recalculate price (prices may have changed)
+            const priceResult = await calculatePrice({
+                templateId: data.template_id,
+                selectedOptions: data.selected_options,
+                quantity: data.quantity,
+            });
 
-                data.total_price = newPrice.toString();
-                data.base_price = priceResult.data.basePrice.toString();
-                data.options_total = priceResult.data.optionsTotal.toString();
-                data.discount_amount = priceResult.data.discountAmount.toString();
-                data.price_breakdown = priceResult.data.breakdown;
+            if (priceResult.success && priceResult.data) {
+                // Update stored price if different
+                const newPrice = priceResult.data.total;
+                if (Math.abs(newPrice - parseFloat(data.total_price)) > PRICE_DIFFERENCE_THRESHOLD) {
+                    await supabase
+                        .from("configurations")
+                        .update({
+                            base_price: priceResult.data.basePrice,
+                            options_total: priceResult.data.optionsTotal,
+                            discount_amount: priceResult.data.discountAmount,
+                            total_price: priceResult.data.total,
+                            price_breakdown: priceResult.data.breakdown,
+                        })
+                        .eq("id", configurationId);
+
+                    data.total_price = newPrice.toString();
+                    data.base_price = priceResult.data.basePrice.toString();
+                    data.options_total = priceResult.data.optionsTotal.toString();
+                    data.discount_amount = priceResult.data.discountAmount.toString();
+                    data.price_breakdown = priceResult.data.breakdown;
+                }
             }
         }
 
@@ -228,7 +270,8 @@ export async function getConfigurationByShareToken(shareToken: string): Promise<
     error?: string;
 }> {
     try {
-        const supabase = createAdminClient();
+
+        const supabase = await createClient();
 
         const { data, error } = await supabase
             .from("configurations")
@@ -275,7 +318,8 @@ export async function updateConfiguration(
     error?: string;
 }> {
     try {
-        const supabase = createAdminClient();
+
+        const supabase = await createClient();
 
         // 1. Get existing configuration
         const { data: existing, error: fetchError } = await supabase
@@ -325,7 +369,8 @@ export async function completeConfiguration(configurationId: string): Promise<{
     error?: string;
 }> {
     try {
-        const supabase = createAdminClient();
+
+        const supabase = await createClient();
 
         // 1. Get configuration
         const { data: config, error: fetchError } = await supabase
@@ -392,7 +437,8 @@ export async function getConfigurations(params?: {
     error?: string;
 }> {
     try {
-        const supabase = createAdminClient();
+
+        const supabase = await createClient();
 
         const {
             data: { user },
@@ -403,7 +449,7 @@ export async function getConfigurations(params?: {
         }
 
         const page = params?.page || 1;
-        const pageSize = Math.min(params?.pageSize || 20, 100);
+        const pageSize = Math.min(params?.pageSize || DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
 
         let query = supabase
             .from("configurations")
@@ -440,21 +486,174 @@ export async function getConfigurations(params?: {
     }
 }
 
+/**
+ * Delete a configuration (only drafts can be deleted by non-admins).
+ */
+export async function deleteConfiguration(configurationId: string): Promise<{
+    success: boolean;
+    error?: string;
+}> {
+    try {
+        const supabase = await createClient();
+
+        const {
+            data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user) {
+            return { success: false, error: "Authentication required" };
+        }
+
+        // Get configuration first to check permissions
+        const { data: config, error: fetchError } = await supabase
+            .from("configurations")
+            .select("*")
+            .eq("id", configurationId)
+            .single();
+
+        if (fetchError || !config) {
+            return { success: false, error: "Configuration not found" };
+        }
+
+        // Only allow deleting own configurations (unless admin)
+        const isAdmin = user.app_metadata?.app_role === 'admin' || user.app_metadata?.app_role === 'super_admin';
+
+        if (!isAdmin && config.user_id !== user.id) {
+            return { success: false, error: "Not authorized to delete this configuration" };
+        }
+
+        // Only allow deleting drafts (unless admin)
+        if (!isAdmin && config.status !== "draft") {
+            return { success: false, error: "Only draft configurations can be deleted" };
+        }
+
+        // Delete the configuration
+        const { error: deleteError } = await supabase
+            .from("configurations")
+            .delete()
+            .eq("id", configurationId);
+
+        if (deleteError) {
+            return { success: false, error: deleteError.message };
+        }
+
+        return { success: true };
+    } catch (error: any) {
+        console.error("Error in deleteConfiguration:", error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Duplicate a configuration as a new draft.
+ */
+export async function duplicateConfiguration(configurationId: string): Promise<{
+    success: boolean;
+    data?: Configuration;
+    error?: string;
+}> {
+    try {
+        const supabase = await createClient();
+
+        const {
+            data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user) {
+            return { success: false, error: "Authentication required" };
+        }
+
+        // Get existing configuration
+        const { data: existing, error: fetchError } = await supabase
+            .from("configurations")
+            .select("*")
+            .eq("id", configurationId)
+            .single();
+
+        if (fetchError || !existing) {
+            return { success: false, error: "Configuration not found" };
+        }
+
+        // Create new configuration with same data but as draft
+        const newConfigData = {
+            template_id: existing.template_id,
+            user_id: user.id,
+            selected_options: existing.selected_options,
+            base_price: existing.base_price,
+            options_total: existing.options_total,
+            discount_amount: existing.discount_amount,
+            total_price: existing.total_price,
+            quantity: existing.quantity,
+            price_breakdown: existing.price_breakdown,
+            notes: existing.notes ? `Copy of: ${existing.notes}` : "Duplicated configuration",
+            status: "draft",
+            inventory_reservation_status: "none",
+        };
+
+        const { data, error } = await supabase
+            .from("configurations")
+            .insert(newConfigData)
+            .select()
+            .single();
+
+        if (error) {
+            return { success: false, error: error.message };
+        }
+
+        return {
+            success: true,
+            data: mapConfigurationFromDb(data),
+        };
+    } catch (error: any) {
+        console.error("Error in duplicateConfiguration:", error);
+        return { success: false, error: error.message };
+    }
+}
+
 // ============================================================================
 // HELPERS
 // ============================================================================
 
-function mapConfigurationFromDb(data: any): Configuration {
+interface ConfigurationDbRow {
+    id: string;
+    template_id: string;
+    user_id: string | null;
+    session_id: string | null;
+    selected_options: Record<string, string | string[]>;
+    base_price: string;
+    options_total: string;
+    discount_amount: string;
+    total_price: string;
+    quantity: number;
+    status: string;
+    share_token: string | null;
+    price_breakdown: PriceBreakdownItem[];
+    notes: string | null;
+    inventory_reservation_status: string;
+    inventory_reservation_id: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+/**
+ * Helper to round currency values to 2 decimal places
+ * Prevents floating point precision errors
+ */
+function roundCurrency(value: string | number): number {
+    return Math.round(parseFloat(String(value || "0")) * 100) / 100;
+}
+
+function mapConfigurationFromDb(data: ConfigurationDbRow): Configuration {
     return {
         id: data.id,
         templateId: data.template_id,
         userId: data.user_id,
         sessionId: data.session_id,
         selectedOptions: data.selected_options,
-        basePrice: parseFloat(data.base_price || "0"),
-        optionsTotal: parseFloat(data.options_total || "0"),
-        discountAmount: parseFloat(data.discount_amount || "0"),
-        totalPrice: parseFloat(data.total_price || "0"),
+        basePrice: roundCurrency(data.base_price),
+        optionsTotal: roundCurrency(data.options_total),
+        discountAmount: roundCurrency(data.discount_amount),
+        totalPrice: roundCurrency(data.total_price),
         quantity: data.quantity,
         status: data.status,
         shareToken: data.share_token,

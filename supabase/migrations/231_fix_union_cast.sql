@@ -1,6 +1,5 @@
-
--- Migration: 228_get_tenants_json_rpc.sql
--- Description: New JSON-returning RPC to bypass 400 Bad Request issues.
+-- Fix UNION type mismatch by casting both sides to text
+-- The issue is that profiles.role is app_role enum but tenant_members.role is text
 
 CREATE OR REPLACE FUNCTION get_tenants_json()
 RETURNS json
@@ -25,21 +24,21 @@ BEGIN
                 id,
                 name,
                 slug,
-                'system_admin'::app_role as role
+                'distributor' as role  -- Return as text, not app_role
             FROM public.tenants
             ORDER BY name ASC
         ) t;
         RETURN result;
     END IF;
 
-    -- STANDARD LOGIC
+    -- STANDARD LOGIC with explicit text casting
     SELECT json_agg(t) INTO result FROM (
         -- Standard user tenants
         SELECT 
             t.id,
             t.name,
             t.slug,
-            p.role
+            p.role::text as role  -- Cast app_role to text
         FROM 
             public.tenants t
         JOIN 
@@ -54,7 +53,7 @@ BEGIN
             t.id,
             t.name,
             t.slug,
-            tm.role
+            tm.role::text as role  -- Ensure text type
         FROM 
             public.tenants t
         JOIN 

@@ -45,24 +45,26 @@ export function ConfiguratorLayout({
     return (
         <div className="min-h-screen bg-background">
             {/* Header */}
-            <div className="border-b">
-                <div className="container py-6">
-                    <h1 className="text-3xl font-bold">{state.template.name}</h1>
-                    {state.template.description && (
-                        <p className="text-muted-foreground mt-2">{state.template.description}</p>
-                    )}
-                    {state.template.imageUrl && (
-                        <img
-                            src={state.template.imageUrl}
-                            alt={state.template.name}
-                            className="mt-4 rounded-lg w-full max-w-2xl h-64 object-cover"
-                        />
-                    )}
+            <div>
+                <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl">
+                    <div className="py-6 border-b">
+                        <h1 className="text-3xl font-bold">{state.template.name}</h1>
+                        {state.template.description && (
+                            <p className="text-muted-foreground mt-2">{state.template.description}</p>
+                        )}
+                        {state.template.imageUrl && (
+                            <img
+                                src={state.template.imageUrl}
+                                alt={state.template.name}
+                                className="mt-4 rounded-lg w-full max-w-2xl h-64 object-cover"
+                            />
+                        )}
+                    </div>
                 </div>
             </div>
 
             {/* Main content */}
-            <div className="container py-8">
+            <div className="container mx-auto px-4 md:px-6 lg:px-8 max-w-7xl py-8">
                 {/* Preset selector (if not dismissed) */}
                 {showPresets && (
                     <div className="mb-8">

@@ -1,8 +1,6 @@
 "use server";
 
-// TEMPORARY: Using admin client for testing without auth
-// TODO: Revert to regular createClient after testing
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 
 // ============================================================================
@@ -121,8 +119,8 @@ export async function getTemplates(params?: {
     error?: string;
 }> {
     try {
-        // TEMPORARY: Using admin client to bypass RLS for testing
-        const supabase = createAdminClient();
+
+        const supabase = await createClient();
 
         const page = params?.page || 1;
         const pageSize = Math.min(params?.pageSize || 20, 100);
@@ -199,8 +197,8 @@ export async function getTemplateById(
     error?: string;
 }> {
     try {
-        // TEMPORARY: Using admin client to bypass RLS for testing
-        const supabase = createAdminClient();
+
+        const supabase = await createClient();
 
         // 1. Get template
         const { data: templateData, error: templateError } = await supabase
@@ -360,6 +358,311 @@ export async function getTemplateById(
         };
     } catch (error: any) {
         console.error("Error in getTemplateById:", error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Create a new product template.
+ */
+export async function createTemplate(params: {
+    name: string;
+    description?: string;
+    basePrice: number;
+    categoryId?: string;
+    displayMode?: "single_page" | "wizard";
+}): Promise<{
+    success: boolean;
+    data?: ProductTemplate;
+    error?: string;
+}> {
+    try {
+        const supabase = await createClient();
+
+        const {
+            data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user) {
+            return { success: false, error: "Authentication required" };
+        }
+
+        // Try to get tenant_id from app_metadata first
+        let tenantId = user.app_metadata?.tenant_id || user.user_metadata?.tenant_id;
+
+        // If not found, try to get it from profiles table
+        if (!tenantId) {
+            const { data: profile, error: profileError } = await supabase
+                .from("profiles")
+                .select("tenant_id")
+                .eq("id", user.id)
+                .single();
+
+            if (!profileError && profile) {
+                tenantId = profile.tenant_id;
+            }
+        }
+
+        if (!tenantId) {
+            return { success: false, error: "Tenant ID required. Please make sure you are assigned to a tenant." };
+        }
+
+        const { data, error } = await supabase
+            .from("product_templates")
+            .insert({
+                tenant_id: tenantId,
+                name: params.name,
+                description: params.description || null,
+                base_price: params.basePrice,
+                category_id: params.categoryId || null,
+                display_mode: params.displayMode || "single_page",
+                is_active: true,
+            })
+            .select(`
+                *,
+                product_categories(name)
+            `)
+            .single();
+
+        if (error) {
+            console.error("Error creating template:", error);
+            return { success: false, error: error.message };
+        }
+
+        const template: ProductTemplate = {
+            id: data.id,
+            tenantId: data.tenant_id,
+            name: data.name,
+            description: data.description,
+            basePrice: parseFloat(data.base_price || "0"),
+            baseProductId: data.base_product_id,
+            categoryId: data.category_id,
+            categoryName: data.product_categories?.name || null,
+            imageUrl: data.image_url,
+            displayMode: data.display_mode,
+            isActive: data.is_active,
+            createdAt: data.created_at,
+            updatedAt: data.updated_at,
+        };
+
+        return { success: true, data: template };
+    } catch (error: any) {
+        console.error("Error in createTemplate:", error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Update an existing template's settings.
+ * Used by the Template Editor Settings form.
+ */
+export async function updateTemplate(
+    templateId: string,
+    params: {
+        name?: string;
+        description?: string;
+        basePrice?: number;
+        displayMode?: "single_page" | "wizard";
+        imageUrl?: string;
+        categoryId?: string | null;
+        baseProductId?: string | null;
+        isActive?: boolean;
+    }
+): Promise<{ success: boolean; data?: ProductTemplate; error?: string }> {
+    try {
+        const supabase = await createClient();
+
+        // 1. Auth check
+        const {
+            data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user) {
+            return { success: false, error: "Authentication required" };
+        }
+
+        // 2. Build update object (only include provided fields)
+        const updateData: any = {
+            updated_at: new Date().toISOString(),
+        };
+
+        if (params.name !== undefined) updateData.name = params.name;
+        if (params.description !== undefined)
+            updateData.description = params.description || null;
+        if (params.basePrice !== undefined) updateData.base_price = params.basePrice;
+        if (params.displayMode !== undefined)
+            updateData.display_mode = params.displayMode;
+        if (params.imageUrl !== undefined)
+            updateData.image_url = params.imageUrl || null;
+        if (params.categoryId !== undefined)
+            updateData.category_id = params.categoryId || null;
+        if (params.baseProductId !== undefined)
+            updateData.base_product_id = params.baseProductId || null;
+        if (params.isActive !== undefined) updateData.is_active = params.isActive;
+
+        // 3. Update in DB - RLS will handle tenant isolation
+        const { data, error } = await supabase
+            .from("product_templates")
+            .update(updateData)
+            .eq("id", templateId)
+            .select(
+                `
+        *,
+        product_categories(name)
+      `
+            )
+            .single();
+
+        if (error) {
+            console.error("Error updating template:", error);
+            if (error.code === "23505") {
+                return { success: false, error: "A template with this name already exists" };
+            }
+            return { success: false, error: error.message };
+        }
+
+        const template: ProductTemplate = {
+            id: data.id,
+            tenantId: data.tenant_id,
+            name: data.name,
+            description: data.description,
+            basePrice: parseFloat(data.base_price || "0"),
+            baseProductId: data.base_product_id,
+            categoryId: data.category_id,
+            categoryName: data.product_categories?.name || null,
+            imageUrl: data.image_url,
+            displayMode: data.display_mode,
+            isActive: data.is_active,
+            createdAt: data.created_at,
+            updatedAt: data.updated_at,
+        };
+
+        return { success: true, data: template };
+    } catch (error: any) {
+        console.error("Error in updateTemplate:", error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Toggle template active status (publish/unpublish).
+ * Only allow publishing if template has at least one option group.
+ */
+export async function toggleTemplateActive(
+    templateId: string
+): Promise<{ success: boolean; data?: { isActive: boolean }; error?: string }> {
+    try {
+        const supabase = await createClient();
+
+        // 1. Auth check
+        const {
+            data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user) {
+            return { success: false, error: "Authentication required" };
+        }
+
+        // 2. Get current template status
+        const { data: template, error: fetchError } = await supabase
+            .from("product_templates")
+            .select("is_active")
+            .eq("id", templateId)
+            .single();
+
+        if (fetchError || !template) {
+            return { success: false, error: "Template not found" };
+        }
+
+        const newStatus = !template.is_active;
+
+        // 3. If publishing, verify template has option groups
+        if (newStatus) {
+            const { count, error: countError } = await supabase
+                .from("option_groups")
+                .select("id", { count: "exact", head: true })
+                .eq("template_id", templateId);
+
+            if (countError) {
+                return { success: false, error: "Failed to verify template" };
+            }
+
+            if (!count || count === 0) {
+                return {
+                    success: false,
+                    error: "Cannot publish template without option groups",
+                };
+            }
+        }
+
+        // 4. Toggle status
+        const { error: updateError } = await supabase
+            .from("product_templates")
+            .update({ is_active: newStatus, updated_at: new Date().toISOString() })
+            .eq("id", templateId);
+
+        if (updateError) {
+            return { success: false, error: updateError.message };
+        }
+
+        return { success: true, data: { isActive: newStatus } };
+    } catch (error: any) {
+        console.error("Error in toggleTemplateActive:", error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Get all products in a category (for category-sourced option groups)
+ */
+export async function getCategoryProducts(categoryId: string): Promise<{
+    success: boolean;
+    data?: Array<{
+        id: string;
+        name: string;
+        sku: string | null;
+        listPrice: number;
+        imageUrl: string | null;
+    }>;
+    error?: string;
+}> {
+    try {
+        const supabase = await createClient();
+
+        // 1. Auth check
+        const {
+            data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user) {
+            return { success: false, error: "Authentication required" };
+        }
+
+        // 2. Fetch products
+        const { data, error } = await supabase
+            .from("products")
+            .select("id, name, sku, list_price, image_url")
+            .eq("category_id", categoryId)
+            .eq("is_active", true)
+            .order("name");
+
+        if (error) {
+            console.error("Error fetching category products:", error);
+            return { success: false, error: error.message };
+        }
+
+        // 3. Transform to camelCase
+        const products = (data || []).map((p) => ({
+            id: p.id,
+            name: p.name,
+            sku: p.sku,
+            listPrice: parseFloat(p.list_price || "0"),
+            imageUrl: p.image_url,
+        }));
+
+        return { success: true, data: products };
+    } catch (error: any) {
+        console.error("Error in getCategoryProducts:", error);
         return { success: false, error: error.message };
     }
 }

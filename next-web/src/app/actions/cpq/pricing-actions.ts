@@ -1,7 +1,6 @@
 "use server";
 
-// TEMPORARY: Using admin client for testing without auth
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 
 // ============================================================================
@@ -61,7 +60,8 @@ export async function calculatePrice(params: {
     error?: string;
 }> {
     try {
-        const supabase = createAdminClient();
+        
+        const supabase = await createClient();
         const quantity = params.quantity || 1;
 
         // 1. Get template base price

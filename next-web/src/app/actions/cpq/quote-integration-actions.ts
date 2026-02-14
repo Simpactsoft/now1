@@ -1,8 +1,8 @@
 "use server";
 
-// TEMPORARY: Using admin client
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
+import type { ProductTemplate, OptionGroup, Option } from "./template-actions";
 import { completeConfiguration } from "./configuration-actions";
 
 // ============================================================================
@@ -48,7 +48,8 @@ export async function addConfiguredProductToQuote(params: {
     error?: string;
 }> {
     try {
-        const supabase = createAdminClient();
+        
+        const supabase = await createClient();
 
         // 1. Get configuration
         const { data: config, error: configError } = await supabase

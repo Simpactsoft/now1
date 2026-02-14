@@ -41,7 +41,9 @@ export const translations = {
         group: "Group",
         count: "Count",
         organizations: "Organizations",
-        products: "Products"
+        products: "Products",
+        cpq: "CPQ Configurator",
+        my_configurations: "My Configurations"
     },
     he: {
         dashboard: "לוח בקרה",
@@ -83,6 +85,8 @@ export const translations = {
         group: "קבוצה",
         count: "כמות",
         organizations: "ארגונים",
-        products: "פריטים"
+        products: "פריטים",
+        cpq: "קונפיגורטור CPQ",
+        my_configurations: "הקונפיגורציות שלי"
     }
 };

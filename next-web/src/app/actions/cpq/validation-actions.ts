@@ -1,7 +1,6 @@
 "use server";
 
-// TEMPORARY: Using admin client
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import type { ConfigurationRule, Option, OptionGroup } from "./template-actions";
 
@@ -47,7 +46,8 @@ export async function validateConfiguration(params: {
     error?: string;
 }> {
     try {
-        const supabase = createAdminClient();
+        
+        const supabase = await createClient();
 
         const errors: ValidationMessage[] = [];
         const warnings: ValidationMessage[] = [];

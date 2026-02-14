@@ -28,7 +28,13 @@ export default function TenantSwitcher({ currentTenantId }: TenantSwitcherProps)
             let { data, error } = await supabase.rpc("get_tenants_json");
 
             if (error) {
-                console.error("[TenantSwitcher] JSON RPC failed", error);
+                console.error("[TenantSwitcher] JSON RPC failed:", {
+                    message: error.message,
+                    details: error.details,
+                    hint: error.hint,
+                    code: error.code,
+                    fullError: error
+                });
 
                 // Strat 2: Try V2 (Legacy)
                 const resV2 = await supabase.rpc("get_my_tenants_v2");
