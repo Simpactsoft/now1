@@ -46,7 +46,11 @@ export async function validateConfiguration(params: {
     error?: string;
 }> {
     try {
-        
+        console.log('[Server Validation] Starting', {
+            templateId: params.templateId,
+            selections: params.selectedOptions,
+        });
+
         const supabase = await createClient();
 
         const errors: ValidationMessage[] = [];
@@ -156,11 +160,16 @@ export async function validateConfiguration(params: {
 
                 case "conflicts":
                     if (rule.then_option_id && isOptionSelected(rule.then_option_id, params.selectedOptions)) {
+                        // Find which group this option belongs to
+                        const optionGroupId = optionGroups.find(g =>
+                            g.options.some(o => o.id === rule.then_option_id)
+                        )?.id || null;
+
                         errors.push({
                             ruleId: rule.id,
                             ruleName: rule.name,
                             message: rule.error_message || rule.name,
-                            groupId: null,
+                            groupId: optionGroupId,
                             optionId: rule.then_option_id,
                             severity: "error",
                         });
@@ -181,10 +190,17 @@ export async function validateConfiguration(params: {
             }
         }
 
+        const isValid = errors.length === 0;
+        console.log('[Server Validation] END', {
+            isValid,
+            errorsCount: errors.length,
+            errors: errors.map(e => ({ message: e.message, groupId: e.groupId })),
+        });
+
         return {
             success: true,
             data: {
-                isValid: errors.length === 0,
+                isValid,
                 errors,
                 warnings,
                 autoSelections,

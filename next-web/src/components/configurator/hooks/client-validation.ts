@@ -35,6 +35,13 @@ export function validateConfigurationClientSide(
     selections: Record<string, string | string[]>,
     rules: ConfigurationRule[]
 ): ValidationResult {
+    console.log('[Validation] ===== START =====', {
+        timestamp: new Date().toISOString(),
+        selectionsCount: Object.keys(selections).length,
+        rulesCount: rules.length,
+        selections: JSON.stringify(selections),
+    });
+
     const errors: ValidationMessage[] = [];
     const warnings: ValidationMessage[] = [];
     const hiddenOptions: string[] = [];
@@ -91,31 +98,40 @@ export function validateConfigurationClientSide(
     const activeRules = rules.filter((r) => r.isActive).sort((a, b) => a.priority - b.priority);
 
     for (const rule of activeRules) {
+        // Handle both camelCase and snake_case property names from database
+        const ifOptionId = (rule as any).ifOptionId || (rule as any).if_option_id;
+        const ifGroupId = (rule as any).ifGroupId || (rule as any).if_group_id;
+        const ifProductId = (rule as any).ifProductId || (rule as any).if_product_id;
+        const thenOptionId = (rule as any).thenOptionId || (rule as any).then_option_id;
+        const thenGroupId = (rule as any).thenGroupId || (rule as any).then_group_id;
+        const ruleType = (rule as any).ruleType || (rule as any).rule_type;
+        const errorMessage = (rule as any).errorMessage || (rule as any).error_message;
+
         const conditionMet =
-            isOptionSelected(rule.ifOptionId, selections) ||
-            isGroupSelected(rule.ifGroupId, selections) ||
-            isOptionSelected(rule.ifProductId, selections); // For category-driven groups
+            isOptionSelected(ifOptionId, selections) ||
+            isGroupSelected(ifGroupId, selections) ||
+            isOptionSelected(ifProductId, selections); // For category-driven groups
 
         if (!conditionMet) continue;
 
-        switch (rule.ruleType) {
+        switch (ruleType) {
             case "requires":
-                if (rule.thenOptionId && !isOptionSelected(rule.thenOptionId, selections)) {
+                if (thenOptionId && !isOptionSelected(thenOptionId, selections)) {
                     errors.push({
                         ruleId: rule.id,
                         ruleName: rule.name,
-                        message: rule.errorMessage || `${rule.name}`,
-                        groupId: rule.thenGroupId,
-                        optionId: rule.thenOptionId,
+                        message: errorMessage || `${rule.name}`,
+                        groupId: thenGroupId,
+                        optionId: thenOptionId,
                         severity: "error",
                     });
                 }
-                if (rule.thenGroupId && !isGroupSelected(rule.thenGroupId, selections)) {
+                if (thenGroupId && !isGroupSelected(thenGroupId, selections)) {
                     errors.push({
                         ruleId: rule.id,
                         ruleName: rule.name,
-                        message: rule.errorMessage || `${rule.name}`,
-                        groupId: rule.thenGroupId,
+                        message: errorMessage || `${rule.name}`,
+                        groupId: thenGroupId,
                         optionId: null,
                         severity: "error",
                     });
@@ -123,34 +139,48 @@ export function validateConfigurationClientSide(
                 break;
 
             case "conflicts":
-                if (rule.thenOptionId && isOptionSelected(rule.thenOptionId, selections)) {
+                if (thenOptionId && isOptionSelected(thenOptionId, selections)) {
+                    // Find which group this option belongs to
+                    const optionGroupId = optionGroups.find(g =>
+                        g.options.some(o => o.id === thenOptionId)
+                    )?.id || null;
+
                     errors.push({
                         ruleId: rule.id,
                         ruleName: rule.name,
-                        message: rule.errorMessage || `${rule.name}`,
-                        groupId: null,
-                        optionId: rule.thenOptionId,
+                        message: errorMessage || `${rule.name}`,
+                        groupId: optionGroupId,
+                        optionId: thenOptionId,
                         severity: "error",
                     });
-                    disabledOptions.push(rule.thenOptionId);
+                    disabledOptions.push(thenOptionId);
                 }
                 break;
 
             case "hides":
-                if (rule.thenOptionId) hiddenOptions.push(rule.thenOptionId);
-                if (rule.thenGroupId) hiddenGroups.push(rule.thenGroupId);
+                if (thenOptionId) hiddenOptions.push(thenOptionId);
+                if (thenGroupId) hiddenGroups.push(thenGroupId);
                 break;
 
             case "auto_select":
-                if (rule.thenOptionId && rule.thenGroupId) {
-                    autoSelections[rule.thenGroupId] = rule.thenOptionId;
+                if (thenOptionId && thenGroupId) {
+                    autoSelections[thenGroupId] = thenOptionId;
                 }
                 break;
         }
     }
 
+    const isValid = errors.length === 0;
+
+    console.log('[Validation] ===== END =====', {
+        timestamp: new Date().toISOString(),
+        isValid,
+        errorsCount: errors.length,
+        errors: errors.map(e => e.message),
+    });
+
     return {
-        isValid: errors.length === 0,
+        isValid,
         errors,
         warnings,
         autoSelections,
