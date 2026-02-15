@@ -14,6 +14,8 @@ interface ProductCardWrapperProps {
         product_type?: string;
         track_inventory?: boolean;
         custom_fields?: Record<string, any>;
+        is_configurable?: boolean;
+        template_id?: string | null;
     };
     tenantId: string;
 }
@@ -33,12 +35,18 @@ export default function ProductCardWrapper({ product, tenantId }: ProductCardWra
         // router.push('/dashboard/products');
     };
 
+    const handleConfigure = (templateId: string) => {
+        // Navigate to CPQ template editor
+        router.push(`/dashboard/cpq/${templateId}/edit`);
+    };
+
     return (
         <ProductCard
             product={product}
             tenantId={tenantId}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            onConfigure={product.is_configurable && product.template_id ? handleConfigure : undefined}
         />
     );
 }

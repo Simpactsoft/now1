@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Package, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+import { Package, MoreHorizontal, Edit, Trash2, Settings } from 'lucide-react';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useLanguage } from '@/context/LanguageContext';
 import { useEntityView, EntityViewLayout, ColumnDef } from '@/components/entity-view';
@@ -17,10 +17,13 @@ interface ProductCardProps {
         product_type?: string;
         track_inventory?: boolean;
         custom_fields?: Record<string, any>;
+        is_configurable?: boolean;
+        template_id?: string | null;
     };
     tenantId: string;
     onEdit?: (id: string) => void;
     onDelete?: (id: string) => void;
+    onConfigure?: (templateId: string) => void;
 }
 
 interface BomTreeNode {
@@ -37,7 +40,7 @@ interface BomTreeNode {
     custom_fields?: Record<string, any>;
 }
 
-export default function ProductCard({ product, tenantId, onEdit, onDelete }: ProductCardProps) {
+export default function ProductCard({ product, tenantId, onEdit, onDelete, onConfigure }: ProductCardProps) {
     const { language } = useLanguage();
     const [showMenu, setShowMenu] = useState(false);
     const [bomData, setBomData] = useState<BomTreeNode[]>([]);
@@ -246,6 +249,15 @@ export default function ProductCard({ product, tenantId, onEdit, onDelete }: Pro
                     <div className="flex items-center gap-2 relative" ref={menuRef}>
                         {product.status && (
                             <StatusBadge status={product.status} tenantId={tenantId} />
+                        )}
+                        {onConfigure && product.is_configurable && product.template_id && (
+                            <button
+                                onClick={() => onConfigure(product.template_id!)}
+                                className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
+                            >
+                                <Settings size={18} />
+                                <span>{language === 'he' ? 'הגדר' : 'Configure'}</span>
+                            </button>
                         )}
                         <button
                             onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}

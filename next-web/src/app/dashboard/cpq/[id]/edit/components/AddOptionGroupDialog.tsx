@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
     Dialog,
@@ -29,6 +29,8 @@ import {
     createOptionGroup,
     updateOptionGroup,
 } from "@/app/actions/cpq/option-group-actions";
+import { CategoryTreePicker } from "@/components/cpq/CategoryTreePicker";
+import { CategoryProductPreview } from "@/components/cpq/CategoryProductPreview";
 
 interface AddOptionGroupDialogProps {
     templateId: string;
@@ -67,9 +69,10 @@ export function AddOptionGroupDialog({
     const [sourceCategoryId, setSourceCategoryId] = useState(
         editingGroup?.sourceCategoryId || ""
     );
+    const [sourceCategoryPath, setSourceCategoryPath] = useState("");
 
     // Reset form when dialog opens/closes or editingGroup changes
-    useState(() => {
+    useEffect(() => {
         if (editingGroup) {
             setName(editingGroup.name);
             setDescription(editingGroup.description || "");
@@ -89,7 +92,7 @@ export function AddOptionGroupDialog({
             setSourceType("manual");
             setSourceCategoryId("");
         }
-    });
+    }, [editingGroup, open]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -216,20 +219,20 @@ export function AddOptionGroupDialog({
 
                     {/* Category Selector (only if category source) */}
                     {sourceType === "category" && (
-                        <div>
-                            <Label htmlFor="category">
-                                Category <span className="text-destructive">*</span>
-                            </Label>
-                            <Input
-                                id="category"
-                                value={sourceCategoryId}
-                                onChange={(e) => setSourceCategoryId(e.target.value)}
-                                placeholder="Category ID (TODO: CategorySelector)"
-                                disabled={isPending}
-                            />
-                            <p className="text-xs text-muted-foreground mt-1">
-                                TODO: Replace with CategorySelector tree browser
-                            </p>
+                        <div className="space-y-3">
+                            <div>
+                                <Label>
+                                    Category <span className="text-destructive">*</span>
+                                </Label>
+                                <CategoryTreePicker
+                                    value={sourceCategoryId}
+                                    onChange={(categoryId, categoryPath) => {
+                                        setSourceCategoryId(categoryId);
+                                        setSourceCategoryPath(categoryPath);
+                                    }}
+                                />
+                            </div>
+                            <CategoryProductPreview categoryId={sourceCategoryId || null} />
                         </div>
                     )}
 

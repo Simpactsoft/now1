@@ -1,13 +1,14 @@
 "use client";
 
 import { useEntityView, EntityViewLayout, FetchDataParams, FetchDataResult } from "@/components/entity-view";
-import { useRouter } from "next/navigation";
-import { useCallback, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useMemo, useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Sliders, Package, Settings } from "lucide-react";
 import { ColumnDef } from "@/components/entity-view";
 import { getTemplates } from "@/app/actions/cpq/template-actions";
 import CPQTemplateTags from "@/components/cpq/CPQTemplateTags";
+import NewTemplateDropdown from "@/components/cpq/NewTemplateDropdown";
 
 interface CPQTemplate {
     id: string;
@@ -25,6 +26,9 @@ interface CPQPageWrapperProps {
 
 export default function CPQPageWrapper({ tenantId }: CPQPageWrapperProps) {
     const router = useRouter();
+    const searchParams = useSearchParams();
+
+    // Removed saved configurations tab - feature postponed
 
     // ---- Column Definitions ----
     const columns: ColumnDef[] = useMemo(() => [
@@ -161,6 +165,8 @@ export default function CPQPageWrapper({ tenantId }: CPQPageWrapperProps) {
     };
 
 
+
+
     // ---- Available Filters ----
     const availableFilters = useMemo(() => [
         { id: 'search', label: 'Search Templates', icon: null },
@@ -168,77 +174,83 @@ export default function CPQPageWrapper({ tenantId }: CPQPageWrapperProps) {
     ], []);
 
     return (
-        <EntityViewLayout
-            title="CPQ Templates"
-            entityType="cpq_templates"
-            tenantId={tenantId}
-            config={config}
-            columns={columns}
-            onRowClick={handleTemplateClick}
-            onRowDoubleClick={handleTemplateClick}
-            availableViewModes={['tags', 'grid', 'cards']}
-            availableFilters={availableFilters}
-            customActions={
-                <button
-                    onClick={() => router.push('/dashboard/cpq/new')}
-                    className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2"
-                >
-                    <Sliders className="w-4 h-4" />
-                    + New Template
-                </button>
-            }
-
-            // Tags View
-            renderTags={(props) => (
-                <CPQTemplateTags
-                    templates={props.data}
-                    loading={props.loading}
-                    onTemplateClick={handleTemplateClick}
-                />
-            )}
-
-            // Cards View
-            renderCards={(props) => (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 pb-24">
-                    {props.data.map(template => (
-                        <div
-                            key={template.id}
-                            onClick={() => handleTemplateClick(template)}
-                            className="group p-6 border border-border rounded-xl hover:border-primary hover:bg-accent/50 hover:shadow-lg transition-all cursor-pointer"
-                        >
-                            <div className="flex items-start justify-between mb-4">
-                                <div className="p-3 bg-primary/10 rounded-lg">
-                                    <Sliders className="w-8 h-8 text-primary" />
-                                </div>
-                                {template.category && (
-                                    <span className="text-xs px-2 py-1 bg-secondary rounded-full text-muted-foreground">
-                                        {template.category}
-                                    </span>
-                                )}
-                            </div>
-
-                            <h3 className="font-semibold text-lg mb-2 group-hover:text-primary transition-colors">
-                                {template.name}
-                            </h3>
-
-                            {template.description && (
-                                <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
-                                    {template.description}
-                                </p>
-                            )}
-
-                            <div className="flex items-center justify-between pt-4 border-t border-border">
-                                <span className="text-xs text-muted-foreground">
-                                    {new Date(template.updated_at).toLocaleDateString()}
-                                </span>
-                                <span className="text-sm text-primary opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                                    Configure <Settings className="w-4 h-4" />
-                                </span>
-                            </div>
-                        </div>
-                    ))}
+        <div className="h-full flex flex-col">
+            {/* Header with Action Button */}
+            <div className="border-b border-border bg-background sticky top-0 z-40">
+                <div className="flex items-center justify-between px-6 py-3">
+                    <h2 className="text-lg font-semibold flex items-center gap-2">
+                        <Sliders className="w-5 h-5 text-primary" />
+                        Product Templates
+                    </h2>
+                    <NewTemplateDropdown tenantId={tenantId} />
                 </div>
-            )}
-        />
+            </div>
+
+            {/* Content */}
+            <EntityViewLayout
+                title=""
+                entityType="cpq_templates"
+                tenantId={tenantId}
+                config={config}
+                columns={columns}
+                onRowClick={handleTemplateClick}
+                onRowDoubleClick={handleTemplateClick}
+                availableViewModes={['tags', 'grid', 'cards']}
+                availableFilters={availableFilters}
+                hideHeader={true}
+
+                // Tags View
+                renderTags={(props) => (
+                    <CPQTemplateTags
+                        templates={props.data}
+                        loading={props.loading}
+                        onTemplateClick={handleTemplateClick}
+                    />
+                )}
+
+                // Cards View
+                renderCards={(props) => (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 pb-24">
+                        {props.data.map(template => (
+                            <div
+                                key={template.id}
+                                onClick={() => handleTemplateClick(template)}
+                                className="group p-6 border border-border rounded-xl hover:border-primary hover:bg-accent/50 hover:shadow-lg transition-all cursor-pointer"
+                            >
+                                <div className="flex items-start justify-between mb-4">
+                                    <div className="p-3 bg-primary/10 rounded-lg">
+                                        <Sliders className="w-8 h-8 text-primary" />
+                                    </div>
+                                    {template.category && (
+                                        <span className="text-xs px-2 py-1 bg-secondary rounded-full text-muted-foreground">
+                                            {template.category}
+                                        </span>
+                                    )}
+                                </div>
+
+                                <h3 className="font-semibold text-lg mb-2 group-hover:text-primary transition-colors">
+                                    {template.name}
+                                </h3>
+
+                                {template.description && (
+                                    <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
+                                        {template.description}
+                                    </p>
+                                )}
+
+                                <div className="flex items-center justify-between pt-4 border-t border-border">
+                                    <span className="text-xs text-muted-foreground">
+                                        {new Date(template.updated_at).toLocaleDateString()}
+                                    </span>
+                                    <span className="text-sm text-primary opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                                        Configure <Settings className="w-4 h-4" />
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            />
+        </div>
     );
 }

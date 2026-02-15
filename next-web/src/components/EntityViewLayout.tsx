@@ -13,7 +13,8 @@ import {
     X,
     Filter,
     ChevronDown,
-    History
+    History,
+    Settings
 } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import { useViewConfig } from "@/components/universal/ViewConfigContext";
@@ -46,6 +47,7 @@ interface EntityViewLayoutProps {
     renderTags: () => React.ReactNode;
     renderGrid: () => React.ReactNode;
     renderCards: () => React.ReactNode;
+    renderConfigurations?: () => React.ReactNode; // NEW: Optional configurations view
     // Debug
     onDebugSql?: () => void;
 }
@@ -109,6 +111,7 @@ export default function EntityViewLayout({
     renderTags,
     renderGrid,
     renderCards,
+    renderConfigurations, // NEW
     onDebugSql
 }: EntityViewLayoutProps) {
     const { viewMode, filters, sort, dispatch, searchTerm, activeSavedView, isModified } = useViewConfig();
@@ -188,6 +191,11 @@ export default function EntityViewLayout({
                             <button onClick={() => dispatch({ type: 'SET_VIEW_MODE', payload: 'cards' })} className={`p-1.5 rounded-md transition-all ${viewMode === 'cards' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`}>
                                 <CreditCard className="w-4 h-4" />
                             </button>
+                            {renderConfigurations && (
+                                <button onClick={() => dispatch({ type: 'SET_VIEW_MODE', payload: 'configurations' })} className={`p-1.5 rounded-md transition-all ${viewMode === 'configurations' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`}>
+                                    <Settings className="w-4 h-4" />
+                                </button>
+                            )}
                         </div>
 
                         {/* Mobile Actions/More */}
@@ -362,6 +370,7 @@ export default function EntityViewLayout({
                 {viewMode === 'tags' && renderTags()}
                 {viewMode === 'grid' && renderGrid()}
                 {viewMode === 'cards' && renderCards()}
+                {viewMode === 'configurations' && renderConfigurations && renderConfigurations()}
             </div>
         </div>
     );

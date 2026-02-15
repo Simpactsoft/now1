@@ -29,7 +29,11 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
     // Fetch product details from cards view (products is a view)
     const { data: product, error } = await supabase
         .from("products")
-        .select("*")
+        .select(`
+            *,
+            is_configurable,
+            template_id
+        `)
         .eq("id", id)
         .eq("tenant_id", tenantId)
         .single();
@@ -49,6 +53,8 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
         product_type: product.product_type,
         track_inventory: product.track_inventory,
         custom_fields: product.custom_fields || {},
+        is_configurable: product.is_configurable || false,
+        template_id: product.template_id || null,
     };
 
     return (

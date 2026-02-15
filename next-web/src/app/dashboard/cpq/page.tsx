@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/app/actions/getCurrentUser";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import CPQPageWrapper from "@/components/cpq/CPQPageWrapper";
 
 export default async function CPQPage() {
@@ -9,9 +10,9 @@ export default async function CPQPage() {
         redirect('/login');
     }
 
-    // Admin users can have null tenant_id (they see all tenants)
-    // Regular users need a tenant_id
-    const tenantId = user.user_metadata?.tenant_id || user.app_metadata?.tenant_id || null;
+    // Read tenant_id from cookie (like Quote Builder)
+    const cookieStore = await cookies();
+    const tenantId = cookieStore.get('tenant_id')?.value || null;
 
     return <CPQPageWrapper tenantId={tenantId} />;
 }

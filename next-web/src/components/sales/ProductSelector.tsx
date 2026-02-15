@@ -5,8 +5,10 @@ import EntityViewLayout from "@/components/EntityViewLayout";
 import { useViewConfig } from "@/components/universal/ViewConfigContext";
 import ProductsAgGrid from "./ProductsAgGrid";
 import ProductTags from "./ProductTags";
+import ConfigurationsList from "./ConfigurationsList";
 import { Package, Plus, X, AlertTriangle, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { Configuration } from "@/app/actions/cpq/configuration-actions";
 
 interface Product {
     id: string;
@@ -25,10 +27,11 @@ interface ProductSelectorProps {
     categories: { id: string; name: string }[];
     loading: boolean;
     onAddToQuote: (product: Product) => void;
+    onAddConfiguration: (configuration: Configuration) => void; // NEW: Handle configurations
     onRefresh: () => void;
 }
 
-export default function ProductSelector({ products, categories, loading, onAddToQuote, onRefresh }: ProductSelectorProps) {
+export default function ProductSelector({ products, categories, loading, onAddToQuote, onAddConfiguration, onRefresh }: ProductSelectorProps) {
     const { searchTerm, viewMode, filters } = useViewConfig();
 
     // -- Filtering Logic --
@@ -151,6 +154,14 @@ export default function ProductSelector({ products, categories, loading, onAddTo
         />
     );
 
+    // NEW: Render Configurations Tab
+    const renderConfigurations = () => (
+        <ConfigurationsList
+            onAddToQuote={onAddConfiguration}
+            loading={loading}
+        />
+    );
+
     // Map categories for SmartChip options
     const categoryOptions = useMemo(() => {
         return categories.map(c => ({ value: c.id, label: c.name }));
@@ -167,6 +178,7 @@ export default function ProductSelector({ products, categories, loading, onAddTo
             renderGrid={renderGrid}
             renderCards={renderCards}
             renderTags={renderTags}
+            renderConfigurations={renderConfigurations}
             availableFilters={[
                 { id: 'category', label: 'Category', icon: Package }
             ]}

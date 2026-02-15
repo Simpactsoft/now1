@@ -27,6 +27,8 @@ import { getProductsForTenant } from "@/app/actions/quote-actions";
 import ProductsAgGrid from "./ProductsAgGrid";
 import ProductSelector from "./ProductSelector";
 import { ViewConfigProvider } from "@/components/universal/ViewConfigContext";
+import { ProductConfiguratorModal } from "@/components/cpq/ProductConfiguratorModal";
+import type { Configuration } from "@/app/actions/cpq/configuration-actions";
 
 // --- Types ---
 
@@ -50,6 +52,9 @@ interface Product {
     // Computed / Joined fields
     current_stock?: number;
     price_list_price?: number; // Price from specific list
+    // CPQ fields
+    is_configurable?: boolean;
+    template_id?: string;
 }
 
 interface QuoteItem {
@@ -61,6 +66,7 @@ interface QuoteItem {
     unit_price: number;
     discount_percent: number;
     line_total: number;
+    configuration_id?: string; // Links to CPQ configuration if product is configured
 }
 
 interface Customer {
@@ -107,6 +113,10 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [openCustomer, setOpenCustomer] = useState(false);
+
+    // CPQ Configurator state
+    const [configuratorOpen, setConfiguratorOpen] = useState(false);
+    const [currentTemplateId, setCurrentTemplateId] = useState<string | null>(null);
 
     // --- Initialization ---
 
@@ -260,6 +270,14 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
 
     // 3. Add to Quote
     const addToQuote = (product: Product) => {
+        // NEW: Check if product requires configuration
+        if (product.is_configurable && product.template_id) {
+            setCurrentTemplateId(product.template_id);
+            setConfiguratorOpen(true);
+            return;
+        }
+
+        // Standard product flow
         if (product.track_inventory && (product.current_stock || 0) <= 0) {
             // Optional: Allow backorder or block? For now warning only, we block in UI visually
         }
@@ -288,6 +306,22 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
                 line_total: price // 1 * price
             }];
         });
+    };
+
+    // Handle configured product addition
+    const handleConfiguredProductAdd = (configuration: Configuration) => {
+        setQuoteItems(prev => [...prev, {
+            id: crypto.randomUUID(),
+            product_id: configuration.templateId,
+            configuration_id: configuration.id,
+            sku: configuration.id.substring(0, 8), // Use config ID as SKU
+            name: `Configured Product`, // TODO: Get template name
+            quantity: configuration.quantity,
+            unit_price: configuration.totalPrice / configuration.quantity,
+            discount_percent: 0,
+            line_total: configuration.totalPrice
+        }]);
+        setConfiguratorOpen(false);
     };
 
     const updateItem = (id: string, field: keyof QuoteItem, value: number) => {
@@ -521,7 +555,11 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
                                 categories={categories}
                                 loading={loading}
                                 onAddToQuote={addToQuote}
-                                onRefresh={() => fetchMasterData(tenantId || "")}
+                                onAddConfiguration={handleConfiguredProductAdd}
+                                onRefresh={() => {
+                                    setLoading(true);
+                                    loadData();
+                                }}
                             />
                         </ViewConfigProvider>
                     </div>
@@ -624,6 +662,16 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
                 </aside>
 
             </div>
+
+            {/* CPQ Product Configurator Modal */}
+            {currentTemplateId && (
+                <ProductConfiguratorModal
+                    isOpen={configuratorOpen}
+                    templateId={currentTemplateId}
+                    onClose={() => setConfiguratorOpen(false)}
+                    onAddToQuote={handleConfiguredProductAdd}
+                />
+            )}
         </div>
     );
 }

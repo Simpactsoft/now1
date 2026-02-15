@@ -35,6 +35,10 @@ export interface Configuration {
     inventoryReservationId: string | null;
     createdAt: string;
     updatedAt: string;
+    // Template support
+    isTemplate: boolean;
+    templateName: string | null;
+    sourceConfigurationId: string | null;
 }
 
 // ============================================================================
@@ -610,6 +614,216 @@ export async function duplicateConfiguration(configurationId: string): Promise<{
     }
 }
 
+/**
+ * Save an existing configuration as a reusable template.
+ * Templates can be loaded by any user in the same tenant.
+ */
+export async function saveAsTemplate(params: {
+    configurationId: string;
+    templateName: string;
+}): Promise<{
+    success: boolean;
+    data?: Configuration;
+    error?: string;
+}> {
+    try {
+        const supabase = await createClient();
+
+        const {
+            data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user) {
+            return { success: false, error: "Authentication required" };
+        }
+
+        // Validate configuration exists and user has access
+        const { data: existing, error: fetchError } = await supabase
+            .from("configurations")
+            .select("*")
+            .eq("id", params.configurationId)
+            .single();
+
+        if (fetchError || !existing) {
+            return { success: false, error: "Configuration not found" };
+        }
+
+        // Verify configuration is valid before saving as template
+        const validationResult = await validateConfiguration({
+            templateId: existing.template_id,
+            selectedOptions: existing.selected_options,
+        });
+
+        if (!validationResult.success || !validationResult.data?.isValid) {
+            return {
+                success: false,
+                error: "Cannot save invalid configuration as template. Please fix all validation errors first.",
+            };
+        }
+
+        // Update configuration to mark as template
+        const { data, error } = await supabase
+            .from("configurations")
+            .update({
+                is_template: true,
+                template_name: params.templateName.trim(),
+            })
+            .eq("id", params.configurationId)
+            .select()
+            .single();
+
+        if (error) {
+            // Check for unique constraint violation
+            if (error.code === "23505") {
+                return {
+                    success: false,
+                    error: `A template with the name "${params.templateName}" already exists. Please choose a different name.`,
+                };
+            }
+            return { success: false, error: error.message };
+        }
+
+        return {
+            success: true,
+            data: mapConfigurationFromDb(data),
+        };
+    } catch (error: any) {
+        console.error("Error in saveAsTemplate:", error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Get all configuration templates for the current tenant.
+ * Templates are reusable configurations that can be loaded as starting points.
+ */
+export async function getConfigurationTemplates(params?: {
+    templateId?: string; // Filter by product template
+}): Promise<{
+    success: boolean;
+    data?: Configuration[];
+    error?: string;
+}> {
+    try {
+        const supabase = await createClient();
+
+        const {
+            data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user) {
+            return { success: false, error: "Authentication required" };
+        }
+
+        // Get tenant_id from cookie (like QuoteBuilder does)
+        const cookieStore = await cookies();
+        const tenantId = cookieStore.get('tenant_id')?.value;
+
+        if (!tenantId) {
+            console.error("[getConfigurationTemplates] No tenant_id in cookie");
+            return { success: false, error: "Tenant ID not found" };
+        }
+
+        let query = supabase
+            .from("configurations")
+            .select("*")
+            .eq("tenant_id", tenantId)
+            .eq("is_template", true)
+            .order("template_name", { ascending: true });
+
+        if (params?.templateId) {
+            query = query.eq("template_id", params.templateId);
+        }
+
+        const { data, error } = await query;
+
+        if (error) {
+            console.error("[getConfigurationTemplates] Error:", error);
+            return { success: false, error: error.message };
+        }
+
+        console.log("[getConfigurationTemplates] Found", data?.length || 0, "templates for tenant", tenantId);
+
+        return {
+            success: true,
+            data: (data || []).map(mapConfigurationFromDb),
+        };
+    } catch (error: any) {
+        console.error("Error in getConfigurationTemplates:", error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Clone a configuration as a new draft, tracking the source for lineage.
+ * Used when creating new quotes based on existing configurations.
+ */
+export async function cloneConfiguration(sourceConfigurationId: string): Promise<{
+    success: boolean;
+    data?: Configuration;
+    error?: string;
+}> {
+    try {
+        const supabase = await createClient();
+
+        const {
+            data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user) {
+            return { success: false, error: "Authentication required" };
+        }
+
+        // Get source configuration
+        const { data: source, error: fetchError } = await supabase
+            .from("configurations")
+            .select("*")
+            .eq("id", sourceConfigurationId)
+            .single();
+
+        if (fetchError || !source) {
+            return { success: false, error: "Source configuration not found" };
+        }
+
+        // Create new draft configuration with source reference
+        const newConfigData = {
+            template_id: source.template_id,
+            user_id: user.id,
+            selected_options: source.selected_options,
+            base_price: source.base_price,
+            options_total: source.options_total,
+            discount_amount: source.discount_amount,
+            total_price: source.total_price,
+            quantity: source.quantity,
+            price_breakdown: source.price_breakdown,
+            notes: source.notes,
+            status: "draft",
+            inventory_reservation_status: "none",
+            source_configuration_id: sourceConfigurationId, // Track lineage
+            is_template: false, // Clones are not templates by default
+            template_name: null,
+        };
+
+        const { data, error } = await supabase
+            .from("configurations")
+            .insert(newConfigData)
+            .select()
+            .single();
+
+        if (error) {
+            return { success: false, error: error.message };
+        }
+
+        return {
+            success: true,
+            data: mapConfigurationFromDb(data),
+        };
+    } catch (error: any) {
+        console.error("Error in cloneConfiguration:", error);
+        return { success: false, error: error.message };
+    }
+}
+
 // ============================================================================
 // HELPERS
 // ============================================================================
@@ -633,6 +847,9 @@ interface ConfigurationDbRow {
     inventory_reservation_id: string | null;
     created_at: string;
     updated_at: string;
+    is_template: boolean;
+    template_name: string | null;
+    source_configuration_id: string | null;
 }
 
 /**
@@ -663,5 +880,8 @@ function mapConfigurationFromDb(data: ConfigurationDbRow): Configuration {
         inventoryReservationId: data.inventory_reservation_id,
         createdAt: data.created_at,
         updatedAt: data.updated_at,
+        isTemplate: data.is_template,
+        templateName: data.template_name,
+        sourceConfigurationId: data.source_configuration_id,
     };
 }
