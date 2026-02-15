@@ -146,15 +146,33 @@ export async function validateConfiguration(params: {
                             severity: "error",
                         });
                     }
-                    if (rule.then_group_id && !isGroupSelected(rule.then_group_id, params.selectedOptions)) {
-                        errors.push({
-                            ruleId: rule.id,
-                            ruleName: rule.name,
-                            message: rule.error_message || rule.name,
-                            groupId: rule.then_group_id,
-                            optionId: null,
-                            severity: "error",
-                        });
+                    if (rule.then_group_id) {
+                        const selectedOption = params.selectedOptions[rule.then_group_id];
+
+                        // Group is required but nothing selected
+                        if (!selectedOption) {
+                            errors.push({
+                                ruleId: rule.id,
+                                ruleName: rule.name,
+                                message: rule.error_message || rule.name,
+                                groupId: rule.then_group_id,
+                                optionId: null,
+                                severity: "error",
+                            });
+                        }
+                        // Group has selection, but if allowed_options specified, validate it's in the list
+                        else if (rule.allowed_options && rule.allowed_options.length > 0) {
+                            if (!rule.allowed_options.includes(selectedOption)) {
+                                errors.push({
+                                    ruleId: rule.id,
+                                    ruleName: rule.name,
+                                    message: rule.error_message || rule.name,
+                                    groupId: rule.then_group_id,
+                                    optionId: selectedOption,
+                                    severity: "error",
+                                });
+                            }
+                        }
                     }
                     break;
 

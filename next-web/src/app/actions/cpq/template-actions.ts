@@ -70,6 +70,7 @@ export interface ConfigurationRule {
     thenOptionId: string | null;
     thenGroupId: string | null;
     thenProductId: string | null;
+    allowedOptions: string[] | null; // For 'requires' rules: list of valid option IDs from then_group
     quantityMin: number | null;
     quantityMax: number | null;
     discountType: "percentage" | "fixed_amount" | null;

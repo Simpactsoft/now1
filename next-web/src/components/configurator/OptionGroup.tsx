@@ -33,16 +33,6 @@ export function OptionGroupComponent({
     const groupErrors = errors.filter((e) => e.groupId === group.id);
     const visibleOptions = group.options.filter((opt) => !hiddenOptions.includes(opt.id));
 
-    if (errors.length > 0) {
-        const errorGroupIds = errors.map(e => e.groupId);
-        console.log(`[OptionGroup ${group.name}] groupId: ${group.id}`);
-        console.log(`[OptionGroup ${group.name}] errorGroupIds:`, JSON.stringify(errorGroupIds));
-        console.log(`[OptionGroup ${group.name}] groupErrors count: ${groupErrors.length}`);
-        if (groupErrors.length === 0 && errorGroupIds.length > 0) {
-            console.log(`[OptionGroup ${group.name}] ❌ NO MATCH! Error groupIds don't match this group!`);
-        }
-    }
-
     const handleRadioChange = (value: string) => {
         onChange(value);
     };

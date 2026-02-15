@@ -35,12 +35,6 @@ export function validateConfigurationClientSide(
     selections: Record<string, string | string[]>,
     rules: ConfigurationRule[]
 ): ValidationResult {
-    console.log('[Validation] ===== START =====', {
-        timestamp: new Date().toISOString(),
-        selectionsCount: Object.keys(selections).length,
-        rulesCount: rules.length,
-        selections: JSON.stringify(selections),
-    });
 
     const errors: ValidationMessage[] = [];
     const warnings: ValidationMessage[] = [];
@@ -126,15 +120,33 @@ export function validateConfigurationClientSide(
                         severity: "error",
                     });
                 }
-                if (thenGroupId && !isGroupSelected(thenGroupId, selections)) {
-                    errors.push({
-                        ruleId: rule.id,
-                        ruleName: rule.name,
-                        message: errorMessage || `${rule.name}`,
-                        groupId: thenGroupId,
-                        optionId: null,
-                        severity: "error",
-                    });
+                if (thenGroupId) {
+                    const selectedOption = selections[thenGroupId];
+
+                    // Group is required but nothing selected
+                    if (!selectedOption) {
+                        errors.push({
+                            ruleId: rule.id,
+                            ruleName: rule.name,
+                            message: errorMessage || `${rule.name}`,
+                            groupId: thenGroupId,
+                            optionId: null,
+                            severity: "error",
+                        });
+                    }
+                    // Group has selection, but if allowed_options specified, validate it's in the list
+                    else if (rule.allowedOptions && rule.allowedOptions.length > 0) {
+                        if (!rule.allowedOptions.includes(selectedOption)) {
+                            errors.push({
+                                ruleId: rule.id,
+                                ruleName: rule.name,
+                                message: errorMessage || `${rule.name}`,
+                                groupId: thenGroupId,
+                                optionId: selectedOption,
+                                severity: "error",
+                            });
+                        }
+                    }
                 }
                 break;
 
