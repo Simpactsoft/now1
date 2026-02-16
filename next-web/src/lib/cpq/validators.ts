@@ -30,10 +30,10 @@ export const optionGroupSchema = z.object({
     minSelections: z.number().int().min(0).default(0),
     maxSelections: z.number().int().min(1).optional(),
     sourceType: z.enum(["manual", "category"]),
-    sourceCategoryId: z.string().uuid().optional(),
+    sourceCategoryId: z.string().uuid().nullable().optional(),
     categoryPriceMode: z
         .enum(["list_price", "cost_plus", "explicit"])
-        .default("list_price"),
+        .optional(),
 }).refine(
     (d) => d.sourceType !== "category" || d.sourceCategoryId,
     {

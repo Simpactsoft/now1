@@ -87,6 +87,7 @@ export async function createOption(
 
         // 3. Validate with Zod
         const validation = optionSchema.safeParse({
+            groupId: groupId,
             name: params.name,
             description: params.description,
             sku: params.sku,
@@ -97,9 +98,10 @@ export async function createOption(
         });
 
         if (!validation.success) {
+            const firstError = validation.error?.errors?.[0];
             return {
                 success: false,
-                error: validation.error.errors[0]?.message || "Validation failed",
+                error: firstError?.message || "Validation failed",
             };
         }
 

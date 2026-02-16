@@ -71,8 +71,11 @@ export async function createOptionGroup(
             return { success: false, error: "Authentication required" };
         }
 
+
+
         // 2. Validate with Zod
-        const validation = optionGroupSchema.safeParse({
+        const validationData = {
+            templateId: templateId,
             name: params.name,
             description: params.description,
             selectionType: params.selectionType,
@@ -82,16 +85,42 @@ export async function createOptionGroup(
             sourceType: params.sourceType,
             sourceCategoryId: params.sourceCategoryId,
             categoryPriceMode: params.categoryPriceMode,
-        });
+        };
+
+        const validation = optionGroupSchema.safeParse(validationData);
 
         if (!validation.success) {
+
+            const firstError = validation.error?.errors?.[0];
             return {
                 success: false,
-                error: validation.error.errors[0]?.message || "Validation failed",
+                error: firstError?.message || "Validation failed",
             };
         }
 
-        // 3. Get max display_order
+
+
+        // 3. Get tenant_id from user
+        let tenantId = user.app_metadata?.tenant_id || user.user_metadata?.tenant_id;
+
+        // If not found in metadata, try profiles table
+        if (!tenantId) {
+            const { data: profile, error: profileError } = await supabase
+                .from("profiles")
+                .select("tenant_id")
+                .eq("id", user.id)
+                .single();
+
+            if (!profileError && profile) {
+                tenantId = profile.tenant_id;
+            }
+        }
+
+        if (!tenantId) {
+            return { success: false, error: "Tenant ID required. Please make sure you are assigned to a tenant." };
+        }
+
+        // 4. Get max display_order
         const { data: maxOrder } = await supabase
             .from("option_groups")
             .select("display_order")
@@ -102,10 +131,11 @@ export async function createOptionGroup(
 
         const displayOrder = (maxOrder?.display_order ?? -1) + 1;
 
-        // 4. Insert into DB
+        // 5. Insert into DB
         const { data, error } = await supabase
             .from("option_groups")
             .insert({
+                tenant_id: tenantId,
                 template_id: templateId,
                 name: params.name,
                 description: params.description || null,
