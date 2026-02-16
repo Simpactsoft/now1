@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
+import { getTenantId } from "@/lib/auth/tenant";
 
 // ============================================================================
 // TYPES
@@ -388,21 +389,8 @@ export async function createTemplate(params: {
             return { success: false, error: "Authentication required" };
         }
 
-        // Try to get tenant_id from app_metadata first
-        let tenantId = user.app_metadata?.tenant_id || user.user_metadata?.tenant_id;
-
-        // If not found, try to get it from profiles table
-        if (!tenantId) {
-            const { data: profile, error: profileError } = await supabase
-                .from("profiles")
-                .select("tenant_id")
-                .eq("id", user.id)
-                .single();
-
-            if (!profileError && profile) {
-                tenantId = profile.tenant_id;
-            }
-        }
+        // Try to get tenant_id
+        const tenantId = await getTenantId(user, supabase);
 
         if (!tenantId) {
             return { success: false, error: "Tenant ID required. Please make sure you are assigned to a tenant." };

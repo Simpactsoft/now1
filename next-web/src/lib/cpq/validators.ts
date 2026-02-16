@@ -30,7 +30,11 @@ export const optionGroupSchema = z.object({
     minSelections: z.number().int().min(0).default(0),
     maxSelections: z.number().int().min(1).optional(),
     sourceType: z.enum(["manual", "category"]),
+    // Accepts null (from JSON), undefined (omitted), or valid UUID
+    // DO NOT simplify to just .optional() - client sends null for manual sourceType
     sourceCategoryId: z.string().uuid().nullable().optional(),
+    // Can be undefined when sourceType is "manual"
+    // DO NOT use .default() - it doesn't work with safeParse() when value is missing
     categoryPriceMode: z
         .enum(["list_price", "cost_plus", "explicit"])
         .optional(),

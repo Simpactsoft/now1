@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { optionGroupSchema } from "@/lib/cpq/validators";
+import { getTenantId } from "@/lib/auth/tenant";
 
 // ============================================================================
 // TYPES
@@ -101,20 +102,7 @@ export async function createOptionGroup(
 
 
         // 3. Get tenant_id from user
-        let tenantId = user.app_metadata?.tenant_id || user.user_metadata?.tenant_id;
-
-        // If not found in metadata, try profiles table
-        if (!tenantId) {
-            const { data: profile, error: profileError } = await supabase
-                .from("profiles")
-                .select("tenant_id")
-                .eq("id", user.id)
-                .single();
-
-            if (!profileError && profile) {
-                tenantId = profile.tenant_id;
-            }
-        }
+        const tenantId = await getTenantId(user, supabase);
 
         if (!tenantId) {
             return { success: false, error: "Tenant ID required. Please make sure you are assigned to a tenant." };
