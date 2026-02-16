@@ -5,6 +5,28 @@
 new row violates row-level security policy for table "X"
 ```
 
+⏱️ **Expected Resolution Time:** 5-10 minutes  
+🎯 **Success Rate:** 95% if checklist followed completely
+
+---
+
+## 🧠 Before You Begin: Avoid Common Thinking Traps
+
+**❌ DON'T:**
+- ❌ Jump to "this happened before" (Availability Bias)
+- ❌ Stop after finding one issue (Premature Closure)  
+- ❌ Assume your first guess is right (Confirmation Bias)
+- ❌ Skip steps because they "seem unnecessary"
+
+**✅ DO:**
+- ✅ Follow the **ENTIRE** checklist in order
+- ✅ Verify each step with actual queries
+- ✅ Document what you find at each step
+- ✅ Complete all 6 steps even if you think you found the issue
+
+**⏱️ Investment:** 5 extra minutes to follow full checklist  
+**💰 Payoff:** 80% faster resolution + prevents returning to same issue
+
 ---
 
 ## 🛑 STOP! Follow This Checklist

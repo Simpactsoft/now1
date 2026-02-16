@@ -5,6 +5,24 @@
 Validation failed
 ```
 
+⏱️ **Expected Resolution Time:** 5-15 minutes  
+🎯 **Success Rate:** 90% if debugging steps followed
+
+---
+
+## 🧠 Cognitive Checklist
+
+**Before debugging, verify:**
+- [ ] I have NOT assumed this is the same validation error as last time
+- [ ] I will check the ACTUAL error message (not guess)
+- [ ] I will log both client and server data to compare
+- [ ] I will not stop after fixing the first field that fails
+
+**Common thinking traps to avoid:**
+- ❌ "It's probably the same Zod issue" → Check the actual error
+- ❌ "I'll just make it optional" → Understand why it's failing first
+- ❌ "The schema looks right" → Test it with the actual data
+
 ---
 
 ## 🛑 Common Causes & Fixes
