@@ -486,6 +486,7 @@ export async function getConfigurations(params?: {
             .from("configurations")
             .select("*", { count: "exact" })
             .eq("user_id", user.id)
+            .eq("tenant_id", (await getTenantId(user, supabase)) || "")
             .order("updated_at", { ascending: false });
 
         if (params?.status) {

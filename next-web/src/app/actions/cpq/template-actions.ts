@@ -124,6 +124,17 @@ export async function getTemplates(params?: {
 
         const supabase = await createClient();
 
+        // Authenticate and get tenant
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            return { success: false, error: "Authentication required" };
+        }
+
+        const tenantId = await getTenantId(user, supabase);
+        if (!tenantId) {
+            return { success: false, error: "Tenant not found" };
+        }
+
         const page = params?.page || 1;
         const pageSize = Math.min(params?.pageSize || 20, 100);
 
@@ -133,6 +144,7 @@ export async function getTemplates(params?: {
         *,
         product_categories(name)
       `, { count: "exact" })
+            .eq("tenant_id", tenantId)
             .order("name");
 
         // Only filter by is_active when explicitly provided
