@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { optionGroupSchema } from "@/lib/cpq/validators";
 import { getTenantId } from "@/lib/auth/tenant";
 
@@ -18,6 +19,7 @@ export interface CreateOptionGroupParams {
     sourceType: "manual" | "category";
     sourceCategoryId?: string | null;
     categoryPriceMode?: "list_price" | "cost_plus" | "explicit";
+    iconUrl?: string;
 }
 
 export interface UpdateOptionGroupParams {
@@ -30,6 +32,7 @@ export interface UpdateOptionGroupParams {
     sourceType?: "manual" | "category";
     sourceCategoryId?: string | null;
     categoryPriceMode?: "list_price" | "cost_plus" | "explicit";
+    iconUrl?: string;
 }
 
 type OptionGroup = {
@@ -92,7 +95,7 @@ export async function createOptionGroup(
 
         if (!validation.success) {
 
-            const firstError = validation.error?.errors?.[0];
+            const firstError = validation.error?.issues?.[0];
             return {
                 success: false,
                 error: firstError?.message || "Validation failed",
@@ -135,6 +138,7 @@ export async function createOptionGroup(
                 source_type: params.sourceType,
                 source_category_id: params.sourceCategoryId || null,
                 category_price_mode: params.categoryPriceMode || null,
+                icon_url: params.iconUrl || null,
             })
             .select()
             .single();
@@ -192,6 +196,8 @@ export async function updateOptionGroup(
             updateData.source_category_id = params.sourceCategoryId || null;
         if (params.categoryPriceMode !== undefined)
             updateData.category_price_mode = params.categoryPriceMode || null;
+        if (params.iconUrl !== undefined)
+            updateData.icon_url = params.iconUrl || null;
 
         // 3. Special case: If switching from manual to category, delete child options
         if (params.sourceType === "category") {
@@ -203,7 +209,7 @@ export async function updateOptionGroup(
 
             if (currentGroup?.source_type === "manual") {
                 // Delete all manual options for this group
-                await supabase.from("options").delete().eq("option_group_id", groupId);
+                await supabase.from("options").delete().eq("group_id", groupId);
             }
         }
 
@@ -228,7 +234,7 @@ export async function updateOptionGroup(
 }
 
 /**
- * Delete an option group (cascade deletes options)
+ * Delete an option group (uses admin client to bypass RLS)
  */
 export async function deleteOptionGroup(
     groupId: string
@@ -236,7 +242,7 @@ export async function deleteOptionGroup(
     try {
         const supabase = await createClient();
 
-        // 1. Auth check
+        // 1. Auth check (regular client)
         const {
             data: { user },
         } = await supabase.auth.getUser();
@@ -245,15 +251,48 @@ export async function deleteOptionGroup(
             return { success: false, error: "Authentication required" };
         }
 
-        // 2. Delete from DB (CASCADE handles child options)
-        const { error } = await supabase
+        // Use admin client for delete operations (bypasses RLS)
+        const admin = createAdminClient();
+
+        // 2. Delete child options first
+        const { error: optionsError } = await admin
+            .from("options")
+            .delete()
+            .eq("group_id", groupId);
+
+        if (optionsError) {
+            console.error("Error deleting options for group:", optionsError);
+            return { success: false, error: `Failed to delete options: ${optionsError.message}` };
+        }
+
+        // 2b. Delete option_overrides referencing this group
+        await admin
+            .from("option_overrides")
+            .delete()
+            .eq("group_id", groupId);
+
+        // 2c. Delete configuration_rules referencing this group
+        await admin
+            .from("configuration_rules")
+            .delete()
+            .or(`if_group_id.eq.${groupId},then_group_id.eq.${groupId}`);
+
+        // 3. Delete the option group itself
+        const { data, error } = await admin
             .from("option_groups")
             .delete()
-            .eq("id", groupId);
+            .eq("id", groupId)
+            .select("id");
 
         if (error) {
             console.error("Error deleting option group:", error);
             return { success: false, error: error.message };
+        }
+
+        // 4. Verify deletion
+        if (!data || data.length === 0) {
+            console.error("deleteOptionGroup: No rows affected. groupId:", groupId);
+            return { success: false, error: "Group not found" };
         }
 
         return { success: true };

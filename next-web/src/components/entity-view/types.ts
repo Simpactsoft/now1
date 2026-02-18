@@ -214,6 +214,7 @@ export interface EntityViewLayoutProps<T = any> {
     enableExport?: boolean;
     enableImport?: boolean;
     enableBulkActions?: boolean;
+    onBulkDelete?: (ids: string[]) => Promise<void>;
     onExport?: () => void;
     onDebugSql?: () => void;
 

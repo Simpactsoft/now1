@@ -22,7 +22,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Loader2 } from "lucide-react";
+import { Loader2, ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import type { OptionGroup } from "@/app/actions/cpq/template-actions";
 import {
@@ -70,6 +70,7 @@ export function AddOptionGroupDialog({
         editingGroup?.sourceCategoryId || ""
     );
     const [sourceCategoryPath, setSourceCategoryPath] = useState("");
+    const [iconUrl, setIconUrl] = useState(editingGroup?.iconUrl || "");
 
     // Reset form when dialog opens/closes or editingGroup changes
     useEffect(() => {
@@ -82,6 +83,7 @@ export function AddOptionGroupDialog({
             setMaxSelections(editingGroup.maxSelections?.toString() || "");
             setSourceType(editingGroup.sourceType);
             setSourceCategoryId(editingGroup.sourceCategoryId || "");
+            setIconUrl(editingGroup.iconUrl || "");
         } else {
             setName("");
             setDescription("");
@@ -91,6 +93,7 @@ export function AddOptionGroupDialog({
             setMaxSelections("");
             setSourceType("manual");
             setSourceCategoryId("");
+            setIconUrl("");
         }
     }, [editingGroup, open]);
 
@@ -133,6 +136,7 @@ export function AddOptionGroupDialog({
                 sourceType,
                 sourceCategoryId: sourceType === "category" ? sourceCategoryId : null,
                 categoryPriceMode: sourceType === "category" ? "list_price" : undefined,
+                iconUrl: iconUrl.trim() || undefined,
             };
 
             const result = editingGroup
@@ -301,6 +305,38 @@ export function AddOptionGroupDialog({
                             onCheckedChange={setIsRequired}
                             disabled={isPending}
                         />
+                    </div>
+
+                    {/* Group Icon/Image */}
+                    <div className="space-y-2">
+                        <Label htmlFor="iconUrl">Group Image / Icon</Label>
+                        <Input
+                            id="iconUrl"
+                            type="url"
+                            value={iconUrl}
+                            onChange={(e) => setIconUrl(e.target.value)}
+                            placeholder="https://example.com/icon.png"
+                            disabled={isPending}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Optional image shown next to the group name in the configurator
+                        </p>
+                        {iconUrl ? (
+                            <div className="mt-1 inline-flex rounded-lg border overflow-hidden bg-muted/30 p-1">
+                                <img
+                                    src={iconUrl}
+                                    alt="Group icon"
+                                    className="h-16 w-16 object-contain rounded"
+                                    onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                    }}
+                                />
+                            </div>
+                        ) : (
+                            <div className="mt-1 inline-flex items-center justify-center h-16 w-16 rounded-lg border-2 border-dashed bg-muted/20">
+                                <ImageIcon className="h-6 w-6 text-muted-foreground opacity-30" />
+                            </div>
+                        )}
                     </div>
 
                     <DialogFooter>

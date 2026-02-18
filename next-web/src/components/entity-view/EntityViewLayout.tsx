@@ -17,10 +17,13 @@ import {
     X,
     Filter,
     ChevronDown,
+    ChevronLeft,
+    ChevronRight,
     History,
     CheckSquare,
     XCircle,
     GitBranch,
+    Trash2,
 } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
 import SavedViewsMenu from "@/components/SavedViewsMenu";
@@ -122,6 +125,7 @@ export default function EntityViewLayout<T = any>({
     enableExport = false,
     enableImport = false,
     enableBulkActions = true,
+    onBulkDelete,
     onExport,
     onDebugSql,
     availableViewModes = ["tags", "grid", "cards"],
@@ -141,6 +145,7 @@ export default function EntityViewLayout<T = any>({
 }: EntityViewLayoutProps<T>) {
     const inputRef = useRef<HTMLInputElement>(null);
     const [showHistory, setShowHistory] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
 
     // Filtered search history
@@ -527,6 +532,32 @@ export default function EntityViewLayout<T = any>({
                             <XCircle className="w-3 h-3" />
                             בטל בחירה
                         </button>
+
+                        {/* Delete Button */}
+                        {onBulkDelete && (
+                            <button
+                                onClick={async () => {
+                                    const count = config.selectedIds.length;
+                                    const confirmed = window.confirm(
+                                        `האם אתה בטוח שברצונך למחוק ${count} פריט${count > 1 ? 'ים' : ''}? פעולה זו אינה ניתנת לביטול.`
+                                    );
+                                    if (!confirmed) return;
+                                    setIsDeleting(true);
+                                    try {
+                                        await onBulkDelete(config.selectedIds);
+                                        config.clearSelection();
+                                        config.refresh(true);
+                                    } finally {
+                                        setIsDeleting(false);
+                                    }
+                                }}
+                                disabled={isDeleting}
+                                className="text-xs px-2.5 py-1 rounded-md border border-destructive/50 hover:bg-destructive/10 text-destructive transition-colors flex items-center gap-1 disabled:opacity-50"
+                            >
+                                <Trash2 className="w-3 h-3" />
+                                {isDeleting ? 'מוחק...' : 'מחק'}
+                            </button>
+                        )}
                     </div>
                 )
             }
@@ -549,8 +580,49 @@ export default function EntityViewLayout<T = any>({
             {/* ==================== Content Area ==================== */}
             {
                 !config.error && (
-                    <div className="transition-all duration-300 flex-1 min-h-0 flex flex-col">
+                    <div className="transition-all duration-300 flex-1 min-h-0 flex flex-col overflow-auto">
                         {renderCurrentView()}
+                    </div>
+                )
+            }
+
+            {/* ==================== Pagination Bar (non-grid views) ==================== */}
+            {
+                !config.error && config.viewMode !== "grid" && totalCount > filteredCount && (
+                    <div className="sticky bottom-0 z-10 flex items-center justify-between px-4 py-3 border-t border-border bg-card/95 backdrop-blur-sm rounded-b-xl shadow-[0_-2px_8px_rgba(0,0,0,0.05)]">
+                        <span className="text-sm text-muted-foreground">
+                            מציג {filteredCount.toLocaleString()} מתוך {totalCount.toLocaleString()}
+                        </span>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => {
+                                    if (config.pagination.page > 1) {
+                                        config.setPagination({ page: config.pagination.page - 1 });
+                                    }
+                                }}
+                                disabled={config.pagination.page <= 1}
+                                className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg border border-border hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            >
+                                <ChevronRight className="w-4 h-4" />
+                                הקודם
+                            </button>
+                            <span className="text-sm text-muted-foreground px-2">
+                                עמוד {config.pagination.page} מתוך {config.pagination.totalPages || Math.ceil(totalCount / config.pagination.pageSize)}
+                            </span>
+                            <button
+                                onClick={() => {
+                                    const maxPage = config.pagination.totalPages || Math.ceil(totalCount / config.pagination.pageSize);
+                                    if (config.pagination.page < maxPage) {
+                                        config.setPagination({ page: config.pagination.page + 1 });
+                                    }
+                                }}
+                                disabled={config.pagination.page >= (config.pagination.totalPages || Math.ceil(totalCount / config.pagination.pageSize))}
+                                className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg border border-border hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            >
+                                הבא
+                                <ChevronLeft className="w-4 h-4" />
+                            </button>
+                        </div>
                     </div>
                 )
             }

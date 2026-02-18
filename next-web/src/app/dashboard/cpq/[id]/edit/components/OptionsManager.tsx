@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -186,10 +186,14 @@ export function OptionsManager({ groupId, options, onUpdate }: OptionsManagerPro
         }
     };
 
-    const handleRefresh = () => {
-        router.refresh();
+    // Sync local state when options prop updates (after router.refresh)
+    useEffect(() => {
         setItems(options);
+    }, [options]);
+
+    const handleRefresh = () => {
         onUpdate();
+        router.refresh();
     };
 
     const handleEdit = (option: Option) => {

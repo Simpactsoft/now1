@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Save, Eye, EyeOff } from "lucide-react";
+import { Loader2, Save, Eye, EyeOff, ImageIcon } from "lucide-react";
 import type { ProductTemplate } from "@/app/actions/cpq/template-actions";
 import { updateTemplate, toggleTemplateActive } from "@/app/actions/cpq/template-actions";
 
@@ -166,7 +166,7 @@ export function TemplateSettingsForm({ template }: TemplateSettingsFormProps) {
 
                     {/* Image URL */}
                     <div className="space-y-2">
-                        <Label htmlFor="imageUrl">Image URL</Label>
+                        <Label htmlFor="imageUrl">Product Image</Label>
                         <Input
                             id="imageUrl"
                             type="url"
@@ -177,6 +177,25 @@ export function TemplateSettingsForm({ template }: TemplateSettingsFormProps) {
                         <p className="text-sm text-muted-foreground">
                             Hero image displayed in the configurator header
                         </p>
+                        {imageUrl ? (
+                            <div className="mt-2 rounded-lg border overflow-hidden bg-muted/30 p-2">
+                                <img
+                                    src={imageUrl}
+                                    alt="Product preview"
+                                    className="max-h-48 w-auto mx-auto object-contain rounded"
+                                    onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                    }}
+                                />
+                            </div>
+                        ) : (
+                            <div className="mt-2 flex items-center justify-center h-32 rounded-lg border-2 border-dashed bg-muted/20">
+                                <div className="text-center text-muted-foreground">
+                                    <ImageIcon className="h-8 w-8 mx-auto mb-1 opacity-30" />
+                                    <p className="text-xs">No image set</p>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </CardContent>
             </Card>

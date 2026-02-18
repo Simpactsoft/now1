@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { validateConfiguration } from "./validation-actions";
 import { calculatePrice, type PriceCalculation } from "./pricing-actions";
+import { getTenantId } from "@/lib/auth/tenant";
 
 // ============================================================================
 // TYPES
@@ -39,6 +40,32 @@ export interface Configuration {
     isTemplate: boolean;
     templateName: string | null;
     sourceConfigurationId: string | null;
+    // Lineage: snapshot of source state at clone time
+    sourceSnapshot: SourceSnapshot | null;
+}
+
+/**
+ * Snapshot of the source configuration/template at clone time.
+ * Immutable after creation — used for historical comparison and audit.
+ */
+export interface SourceSnapshot {
+    clonedAt: string;
+    sourceType: "configuration" | "template";
+    templateId: string;
+    templateName: string;
+    basePrice: number;
+    optionGroups: Array<{
+        id: string;
+        name: string;
+        options: Array<{
+            id: string;
+            name: string;
+            priceModifierType: string;
+            priceModifierAmount: number;
+        }>;
+    }>;
+    selectedOptions: Record<string, string | string[]>;
+    totalPrice: number;
 }
 
 // ============================================================================
@@ -75,7 +102,12 @@ export async function saveConfiguration(params: {
         const supabase = await createClient();
         const quantity = params.quantity || 1;
 
-        // 1. Validate configuration
+        // 1. Get current user
+        const {
+            data: { user },
+        } = await supabase.auth.getUser();
+
+        // 2. Validate configuration
         const validationResult = await validateConfiguration({
             templateId: params.templateId,
             selectedOptions: params.selectedOptions,
@@ -88,7 +120,7 @@ export async function saveConfiguration(params: {
             };
         }
 
-        // 2. Validate tenant access (defense in depth beyond RLS)
+        // 3. Validate tenant access (defense in depth beyond RLS)
         const { data: template, error: templateError } = await supabase
             .from('cpq_templates')
             .select('tenant_id')
@@ -101,7 +133,7 @@ export async function saveConfiguration(params: {
 
         // Verify user's tenant matches template's tenant (admins bypass this)
         if (user) {
-            const userTenantId = user.app_metadata?.tenant_id;
+            const userTenantId = await getTenantId(user, supabase);
             const isAdmin = user.app_metadata?.app_role === 'admin' || user.app_metadata?.app_role === 'super_admin';
 
             if (!isAdmin && template.tenant_id !== userTenantId) {
@@ -109,7 +141,7 @@ export async function saveConfiguration(params: {
             }
         }
 
-        // 3. Calculate price
+        // 4. Calculate price
         const priceResult = await calculatePrice({
             templateId: params.templateId,
             selectedOptions: params.selectedOptions,
@@ -121,11 +153,6 @@ export async function saveConfiguration(params: {
         }
 
         const pricing = priceResult.data;
-
-        // 3. Get current user or session
-        const {
-            data: { user },
-        } = await supabase.auth.getUser();
 
         // 4. Prepare configuration data
         const configData: any = {
@@ -785,7 +812,45 @@ export async function cloneConfiguration(sourceConfigurationId: string): Promise
             return { success: false, error: "Source configuration not found" };
         }
 
-        // Create new draft configuration with source reference
+        // Fetch template info for snapshot
+        const { data: template } = await supabase
+            .from("product_templates")
+            .select("id, name, base_price")
+            .eq("id", source.template_id)
+            .single();
+
+        // Fetch option groups + options for snapshot
+        const { data: groups } = await supabase
+            .from("option_groups")
+            .select(`
+                id, name,
+                options:options(id, name, price_modifier_type, price_modifier_amount)
+            `)
+            .eq("template_id", source.template_id)
+            .order("display_order");
+
+        // Build source snapshot
+        const sourceSnapshot: SourceSnapshot = {
+            clonedAt: new Date().toISOString(),
+            sourceType: source.is_template ? "template" : "configuration",
+            templateId: source.template_id,
+            templateName: template?.name || "Unknown",
+            basePrice: parseFloat(String(template?.base_price || 0)),
+            optionGroups: (groups || []).map((g: any) => ({
+                id: g.id,
+                name: g.name,
+                options: (g.options || []).map((o: any) => ({
+                    id: o.id,
+                    name: o.name,
+                    priceModifierType: o.price_modifier_type,
+                    priceModifierAmount: parseFloat(String(o.price_modifier_amount || 0)),
+                })),
+            })),
+            selectedOptions: source.selected_options,
+            totalPrice: parseFloat(String(source.total_price || 0)),
+        };
+
+        // Create new draft configuration with source reference + snapshot
         const newConfigData = {
             template_id: source.template_id,
             user_id: user.id,
@@ -800,6 +865,7 @@ export async function cloneConfiguration(sourceConfigurationId: string): Promise
             status: "draft",
             inventory_reservation_status: "none",
             source_configuration_id: sourceConfigurationId, // Track lineage
+            source_snapshot: sourceSnapshot,                // Snapshot at clone time
             is_template: false, // Clones are not templates by default
             template_name: null,
         };
@@ -850,6 +916,7 @@ interface ConfigurationDbRow {
     is_template: boolean;
     template_name: string | null;
     source_configuration_id: string | null;
+    source_snapshot: SourceSnapshot | null;
 }
 
 /**
@@ -872,16 +939,17 @@ function mapConfigurationFromDb(data: ConfigurationDbRow): Configuration {
         discountAmount: roundCurrency(data.discount_amount),
         totalPrice: roundCurrency(data.total_price),
         quantity: data.quantity,
-        status: data.status,
+        status: data.status as Configuration["status"],
         shareToken: data.share_token,
         priceBreakdown: data.price_breakdown,
         notes: data.notes,
-        inventoryReservationStatus: data.inventory_reservation_status,
+        inventoryReservationStatus: data.inventory_reservation_status as Configuration["inventoryReservationStatus"],
         inventoryReservationId: data.inventory_reservation_id,
         createdAt: data.created_at,
         updatedAt: data.updated_at,
         isTemplate: data.is_template,
         templateName: data.template_name,
         sourceConfigurationId: data.source_configuration_id,
+        sourceSnapshot: data.source_snapshot,
     };
 }

@@ -7,7 +7,8 @@ import {
     GridReadyEvent,
     IDetailCellRendererParams,
     GetRowIdParams,
-    RowSelectionOptions
+    RowSelectionOptions,
+    themeQuartz,
 } from "ag-grid-community";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
@@ -58,9 +59,7 @@ export default function EntityAgGrid({
 }: EntityAgGridProps) {
     const { theme } = useTheme();
     const gridRef = useRef<AgGridReact>(null);
-
-    // Dynamic Theme Class
-    const themeClass = theme === 'dark' ? 'ag-theme-quartz-dark' : 'ag-theme-quartz';
+    const gridTheme = themeQuartz.withParams({ accentColor: '#6366f1' });
 
     // Default Column Definitions
     const defaultColDef = useMemo(() => ({
@@ -74,7 +73,7 @@ export default function EntityAgGrid({
     const defaultGetRowId = (params: GetRowIdParams) => params.data.id || params.data.ret_id;
 
     return (
-        <div className={cn(`w-full h-full ${themeClass} border border-border rounded-xl overflow-hidden shadow-sm bg-card relative`, className)}>
+        <div className={cn("w-full h-full border border-border rounded-xl overflow-hidden shadow-sm bg-card relative", className)}>
             <div className="h-full w-full relative">
                 <AgGridReact
                     ref={gridRef}
@@ -100,8 +99,7 @@ export default function EntityAgGrid({
                     masterDetail={masterDetail}
                     detailCellRenderer={detailCellRenderer}
                     detailRowHeight={detailRowHeight}
-                    // Fix for Warning & Theme:
-                    theme="legacy"
+                    theme={gridTheme}
                 />
 
                 {loading && (

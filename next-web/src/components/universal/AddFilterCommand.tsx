@@ -105,7 +105,7 @@ export default function AddFilterCommand({ onSelectField, minimal = false, field
                                             "
                                         >
                                             <div className="flex items-center justify-center w-8 h-8 rounded-full bg-secondary/50 mr-3 group-data-[selected=true]:bg-background/80 shadow-sm border border-border/20">
-                                                <Icon className="w-4 h-4 text-muted-foreground group-data-[selected=true]:text-primary" />
+                                                {Icon ? <Icon className="w-4 h-4 text-muted-foreground group-data-[selected=true]:text-primary" /> : null}
                                             </div>
                                             <span className="flex-1 font-medium">{f.label}</span>
                                             <ChevronRight className="w-3 h-3 opacity-0 group-data-[selected=true]:opacity-50 transition-opacity" />

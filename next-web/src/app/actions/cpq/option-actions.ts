@@ -11,6 +11,7 @@ export interface CreateOptionParams {
     name: string;
     description?: string;
     sku?: string;
+    productId?: string;
     priceModifierType: "add" | "multiply" | "replace";
     priceModifierValue: number;
     imageUrl?: string;
@@ -21,6 +22,7 @@ export interface UpdateOptionParams {
     name?: string;
     description?: string;
     sku?: string;
+    productId?: string | null;
     priceModifierType?: "add" | "multiply" | "replace";
     priceModifierValue?: number;
     imageUrl?: string;
@@ -29,7 +31,7 @@ export interface UpdateOptionParams {
 
 type Option = {
     id: string;
-    option_group_id: string;
+    group_id: string;
     name: string;
     description: string | null;
     sku: string | null;
@@ -67,10 +69,10 @@ export async function createOption(
             return { success: false, error: "Authentication required" };
         }
 
-        // 2. Verify group is manual (can't add options to category groups)
+        // 2. Verify group is manual and get tenant_id
         const { data: group, error: groupError } = await supabase
             .from("option_groups")
-            .select("source_type")
+            .select("source_type, tenant_id")
             .eq("id", groupId)
             .single();
 
@@ -92,13 +94,13 @@ export async function createOption(
             description: params.description,
             sku: params.sku,
             priceModifierType: params.priceModifierType,
-            priceModifierValue: params.priceModifierValue,
+            priceModifierAmount: params.priceModifierValue,
             imageUrl: params.imageUrl,
             isDefault: params.isDefault || false,
         });
 
         if (!validation.success) {
-            const firstError = validation.error?.errors?.[0];
+            const firstError = validation.error?.issues?.[0];
             return {
                 success: false,
                 error: firstError?.message || "Validation failed",
@@ -109,7 +111,7 @@ export async function createOption(
         const { data: maxOrder } = await supabase
             .from("options")
             .select("display_order")
-            .eq("option_group_id", groupId)
+            .eq("group_id", groupId)
             .order("display_order", { ascending: false })
             .limit(1)
             .single();
@@ -120,12 +122,14 @@ export async function createOption(
         const { data, error } = await supabase
             .from("options")
             .insert({
-                option_group_id: groupId,
+                tenant_id: group.tenant_id,
+                group_id: groupId,
                 name: params.name,
                 description: params.description || null,
                 sku: params.sku || null,
+                product_id: params.productId || null,
                 price_modifier_type: params.priceModifierType,
-                price_modifier_value: params.priceModifierValue,
+                price_modifier_amount: params.priceModifierValue,
                 display_order: displayOrder,
                 image_url: params.imageUrl || null,
                 is_default: params.isDefault || false,
@@ -174,10 +178,11 @@ export async function updateOption(
         if (params.description !== undefined)
             updateData.description = params.description || null;
         if (params.sku !== undefined) updateData.sku = params.sku || null;
+        if (params.productId !== undefined) updateData.product_id = params.productId || null;
         if (params.priceModifierType !== undefined)
             updateData.price_modifier_type = params.priceModifierType;
         if (params.priceModifierValue !== undefined)
-            updateData.price_modifier_value = params.priceModifierValue;
+            updateData.price_modifier_amount = params.priceModifierValue;
         if (params.imageUrl !== undefined)
             updateData.image_url = params.imageUrl || null;
         if (params.isDefault !== undefined)
@@ -261,7 +266,7 @@ export async function reorderOptions(
                 .from("options")
                 .update({ display_order: index, updated_at: new Date().toISOString() })
                 .eq("id", id)
-                .eq("option_group_id", groupId) // Security: only update options in this group
+                .eq("group_id", groupId) // Security: only update options in this group
         );
 
         const results = await Promise.all(updates);
@@ -276,6 +281,66 @@ export async function reorderOptions(
         return { success: true };
     } catch (error: any) {
         console.error("Error in reorderOptions:", error);
+        return { success: false, error: error.message };
+    }
+}
+
+// ============================================================================
+// PRODUCT SEARCH (for catalog integration)
+// ============================================================================
+
+export interface CatalogProduct {
+    id: string;
+    name: string;
+    sku: string;
+    listPrice: number;
+    costPrice: number;
+    description: string | null;
+}
+
+/**
+ * Search products from the catalog by name or SKU.
+ */
+export async function searchProducts(
+    query: string
+): Promise<{ success: boolean; data?: CatalogProduct[]; error?: string }> {
+    try {
+        const supabase = await createClient();
+
+        const {
+            data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user) {
+            return { success: false, error: "Authentication required" };
+        }
+
+        const searchTerm = `%${query.trim()}%`;
+
+        const { data, error } = await supabase
+            .from("products")
+            .select("id, name, sku, list_price, cost_price, description")
+            .or(`name.ilike.${searchTerm},sku.ilike.${searchTerm}`)
+            .order("name")
+            .limit(20);
+
+        if (error) {
+            console.error("Error searching products:", error);
+            return { success: false, error: error.message };
+        }
+
+        const mapped: CatalogProduct[] = (data || []).map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            sku: p.sku,
+            listPrice: parseFloat(p.list_price) || 0,
+            costPrice: parseFloat(p.cost_price) || 0,
+            description: p.description,
+        }));
+
+        return { success: true, data: mapped };
+    } catch (error: any) {
+        console.error("Error in searchProducts:", error);
         return { success: false, error: error.message };
     }
 }

@@ -147,7 +147,8 @@ export async function validateConfiguration(params: {
                         });
                     }
                     if (rule.then_group_id) {
-                        const selectedOption = params.selectedOptions[rule.then_group_id];
+                        const rawSelected = params.selectedOptions[rule.then_group_id];
+                        const selectedOption: string | undefined = Array.isArray(rawSelected) ? rawSelected[0] : rawSelected;
 
                         // Group is required but nothing selected
                         if (!selectedOption) {
@@ -178,10 +179,20 @@ export async function validateConfiguration(params: {
 
                 case "conflicts":
                     if (rule.then_option_id && isOptionSelected(rule.then_option_id, params.selectedOptions)) {
-                        // Find which group this option belongs to
-                        const optionGroupId = optionGroups.find(g =>
-                            g.options.some(o => o.id === rule.then_option_id)
-                        )?.id || null;
+                        // Find which group this option belongs to using groupsData
+                        let optionGroupId: string | null = null;
+                        for (const g of groupsData || []) {
+                            const { data: opts } = await supabase
+                                .from("options")
+                                .select("id")
+                                .eq("group_id", g.id)
+                                .eq("id", rule.then_option_id)
+                                .maybeSingle();
+                            if (opts) {
+                                optionGroupId = g.id;
+                                break;
+                            }
+                        }
 
                         errors.push({
                             ruleId: rule.id,

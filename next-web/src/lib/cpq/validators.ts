@@ -45,6 +45,12 @@ export const optionGroupSchema = z.object({
         path: ["sourceCategoryId"],
     }
 ).refine(
+    (d) => d.sourceType !== "category" || d.categoryPriceMode,
+    {
+        message: "Category source requires a price mode",
+        path: ["categoryPriceMode"],
+    }
+).refine(
     (d) =>
         d.selectionType !== "multiple" ||
         !d.maxSelections ||

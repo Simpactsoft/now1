@@ -6,7 +6,7 @@ import { useCallback, useMemo, useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Sliders, Package, Settings } from "lucide-react";
 import { ColumnDef } from "@/components/entity-view";
-import { getTemplates } from "@/app/actions/cpq/template-actions";
+import { getTemplates, deleteTemplates } from "@/app/actions/cpq/template-actions";
 import CPQTemplateTags from "@/components/cpq/CPQTemplateTags";
 import NewTemplateDropdown from "@/components/cpq/NewTemplateDropdown";
 
@@ -164,6 +164,15 @@ export default function CPQPageWrapper({ tenantId }: CPQPageWrapperProps) {
         router.push(`/dashboard/cpq/${template.id}/edit`);
     };
 
+    const handleBulkDelete = useCallback(async (ids: string[]) => {
+        const result = await deleteTemplates(ids);
+        if (result.success) {
+            toast.success(`${result.deletedCount} תבנית${(result.deletedCount || 0) > 1 ? 'ות' : ''} נמחקו בהצלחה`);
+        } else {
+            toast.error(result.error || 'שגיאה במחיקת תבניות');
+        }
+    }, []);
+
 
 
 
@@ -198,6 +207,7 @@ export default function CPQPageWrapper({ tenantId }: CPQPageWrapperProps) {
                 availableViewModes={['tags', 'grid', 'cards']}
                 availableFilters={availableFilters}
                 hideHeader={true}
+                onBulkDelete={handleBulkDelete}
 
                 // Tags View
                 renderTags={(props) => (

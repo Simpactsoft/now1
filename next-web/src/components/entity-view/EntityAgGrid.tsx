@@ -10,6 +10,7 @@ import {
     GridReadyEvent,
     GetRowIdParams,
     RowSelectionOptions,
+    themeQuartz,
 } from "ag-grid-community";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
@@ -69,7 +70,7 @@ function EntityAgGridInner<T = any>(props: EntityAgGridProps<T>) {
 
     const { theme } = useTheme();
     const gridRef = useRef<AgGridReact>(null);
-    const themeClass = theme === 'dark' ? 'ag-theme-quartz-dark' : 'ag-theme-quartz';
+    const gridTheme = theme === 'dark' ? themeQuartz.withParams({ accentColor: '#6366f1' }) : themeQuartz.withParams({ accentColor: '#6366f1' });
     const isRtl = typeof document !== 'undefined' && document.documentElement.dir === 'rtl';
 
     // ---- Map our ColumnDef<T> to ag-grid ColDef ----
@@ -168,7 +169,7 @@ function EntityAgGridInner<T = any>(props: EntityAgGridProps<T>) {
         <div className={cn("flex flex-col w-full h-full", className)}>
             {/* AG Grid */}
             <div className={cn(
-                `${themeClass} border border-border rounded-xl overflow-hidden shadow-sm bg-card relative flex-1 min-h-0`,
+                "border border-border rounded-xl overflow-hidden shadow-sm bg-card relative flex-1 min-h-[500px]",
                 hasPagination ? 'rounded-b-none border-b-0' : ''
             )}>
                 <div className="w-full h-full relative">
@@ -194,7 +195,7 @@ function EntityAgGridInner<T = any>(props: EntityAgGridProps<T>) {
                         detailCellRenderer={detailCellRenderer}
                         detailRowHeight={detailRowHeight}
                         enableRtl={isRtl}
-                        theme="legacy"
+                        theme={gridTheme}
                     />
 
                     {loading && (

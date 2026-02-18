@@ -150,7 +150,7 @@ function EntityTreeGridInner<T = any>(props: EntityTreeGridProps<T>) {
 
     return (
         <div className={cn("flex flex-col h-full", className)} dir={isRtl ? 'rtl' : 'ltr'}>
-            <div className="flex-1 ag-theme-quartz">
+            <div className="flex-1">
                 <AgGridReact
                     theme={themeQuartz}
                     rowData={data}

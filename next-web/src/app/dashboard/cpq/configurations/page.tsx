@@ -1,6 +1,8 @@
 import { getCurrentUser } from "@/app/actions/getCurrentUser";
 import { redirect } from "next/navigation";
 import ConfigurationsPageWrapper from "@/components/cpq/ConfigurationsPageWrapper";
+import { createClient } from "@/lib/supabase/server";
+import { getTenantId } from "@/lib/auth/tenant";
 
 export default async function ConfigurationsPage() {
     const user = await getCurrentUser();
@@ -11,7 +13,8 @@ export default async function ConfigurationsPage() {
 
     // Admin users can have null tenant_id (they see all tenants)
     // Regular users need a tenant_id
-    const tenantId = user.user_metadata?.tenant_id || user.app_metadata?.tenant_id || null;
+    const supabase = await createClient();
+    const tenantId = await getTenantId(user, supabase);
 
     return <ConfigurationsPageWrapper tenantId={tenantId} />;
 }

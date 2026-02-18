@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -93,10 +93,20 @@ function SortableGroupCard({
                     {group.sourceType === "manual" && (
                         <button
                             onClick={() => setIsExpanded(!isExpanded)}
-                            className="mt-1 text-muted-foreground hover:text-foreground"
+                            className="h-7 w-7 rounded-full bg-primary/10 text-primary hover:bg-primary/20 flex items-center justify-center transition-all"
+                            title={isExpanded ? "Collapse options" : "Expand options"}
                         >
-                            <ChevronIcon className="h-5 w-5" />
+                            <ChevronIcon className="h-4 w-4" />
                         </button>
+                    )}
+
+                    {/* Group Icon */}
+                    {group.iconUrl && (
+                        <img
+                            src={group.iconUrl}
+                            alt={group.name}
+                            className="h-10 w-10 object-contain rounded-lg border bg-muted/30 p-0.5"
+                        />
                     )}
 
                     {/* Content */}
@@ -217,9 +227,13 @@ export function OptionGroupsManager({ templateId, groups = [] }: OptionGroupsMan
         }
     };
 
+    // Sync local state when groups prop updates (after router.refresh)
+    useEffect(() => {
+        setItems(groups);
+    }, [groups]);
+
     const handleRefresh = () => {
         router.refresh();
-        setItems(groups);
     };
 
     const handleEdit = (group: OptionGroup) => {

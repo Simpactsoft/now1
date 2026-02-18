@@ -1,7 +1,6 @@
 "use client";
 
-// Using Theming API - removed legacy ag-grid.css
-import "ag-grid-community/styles/ag-theme-quartz.css";
+// AG Grid v35 uses the built-in Theming API — no legacy CSS imports needed
 
 import { ModuleRegistry } from "ag-grid-community";
 import { AllEnterpriseModule, LicenseManager } from "ag-grid-enterprise";

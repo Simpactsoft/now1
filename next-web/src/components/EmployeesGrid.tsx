@@ -8,6 +8,7 @@ import {
     GridReadyEvent,
     IServerSideDatasource,
     IServerSideGetRowsParams,
+    themeQuartz,
 } from "ag-grid-community";
 import { fetchGridData } from "@/app/actions/fetchEmployees";
 
@@ -99,9 +100,9 @@ export default function EmployeesGrid({
                 <span>Row Model: Server-Side Row Model (SSRM)</span>
                 {error && <span className="text-red-500 font-bold">Error: {error}</span>}
             </div>
-            <div className="ag-theme-quartz-dark w-full h-[600px] rounded-xl overflow-hidden border border-zinc-800 shadow-2xl">
+            <div className="w-full h-[600px] rounded-xl overflow-hidden border border-zinc-800 shadow-2xl">
                 <AgGridReact
-                    theme="legacy"
+                    theme={themeQuartz}
                     ref={gridRef}
                     columnDefs={columnDefs}
                     rowModelType="serverSide"

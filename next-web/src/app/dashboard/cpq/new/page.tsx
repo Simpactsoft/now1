@@ -1,6 +1,8 @@
 import { getCurrentUser } from "@/app/actions/getCurrentUser";
 import { redirect } from "next/navigation";
 import NewTemplateForm from "@/components/cpq/NewTemplateForm";
+import { createClient } from "@/lib/supabase/server";
+import { getTenantId } from "@/lib/auth/tenant";
 
 export default async function NewTemplatePage() {
     const user = await getCurrentUser();
@@ -9,7 +11,8 @@ export default async function NewTemplatePage() {
         redirect('/login');
     }
 
-    const tenantId = user.user_metadata?.tenant_id || user.app_metadata?.tenant_id || null;
+    const supabase = await createClient();
+    const tenantId = await getTenantId(user, supabase);
 
     return (
         <div className="container max-w-2xl mx-auto py-8 px-4">

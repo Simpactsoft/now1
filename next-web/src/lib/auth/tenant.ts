@@ -1,5 +1,4 @@
-import { User } from "@supabase/supabase-js";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { User, SupabaseClient } from "@supabase/supabase-js";
 
 /**
  * Extracts tenant_id from user metadata or profiles table.
@@ -24,7 +23,7 @@ export async function getTenantId(
     supabase: SupabaseClient
 ): Promise<string | null> {
     // Try metadata first (fastest)
-    let tenantId = user.app_metadata?.tenant_id || user.user_metadata?.tenant_id;
+    let tenantId = user.app_metadata?.tenant_id ?? user.user_metadata?.tenant_id;
 
     // Fallback to profiles table if not in metadata
     if (!tenantId) {
@@ -39,5 +38,5 @@ export async function getTenantId(
         }
     }
 
-    return tenantId || null;
+    return tenantId ?? null;
 }
