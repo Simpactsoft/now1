@@ -90,6 +90,7 @@ export default function OrganizationViewWrapper({ user, tenantId }: Organization
         serverSide: true,
         onFetchData,
         getItemId: (item) => item.ret_id,
+        validFilterFields: ['search', 'status', 'industry', 'company_size', 'tags'],
     });
 
     // Restore Highlight

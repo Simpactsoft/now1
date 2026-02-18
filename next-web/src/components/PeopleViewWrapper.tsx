@@ -78,6 +78,7 @@ export default function PeopleViewWrapper({ tenantId }: PeopleViewWrapperProps) 
         initialPageSize: 50,
         onFetchData,
         getItemId: (item) => item.id || item.ret_id,
+        validFilterFields: ['search', 'status', 'role', 'email', 'phone'],
     });
 
     // ---- Actions ----

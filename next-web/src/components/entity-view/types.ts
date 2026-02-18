@@ -258,6 +258,8 @@ export interface UseEntityViewOptions<T> {
     debounceMs?: number;
     // Custom search filter - if provided, overrides default Object.values() search
     searchFilter?: (item: T, searchTerm: string) => boolean;
+    // Valid filter field IDs for this entity — URL params not in this list are discarded on mount
+    validFilterFields?: string[];
 }
 
 export interface FetchDataParams {

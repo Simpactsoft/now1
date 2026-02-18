@@ -110,6 +110,7 @@ export function useEntityView<T = any>(options: UseEntityViewOptions<T>): Entity
         onFetchData,
         getItemId = (item: any) => item.id || item.ret_id,
         debounceMs = 200,
+        validFilterFields,
     } = options;
 
     // Next.js routing (for URL sync)
@@ -158,10 +159,15 @@ export function useEntityView<T = any>(options: UseEntityViewOptions<T>): Entity
         const layout = (searchParams.get('layout') as any) || 'full';
         const query = searchParams.get('q') || '';
 
+        // Build a set of valid fields for fast lookup
+        const validFieldSet = validFilterFields ? new Set(validFilterFields) : null;
+
         const initialFilters: FilterCondition[] = [];
         searchParams.forEach((val, key) => {
             if (key.startsWith('f_')) {
                 const field = key.replace('f_', '');
+                // Skip filters that don't belong to this entity type
+                if (validFieldSet && !validFieldSet.has(field)) return;
                 initialFilters.push({
                     id: `init_${field}_${Date.now()}_${Math.random()}`,
                     field,
