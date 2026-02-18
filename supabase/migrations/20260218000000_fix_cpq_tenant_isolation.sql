@@ -3,6 +3,7 @@
 -- ============================================================================
 -- Previous migration (20260217200000_fix_cpq_rls_comprehensive.sql) set all
 -- CPQ policies to USING(true), allowing any authenticated user to see all data.
+-- Additionally, product_templates had RLS DISABLED (20260214000002).
 -- This migration restores proper tenant isolation.
 --
 -- Strategy: 
@@ -12,7 +13,17 @@
 
 BEGIN;
 
--- ==================== product_templates ====================
+-- ==================== RE-ENABLE RLS ON ALL CPQ TABLES ====================
+-- product_templates was DISABLED by 20260214000002_disable_rls_for_testing.sql
+-- Re-enable it and ensure all others are also enabled (idempotent)
+ALTER TABLE product_templates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE option_groups ENABLE ROW LEVEL SECURITY;
+ALTER TABLE options ENABLE ROW LEVEL SECURITY;
+ALTER TABLE option_overrides ENABLE ROW LEVEL SECURITY;
+ALTER TABLE configuration_rules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE configurations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE template_presets ENABLE ROW LEVEL SECURITY;
+
 DROP POLICY IF EXISTS "cpq_templates_select" ON product_templates;
 DROP POLICY IF EXISTS "cpq_templates_insert" ON product_templates;
 DROP POLICY IF EXISTS "cpq_templates_update" ON product_templates;
