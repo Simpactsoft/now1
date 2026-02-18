@@ -3,29 +3,14 @@
 import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import type { ConfigurationRule, Option, OptionGroup } from "./template-actions";
+import {
+    isOptionSelected,
+    isGroupSelected,
+    type ValidationMessage,
+    type ValidationResult,
+} from "@/lib/cpq/CPQValidationService";
 
-// ============================================================================
-// TYPES
-// ============================================================================
-
-export interface ValidationMessage {
-    ruleId: string;
-    ruleName: string;
-    message: string;
-    groupId: string | null;
-    optionId: string | null;
-    severity: "error" | "warning" | "info";
-}
-
-export interface ValidationResult {
-    isValid: boolean;
-    errors: ValidationMessage[];
-    warnings: ValidationMessage[];
-    autoSelections: Record<string, string>;
-    hiddenOptions: string[];
-    hiddenGroups: string[];
-    disabledOptions: string[];
-}
+export type { ValidationMessage, ValidationResult };
 
 // ============================================================================
 // ACTIONS
@@ -244,24 +229,3 @@ export async function validateConfiguration(params: {
     }
 }
 
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
-
-function isOptionSelected(
-    optionId: string | null,
-    selections: Record<string, string | string[]>
-): boolean {
-    if (!optionId) return false;
-    return Object.values(selections).some((v) =>
-        Array.isArray(v) ? v.includes(optionId) : v === optionId
-    );
-}
-
-function isGroupSelected(
-    groupId: string | null,
-    selections: Record<string, string | string[]>
-): boolean {
-    if (!groupId) return false;
-    return !!selections[groupId];
-}

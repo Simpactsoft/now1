@@ -2,8 +2,9 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { ActionResult, actionSuccess, actionError } from "@/lib/action-result";
 
-export async function toggleUserStatus(userId: string, currentStatus: string, tenantId: string) {
+export async function toggleUserStatus(userId: string, currentStatus: string, tenantId: string): Promise<ActionResult<{ newStatus: string }>> {
     try {
         const { createClient: createAdminClient } = require('@supabase/supabase-js');
         const supabaseAdmin = createAdminClient(
@@ -24,7 +25,7 @@ export async function toggleUserStatus(userId: string, currentStatus: string, te
         if (error) throw error;
 
         // Optional: If suspending, we might want to kill their sessions?
-        // Supabase Auth doesn't have a direct "kill session" for specific user via Admin API easily 
+        // Supabase Auth doesn't have a direct "kill session" for specific user via Admin API easily
         // without ban, but modifying the user_metadata or banning is an option.
         // For now, we rely on App Logic checking 'status' in middleware or on load.
 
@@ -35,10 +36,10 @@ export async function toggleUserStatus(userId: string, currentStatus: string, te
         }
 
         revalidatePath('/dashboard/settings/team');
-        return { success: true, newStatus };
+        return actionSuccess({ newStatus });
 
     } catch (error: any) {
         console.error("toggleUserStatus Error:", error);
-        return { error: error.message };
+        return actionError(error.message);
     }
 }

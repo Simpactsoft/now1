@@ -1,8 +1,9 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { ActionResult, actionSuccess, actionError } from "@/lib/action-result";
 
-export async function exportPeople() {
+export async function exportPeople(): Promise<ActionResult<{ csv: string }>> {
     const supabase = await createClient();
 
     try {
@@ -13,11 +14,11 @@ export async function exportPeople() {
 
         if (permError) {
             console.error("Permission check failed:", permError);
-            return { success: false, error: "Permission check failed" };
+            return actionError("Permission check failed", "AUTH_ERROR");
         }
 
         if (!hasPermission) {
-            return { success: false, error: "Unauthorized: You do not have permission to export data." };
+            return actionError("Unauthorized: You do not have permission to export data.", "AUTH_ERROR");
         }
 
         // 2. Fetch Data (RLS applies here too, so they only see their own tenant's data)
@@ -28,7 +29,7 @@ export async function exportPeople() {
 
         if (fetchError) {
             console.error("Export fetch failed:", fetchError);
-            return { success: false, error: fetchError.message };
+            return actionError(fetchError.message, "DB_ERROR");
         }
 
         // 3. Generate CSV
@@ -72,10 +73,10 @@ export async function exportPeople() {
             ...rows.map(r => r.join(','))
         ].join('\n');
 
-        return { success: true, csv: csvContent };
+        return actionSuccess({ csv: csvContent });
 
     } catch (err: any) {
         console.error("Export exception:", err);
-        return { success: false, error: "Export failed" };
+        return actionError("Export failed");
     }
 }

@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import type { TemplatePreset } from "./template-actions";
+import { selectedOptionsSchema } from "@/lib/schemas/selected-options";
 
 // ============================================================================
 // TYPES
@@ -58,6 +59,11 @@ export async function createPreset(
 
         if (templateError || !template) {
             return { success: false, error: "Template not found" };
+        }
+
+        const selectedOptionsValidation = selectedOptionsSchema.safeParse(params.selectedOptions);
+        if (!selectedOptionsValidation.success) {
+            return { success: false, error: `Invalid selected_options: ${selectedOptionsValidation.error.errors[0].message}` };
         }
 
         // Get next display_order if not specified
@@ -118,6 +124,13 @@ export async function updatePreset(
 
         if (!user) {
             return { success: false, error: "Authentication required" };
+        }
+
+        if (params.selectedOptions !== undefined) {
+            const selectedOptionsValidation = selectedOptionsSchema.safeParse(params.selectedOptions);
+            if (!selectedOptionsValidation.success) {
+                return { success: false, error: `Invalid selected_options: ${selectedOptionsValidation.error.errors[0].message}` };
+            }
         }
 
         const updateData: any = {

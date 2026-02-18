@@ -1,8 +1,9 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { ActionResult, actionSuccess, actionError } from "@/lib/action-result";
 
-export async function getTenants() {
+export async function getTenants(): Promise<ActionResult<any[]>> {
     const supabase = await createClient();
 
     // Note: This might be restricted by RLS if app.current_tenant is already set.
@@ -29,12 +30,12 @@ export async function getTenants() {
             console.error("Code:", legacyError.code);
             console.error("Message:", legacyError.message);
             console.error("---------------------------------");
-            return [];
+            return actionError(legacyError.message, "DB_ERROR");
         }
         console.log(`getTenants fallback success: ${legacyData?.length || 0} tenants`);
-        return legacyData || [];
+        return actionSuccess(legacyData || []);
     }
 
     console.log(`getTenants RPC success: ${data?.length || 0} tenants found.`);
-    return data || [];
+    return actionSuccess(data || []);
 }

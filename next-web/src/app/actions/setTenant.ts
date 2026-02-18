@@ -2,8 +2,9 @@
 
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { ActionResult, actionOk } from "@/lib/action-result";
 
-export async function setTenantAction(tenantId: string) {
+export async function setTenantAction(tenantId: string): Promise<ActionResult<void>> {
     const cookieStore = await cookies();
     cookieStore.set("tenant_id", tenantId, {
         path: "/",
@@ -13,4 +14,5 @@ export async function setTenantAction(tenantId: string) {
     });
 
     revalidatePath("/dashboard");
+    return actionOk();
 }

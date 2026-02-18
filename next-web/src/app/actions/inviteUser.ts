@@ -3,8 +3,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
+import { ActionResult, actionOk, actionError } from "@/lib/action-result";
 
-export async function inviteUser(email: string, role: 'distributor' | 'dealer' | 'agent', tenantId: string) {
+export async function inviteUser(email: string, role: 'distributor' | 'dealer' | 'agent', tenantId: string): Promise<ActionResult<void>> {
     const supabase = await createClient();
     const adminClient = createAdminClient();
 
@@ -14,7 +15,7 @@ export async function inviteUser(email: string, role: 'distributor' | 'dealer' |
             .rpc('has_permission', { requested_permission: 'users.manage' });
 
         if (permError || !hasPermission) {
-            return { success: false, error: "Unauthorized: You do not have permission to invite users." };
+            return actionError("Unauthorized: You do not have permission to invite users.", "AUTH_ERROR");
         }
 
         // 2. Check if user exists (Optimization to avoid invite error if already active)
@@ -30,14 +31,14 @@ export async function inviteUser(email: string, role: 'distributor' | 'dealer' |
 
         if (inviteError) {
             console.error("Invite Error:", inviteError);
-            return { success: false, error: inviteError.message };
+            return actionError(inviteError.message, "DB_ERROR");
         }
 
         const user = inviteData.user;
-        if (!user) return { success: false, error: "Failed to create user." };
+        if (!user) return actionError("Failed to create user.", "DB_ERROR");
 
         // 4. Update Profile Role (Public Table)
-        // We use upsert because the 'on_auth_user_created' trigger might not verify/exist, 
+        // We use upsert because the 'on_auth_user_created' trigger might not verify/exist,
         // or we want to ensure specific fields are set immediately.
         const { error: profileError } = await adminClient
             .from('profiles')
@@ -53,14 +54,14 @@ export async function inviteUser(email: string, role: 'distributor' | 'dealer' |
 
         if (profileError) {
             console.error("Profile Upsert Failed:", profileError);
-            return { success: false, error: "User invited but failed to assign role." };
+            return actionError("User invited but failed to assign role.", "DB_ERROR");
         }
 
         revalidatePath("/dashboard/settings/team");
-        return { success: true };
+        return actionOk();
 
     } catch (err: any) {
         console.error("Invite Exception:", err);
-        return { success: false, error: "An error occurred." };
+        return actionError("An error occurred.");
     }
 }

@@ -87,7 +87,7 @@ export function validateInput<K extends keyof SchemaMap>(
     const result = schema.safeParse(data);
 
     if (!result.success) {
-        const firstError = result.error.errors[0];
+        const firstError = result.error.issues[0];
         const path = firstError.path.length > 0 ? ` (${firstError.path.join(".")})` : "";
         return {
             success: false,

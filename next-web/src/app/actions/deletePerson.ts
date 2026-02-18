@@ -2,8 +2,9 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { ActionResult, actionOk, actionError } from "@/lib/action-result";
 
-export async function deletePerson(id: string) {
+export async function deletePerson(id: string): Promise<ActionResult<void>> {
     const supabase = await createClient();
 
     try {
@@ -15,15 +16,15 @@ export async function deletePerson(id: string) {
         if (error) {
             console.error("[deletePerson] Error:", error);
             if (error.code === '42501' || error.message.includes('permission')) {
-                return { success: false, error: "Unauthorized: You do not have permission to delete contacts." };
+                return actionError("Unauthorized: You do not have permission to delete contacts.", "AUTH_ERROR");
             }
-            return { success: false, error: error.message };
+            return actionError(error.message, "DB_ERROR");
         }
 
         revalidatePath("/dashboard/people");
-        return { success: true };
+        return actionOk();
     } catch (err: any) {
         console.error("[deletePerson] Exception:", err);
-        return { success: false, error: "Failed to delete person." };
+        return actionError("Failed to delete person.");
     }
 }

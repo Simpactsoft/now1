@@ -1,8 +1,9 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { ActionResult, actionSuccess, actionError } from "@/lib/action-result";
 
-export async function fetchTotalStats(tenantId: string) {
+export async function fetchTotalStats(tenantId: string): Promise<ActionResult<{ totalPeople: number; totalOrganizations: number }>> {
     try {
         const supabase = await createClient();
 
@@ -23,11 +24,11 @@ export async function fetchTotalStats(tenantId: string) {
         if (peopleError) console.error("Error fetching people stats:", peopleError);
         if (orgError) console.error("Error fetching org stats:", orgError);
 
-        return {
+        return actionSuccess({
             totalPeople: peopleCount || 0,
             totalOrganizations: orgCount || 0
-        };
+        });
     } catch (e: any) {
-        return { totalPeople: 0, error: e.message };
+        return actionError(e.message);
     }
 }

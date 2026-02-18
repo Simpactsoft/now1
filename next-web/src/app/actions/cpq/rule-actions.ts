@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import type { ConfigurationRule } from "./template-actions";
+import { allowedOptionsSchema } from "@/lib/schemas/allowed-options";
 
 // ============================================================================
 // TYPES
@@ -90,6 +91,13 @@ export async function createRule(
             priority = (maxRule?.priority || 0) + 10;
         }
 
+        if (params.allowedOptions !== undefined) {
+            const allowedOptionsValidation = allowedOptionsSchema.safeParse(params.allowedOptions);
+            if (!allowedOptionsValidation.success) {
+                return { success: false, error: `Invalid allowed_options: ${allowedOptionsValidation.error.errors[0].message}` };
+            }
+        }
+
         // Insert the rule
         const { data, error } = await supabase
             .from("configuration_rules")
@@ -160,7 +168,13 @@ export async function updateRule(
         if (params.ifGroupId !== undefined) updateData.if_group_id = params.ifGroupId || null;
         if (params.thenOptionId !== undefined) updateData.then_option_id = params.thenOptionId || null;
         if (params.thenGroupId !== undefined) updateData.then_group_id = params.thenGroupId || null;
-        if (params.allowedOptions !== undefined) updateData.allowed_options = params.allowedOptions;
+        if (params.allowedOptions !== undefined) {
+            const allowedOptionsValidation = allowedOptionsSchema.safeParse(params.allowedOptions);
+            if (!allowedOptionsValidation.success) {
+                return { success: false, error: `Invalid allowed_options: ${allowedOptionsValidation.error.errors[0].message}` };
+            }
+            updateData.allowed_options = params.allowedOptions;
+        }
         if (params.quantityMin !== undefined) updateData.quantity_min = params.quantityMin;
         if (params.quantityMax !== undefined) updateData.quantity_max = params.quantityMax;
         if (params.discountType !== undefined) updateData.discount_type = params.discountType;

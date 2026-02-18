@@ -2,8 +2,8 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { optionGroupSchema } from "@/lib/cpq/validators";
 import { getTenantId } from "@/lib/auth/tenant";
+import { validateInput } from "@/lib/cpq/CPQValidationService";
 
 // ============================================================================
 // TYPES
@@ -91,14 +91,12 @@ export async function createOptionGroup(
             categoryPriceMode: params.categoryPriceMode,
         };
 
-        const validation = optionGroupSchema.safeParse(validationData);
+        const validation = validateInput("optionGroup", validationData);
 
         if (!validation.success) {
-
-            const firstError = validation.error?.issues?.[0];
             return {
                 success: false,
-                error: firstError?.message || "Validation failed",
+                error: validation.error || "Validation failed",
             };
         }
 

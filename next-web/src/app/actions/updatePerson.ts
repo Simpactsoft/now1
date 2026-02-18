@@ -4,6 +4,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { customFieldsSchema } from "@/lib/schemas/custom-fields";
+import { ActionResult, actionOk, actionError } from "@/lib/action-result";
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -20,7 +22,7 @@ const UpdatePersonSchema = z.object({
 
 export type UpdatePersonInput = z.infer<typeof UpdatePersonSchema>;
 
-export async function updatePerson(rawInput: any) {
+export async function updatePerson(rawInput: any): Promise<ActionResult<void>> {
     // [SECURITY FIX] Use Standard Client (RLS Enforced)
     const supabase = await createClient();
 
@@ -49,7 +51,7 @@ export async function updatePerson(rawInput: any) {
 
     if (!result.success) {
         console.error("Validation failed:", JSON.stringify(result.error, null, 2));
-        return { success: false, error: "Validation failed" };
+        return actionError("Validation failed", "VALIDATION_ERROR");
     }
 
     const { id, tenantId, firstName, lastName, email, phone, tags } = result.data;
@@ -59,7 +61,7 @@ export async function updatePerson(rawInput: any) {
         // [Security] Verify Authorization
         // Note: createClient() already handles auth state, but explicit check is good practice
         const user = (await supabase.auth.getUser()).data.user;
-        if (!user) return { success: false, error: "Unauthorized: Not logged in" };
+        if (!user) return actionError("Unauthorized: Not logged in", "AUTH_ERROR");
 
         console.log("Authorized access for user:", user.id);
 
@@ -75,7 +77,7 @@ export async function updatePerson(rawInput: any) {
         if (fetchError) throw new Error(`Fetch Card query failed: ${fetchError.message}`);
 
         if (!currentCard || currentCard.length === 0) {
-            return { success: false, error: "Card not found (0 rows)" };
+            return actionError("Card not found (0 rows)", "NOT_FOUND");
         }
 
         if (currentCard.length > 1) {
@@ -102,6 +104,11 @@ export async function updatePerson(rawInput: any) {
             ...(cardData.custom_fields || {}),
             ...customFields
         };
+
+        const customFieldsValidation = customFieldsSchema.safeParse(updatedCustomFields);
+        if (!customFieldsValidation.success) {
+            return actionError(`Invalid custom_fields: ${customFieldsValidation.error.errors[0].message}`, "VALIDATION_ERROR");
+        }
 
         const status = updatedCustomFields.status || cardData.status || 'lead';
 
@@ -147,7 +154,7 @@ export async function updatePerson(rawInput: any) {
             // OPTIMISTIC LOCK FAIL
             console.error("Race Condition Detected: Data was updated between Fetch and Write.");
             // Returning a distinct error allows client (potential future improvement) to retry
-            return { success: false, error: "Data is stale (Concurrent Update). Please refresh." };
+            return actionError("Data is stale (Concurrent Update). Please refresh.", "CONFLICT");
         }
 
         console.log("Card Update Success (Secure)");
@@ -171,10 +178,10 @@ export async function updatePerson(rawInput: any) {
         revalidatePath(`/dashboard/people/${id}`);
         revalidatePath('/dashboard/people');
 
-        return { success: true };
+        return actionOk();
 
     } catch (error: any) {
         console.error("updatePerson Action Error:", error);
-        return { success: false, error: error.message };
+        return actionError(error.message, "DB_ERROR");
     }
 }

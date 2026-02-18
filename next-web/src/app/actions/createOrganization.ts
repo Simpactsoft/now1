@@ -3,15 +3,16 @@
 import { createClient } from "@/lib/supabase/server";
 import { CreateOrganizationSchema, CreateOrganizationInput } from "@/lib/schemas";
 import { revalidatePath } from "next/cache";
+import { ActionResult, actionSuccess, actionError } from "@/lib/action-result";
 
-export async function createOrganization(params: CreateOrganizationInput) {
+export async function createOrganization(params: CreateOrganizationInput): Promise<ActionResult<any>> {
     const supabase = await createClient();
 
     // 1. Validate Input
     const result = CreateOrganizationSchema.safeParse(params);
     if (!result.success) {
         const errorMessage = result.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
-        return { success: false, error: errorMessage };
+        return actionError(errorMessage, "VALIDATION_ERROR");
     }
 
     const { name, taxId, companySize, industry, email, phone, address, tenantId } = result.data;
@@ -34,10 +35,10 @@ export async function createOrganization(params: CreateOrganizationInput) {
 
         // 3. Revalidate & Return
         revalidatePath('/dashboard/people'); // Assuming organizations are also listed here or in a similar grid
-        return { success: true, data };
+        return actionSuccess(data);
 
     } catch (error: any) {
         console.error("createOrganization Error:", error);
-        return { success: false, error: error.message };
+        return actionError(error.message, "DB_ERROR");
     }
 }

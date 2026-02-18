@@ -3,19 +3,14 @@
 import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { validateConfiguration } from "./validation-actions";
-import { calculatePrice, type PriceCalculation } from "./pricing-actions";
+import { calculatePrice, type PriceCalculation, type PriceBreakdownItem } from "./pricing-actions";
 import { getTenantId } from "@/lib/auth/tenant";
+import { priceBreakdownSchema } from "@/lib/schemas/price-breakdown";
+import { sourceSnapshotSchema, type SourceSnapshot } from "@/lib/schemas/source-snapshot";
 
 // ============================================================================
 // TYPES
 // ============================================================================
-
-export interface PriceBreakdownItem {
-    optionId: string;
-    optionName: string;
-    modifierType: "add" | "multiply" | "percent";
-    modifierAmount: number;
-}
 
 export interface Configuration {
     id: string;
@@ -42,30 +37,6 @@ export interface Configuration {
     sourceConfigurationId: string | null;
     // Lineage: snapshot of source state at clone time
     sourceSnapshot: SourceSnapshot | null;
-}
-
-/**
- * Snapshot of the source configuration/template at clone time.
- * Immutable after creation — used for historical comparison and audit.
- */
-export interface SourceSnapshot {
-    clonedAt: string;
-    sourceType: "configuration" | "template";
-    templateId: string;
-    templateName: string;
-    basePrice: number;
-    optionGroups: Array<{
-        id: string;
-        name: string;
-        options: Array<{
-            id: string;
-            name: string;
-            priceModifierType: string;
-            priceModifierAmount: number;
-        }>;
-    }>;
-    selectedOptions: Record<string, string | string[]>;
-    totalPrice: number;
 }
 
 // ============================================================================
@@ -153,6 +124,12 @@ export async function saveConfiguration(params: {
         }
 
         const pricing = priceResult.data;
+
+        // 4. Validate JSONB fields before writing
+        const priceBreakdownValidation = priceBreakdownSchema.safeParse(pricing.breakdown);
+        if (!priceBreakdownValidation.success) {
+            return { success: false, error: `Invalid price_breakdown: ${priceBreakdownValidation.error.errors[0].message}` };
+        }
 
         // 4. Prepare configuration data
         const configData: any = {
@@ -855,6 +832,11 @@ export async function cloneConfiguration(sourceConfigurationId: string): Promise
             selectedOptions: source.selected_options,
             totalPrice: parseFloat(String(source.total_price || 0)),
         };
+
+        const sourceSnapshotValidation = sourceSnapshotSchema.safeParse(sourceSnapshot);
+        if (!sourceSnapshotValidation.success) {
+            return { success: false, error: `Invalid source_snapshot: ${sourceSnapshotValidation.error.errors[0].message}` };
+        }
 
         // Create new draft configuration with source reference + snapshot
         const newConfigData = {

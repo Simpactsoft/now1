@@ -2,8 +2,9 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ActionResult, actionSuccess, actionError } from "@/lib/action-result";
 
-export async function fetchUsers(tenantId: string) {
+export async function fetchUsers(tenantId: string): Promise<ActionResult<{ users: any[] }>> {
     const supabase = await createClient();
     const adminClient = createAdminClient();
 
@@ -13,7 +14,7 @@ export async function fetchUsers(tenantId: string) {
             .rpc('has_permission', { requested_permission: 'users.manage' });
 
         if (permError || !hasPermission) {
-            return { success: false, error: "Unauthorized" };
+            return actionError("Unauthorized", "AUTH_ERROR");
         }
 
         // 2. Fetch Profiles (Admin Bypass)
@@ -26,12 +27,12 @@ export async function fetchUsers(tenantId: string) {
             .order('created_at', { ascending: false });
 
         if (fetchError) {
-            return { success: false, error: fetchError.message };
+            return actionError(fetchError.message, "DB_ERROR");
         }
 
-        return { success: true, users: profiles };
+        return actionSuccess({ users: profiles });
 
     } catch (err: any) {
-        return { success: false, error: "Failed to fetch users" };
+        return actionError("Failed to fetch users");
     }
 }

@@ -5,7 +5,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "verify": "tsx scripts/verify_system.ts"
+    "verify": "tsx scripts/verify_system.ts",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -46,16 +50,23 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^20",
     "@types/pg": "^8.16.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^5.1.4",
+    "@vitest/ui": "^4.0.18",
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
+    "jsdom": "^28.1.0",
     "pg": "^8.18.0",
     "shadcn": "^3.8.5",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.0.18"
   }
 }

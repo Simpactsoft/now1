@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
+import { ActionResult, actionSuccess, actionOk, actionError } from "@/lib/action-result";
 
 export type AttributeDefinition = {
     id?: string;
@@ -71,12 +72,12 @@ const SYSTEM_ATTRIBUTES: AttributeDefinition[] = [
     }
 ];
 
-export async function getTenantAttributes(entityType?: 'person' | 'organization' | 'party') {
+export async function getTenantAttributes(entityType?: 'person' | 'organization' | 'party'): Promise<ActionResult<AttributeDefinition[]>> {
     const supabase = await createClient();
 
     // Get Tenant
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { error: "Unauthorized" };
+    if (!user) return actionError("Unauthorized", "AUTH_ERROR");
 
     let tenantId = user.app_metadata?.tenant_id;
 
@@ -88,7 +89,7 @@ export async function getTenantAttributes(entityType?: 'person' | 'organization'
         }
     }
 
-    if (!tenantId) return { error: "No Tenant ID" };
+    if (!tenantId) return actionError("No Tenant ID", "AUTH_ERROR");
 
     let query = supabase
         .from('attribute_definitions')
@@ -111,7 +112,7 @@ export async function getTenantAttributes(entityType?: 'person' | 'organization'
 
     if (error) {
         console.error("Error fetching attributes:", error);
-        return { error: error.message };
+        return actionError(error.message, "DB_ERROR");
     }
 
     // Filter System Attributes based on specific request
@@ -136,13 +137,13 @@ export async function getTenantAttributes(entityType?: 'person' | 'organization'
 
     const merged = [...effectiveSystemAttrs, ...(dbAttributes || [])].sort((a, b) => (a.ui_order || 99) - (b.ui_order || 99));
 
-    return { data: merged };
+    return actionSuccess(merged);
 }
 
-export async function addTenantOptionValue(setCode: string, value: string, label: string) {
+export async function addTenantOptionValue(setCode: string, value: string, label: string): Promise<ActionResult<void>> {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { error: "Unauthorized" };
+    if (!user) return actionError("Unauthorized", "AUTH_ERROR");
 
     let tenantId = user.app_metadata?.tenant_id;
     if (!tenantId) {
@@ -150,7 +151,7 @@ export async function addTenantOptionValue(setCode: string, value: string, label
         const rawCookie = cookieStore.get('tenant_id')?.value;
         if (rawCookie) tenantId = rawCookie.replace(/['"]+/g, '').trim();
     }
-    if (!tenantId) return { error: "No Tenant Context" };
+    if (!tenantId) return actionError("No Tenant Context", "AUTH_ERROR");
 
     // 1. Find the Option Set ID (Global or Tenant)
     // We prefer the Tenant local set if it exists, otherwise the Global set.
@@ -162,7 +163,7 @@ export async function addTenantOptionValue(setCode: string, value: string, label
         .order('tenant_id', { ascending: false }); // helper to pick tenant specific if multiple?
 
     if (fetchError || !sets || sets.length === 0) {
-        return { error: `Option Set '${setCode}' not found.` };
+        return actionError(`Option Set '${setCode}' not found.`, "NOT_FOUND");
     }
 
     const targetSetId = sets[0].id;
@@ -180,14 +181,14 @@ export async function addTenantOptionValue(setCode: string, value: string, label
 
     if (error) {
         console.error("Error adding option value:", error);
-        return { error: error.message };
+        return actionError(error.message, "DB_ERROR");
     }
 
     revalidatePath('/dashboard/settings');
-    return { success: true };
+    return actionOk();
 }
 
-export async function upsertAttribute(attribute: AttributeDefinition) {
+export async function upsertAttribute(attribute: AttributeDefinition): Promise<ActionResult<AttributeDefinition>> {
     const cookieStore = await cookies();
     const cookieNames = cookieStore.getAll().map((c: { name: string }) => c.name).join(', ');
     console.log("upsertAttribute: Cookies present:", cookieNames);
@@ -198,13 +199,11 @@ export async function upsertAttribute(attribute: AttributeDefinition) {
     if (!user || authError) {
         console.error("upsertAttribute: Auth Failed.", authError);
         // Return debug info in the error message so the user can show us
-        return {
-            error: `Auth Error: ${authError?.message || "No Session"}. Cookies: [${cookieNames}]`
-        };
+        return actionError(`Auth Error: ${authError?.message || "No Session"}. Cookies: [${cookieNames}]`, "AUTH_ERROR");
     }
 
     // Authorization Check (Admin only ideally, but enforcing standard RLS for now)
-    // In a real app check role: if (user.app_metadata.role !== 'admin') return { error: "Forbidden" };
+    // In a real app check role: if (user.app_metadata.role !== 'admin') return actionError("Forbidden", "AUTH_ERROR");
 
     let tenantId = user.app_metadata?.tenant_id;
 
@@ -219,7 +218,7 @@ export async function upsertAttribute(attribute: AttributeDefinition) {
 
     if (!tenantId) {
         console.error("upsertAttribute: No tenant_id found in app_metadata OR cookies.");
-        return { error: "Unauthorized: No Tenant ID linked to user or session." };
+        return actionError("Unauthorized: No Tenant ID linked to user or session.", "AUTH_ERROR");
     }
 
     const payload = {
@@ -236,11 +235,11 @@ export async function upsertAttribute(attribute: AttributeDefinition) {
 
     if (error) {
         console.error("upsertAttribute DB Error:", error);
-        return { error: `Database Error: ${error.message} (${error.code})` };
+        return actionError(`Database Error: ${error.message} (${error.code})`, "DB_ERROR");
     }
 
     revalidatePath('/dashboard/settings');
-    return { data };
+    return actionSuccess(data);
 }
 
 // --- Option Sets Engine ---
@@ -263,10 +262,10 @@ export type OptionValue = {
     is_custom?: boolean;
 };
 
-export async function fetchOptionSets() {
+export async function fetchOptionSets(): Promise<ActionResult<OptionSet[]>> {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { error: "Unauthorized" };
+    if (!user) return actionError("Unauthorized", "AUTH_ERROR");
 
     let tenantId = user.app_metadata?.tenant_id;
     if (!tenantId) {
@@ -283,11 +282,11 @@ export async function fetchOptionSets() {
         .or(`tenant_id.is.null,tenant_id.eq.${tenantId}`)
         .order('code');
 
-    if (error) return { error: error.message };
-    return { data };
+    if (error) return actionError(error.message, "DB_ERROR");
+    return actionSuccess(data as OptionSet[]);
 }
 
-export async function fetchOptionSetValues(setCode: string) {
+export async function fetchOptionSetValues(setCode: string): Promise<ActionResult<OptionValue[]>> {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -302,7 +301,7 @@ export async function fetchOptionSetValues(setCode: string) {
 
     if (!tenantId) {
         console.warn("[fetchOptionSetValues] No Tenant Context found.");
-        return { error: "No Tenant Context" };
+        return actionError("No Tenant Context", "AUTH_ERROR");
     }
 
     const { data, error } = await supabase.rpc('get_option_set_values', {
@@ -313,22 +312,22 @@ export async function fetchOptionSetValues(setCode: string) {
 
     if (error) {
         console.error("[fetchOptionSetValues] RPC Error:", error);
-        return { error: error.message };
+        return actionError(error.message, "DB_ERROR");
     }
 
     console.log(`[fetchOptionSetValues] Result count for ${setCode}:`, data?.length || 0);
     // console.log(`[DEBUG] Data:`, data); // Uncomment for deep debug
-    return { data };
+    return actionSuccess(data as OptionValue[]);
 }
 
 export async function createOptionSet(params: {
     code: string;
     description: string;
     values: { label: string; value: string }[];
-}) {
+}): Promise<ActionResult<OptionSet>> {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { error: "Unauthorized" };
+    if (!user) return actionError("Unauthorized", "AUTH_ERROR");
 
     let tenantId = user.app_metadata?.tenant_id;
     if (!tenantId) {
@@ -336,7 +335,7 @@ export async function createOptionSet(params: {
         const rawCookie = cookieStore.get('tenant_id')?.value;
         if (rawCookie) tenantId = rawCookie.replace(/['"]+/g, '').trim();
     }
-    if (!tenantId) return { error: "No Tenant Context" };
+    if (!tenantId) return actionError("No Tenant Context", "AUTH_ERROR");
 
     // 1. Create the Set
     const { data: set, error: setError } = await supabase
@@ -351,7 +350,7 @@ export async function createOptionSet(params: {
 
     if (setError) {
         console.error("Error creating option set:", setError);
-        return { error: setError.message };
+        return actionError(setError.message, "DB_ERROR");
     }
 
     // 2. Create the Values
@@ -371,15 +370,15 @@ export async function createOptionSet(params: {
         if (valError) {
             console.error("Error creating option values:", valError);
             // Optional: Rollback set? For now, we return error but set exists empty.
-            return { error: valError.message };
+            return actionError(valError.message, "DB_ERROR");
         }
     }
 
     revalidatePath('/dashboard/settings');
-    return { success: true, data: set };
+    return actionSuccess(set as OptionSet);
 }
 
-export async function deleteAttribute(id: string) {
+export async function deleteAttribute(id: string): Promise<ActionResult<void>> {
     const supabase = await createClient();
 
     const { error } = await supabase
@@ -387,8 +386,8 @@ export async function deleteAttribute(id: string) {
         .delete()
         .eq('id', id);
 
-    if (error) return { error: error.message };
+    if (error) return actionError(error.message, "DB_ERROR");
 
     revalidatePath('/dashboard/settings');
-    return { success: true };
+    return actionOk();
 }

@@ -1,12 +1,13 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { ActionResult, actionSuccess, actionError } from "@/lib/action-result";
 
 export async function fetchAuditLogs(
     tenantId: string,
     page: number = 0,
     pageSize: number = 50
-) {
+): Promise<ActionResult<{ data: any[]; count: number | null }>> {
     const supabase = await createClient();
 
     const from = page * pageSize;
@@ -29,8 +30,8 @@ export async function fetchAuditLogs(
 
     if (error) {
         console.error("Error fetching audit logs:", error);
-        return { data: [], count: 0, error: error.message };
+        return actionError(error.message, "DB_ERROR");
     }
 
-    return { data, count };
+    return actionSuccess({ data: data ?? [], count });
 }

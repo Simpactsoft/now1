@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { ActionResult, actionSuccess, actionOk, actionError } from "@/lib/action-result";
 
 export interface SavedView {
     id: string;
@@ -11,7 +12,7 @@ export interface SavedView {
     created_at: string;
 }
 
-export async function getSavedViews(tenantId: string): Promise<{ data?: SavedView[], error?: string }> {
+export async function getSavedViews(tenantId: string): Promise<ActionResult<SavedView[]>> {
     try {
         const supabase = await createClient();
         const { data, error } = await supabase
@@ -21,14 +22,14 @@ export async function getSavedViews(tenantId: string): Promise<{ data?: SavedVie
             .order('name', { ascending: true });
 
         if (error) throw error;
-        return { data: data as SavedView[] };
+        return actionSuccess(data as SavedView[]);
     } catch (e: any) {
         console.error("getSavedViews Error:", e);
-        return { error: e.message };
+        return actionError(e.message);
     }
 }
 
-export async function saveView(tenantId: string, name: string, config: any) {
+export async function saveView(tenantId: string, name: string, config: any): Promise<ActionResult<SavedView>> {
     try {
         const supabase = await createClient();
 
@@ -37,9 +38,9 @@ export async function saveView(tenantId: string, name: string, config: any) {
         console.log("[saveView] Tenant:", tenantId);
 
         // Upsert by triggering unique constraint logic or just check existence?
-        // Let's use upsert based on constraint (tenant_id, name) if we want overwrite, 
+        // Let's use upsert based on constraint (tenant_id, name) if we want overwrite,
         // OR insert and catch error for duplicate.
-        // For better UX, upsert is often nicer if user confirms "Overwrite", 
+        // For better UX, upsert is often nicer if user confirms "Overwrite",
         // but simple "Save" usually implies new.
         // Let's do simple INSERT for now, UI will handle conflicts (or DB error).
 
@@ -57,20 +58,20 @@ export async function saveView(tenantId: string, name: string, config: any) {
             console.error("[saveView] Insert Error:", error);
             // Check for unique violation
             if (error.code === '23505') { // unique_violation
-                return { error: "A view with this name already exists." };
+                return actionError("A view with this name already exists.", "CONFLICT");
             }
             throw error;
         }
 
         revalidatePath('/dashboard/people');
-        return { data };
+        return actionSuccess(data as SavedView);
     } catch (e: any) {
         console.error("saveView Error:", e);
-        return { error: e.message };
+        return actionError(e.message);
     }
 }
 
-export async function updateViewConfig(id: string, config: any) {
+export async function updateViewConfig(id: string, config: any): Promise<ActionResult<void>> {
     try {
         const supabase = await createClient();
         const { error } = await supabase
@@ -80,13 +81,13 @@ export async function updateViewConfig(id: string, config: any) {
 
         if (error) throw error;
         revalidatePath('/dashboard/people');
-        return { success: true };
+        return actionOk();
     } catch (e: any) {
-        return { error: e.message };
+        return actionError(e.message);
     }
 }
 
-export async function renameView(id: string, newName: string) {
+export async function renameView(id: string, newName: string): Promise<ActionResult<void>> {
     try {
         const supabase = await createClient();
         const { error } = await supabase
@@ -96,18 +97,18 @@ export async function renameView(id: string, newName: string) {
 
         if (error) {
             if (error.code === '23505') {
-                return { error: "Name already taken." };
+                return actionError("Name already taken.", "CONFLICT");
             }
             throw error;
         }
         revalidatePath('/dashboard/people');
-        return { success: true };
+        return actionOk();
     } catch (e: any) {
-        return { error: e.message };
+        return actionError(e.message);
     }
 }
 
-export async function deleteView(id: string) {
+export async function deleteView(id: string): Promise<ActionResult<void>> {
     try {
         const supabase = await createClient();
         const { error } = await supabase
@@ -117,8 +118,8 @@ export async function deleteView(id: string) {
 
         if (error) throw error;
         revalidatePath('/dashboard/people');
-        return { success: true };
+        return actionOk();
     } catch (e: any) {
-        return { error: e.message };
+        return actionError(e.message);
     }
 }

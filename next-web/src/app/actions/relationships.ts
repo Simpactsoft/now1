@@ -4,6 +4,7 @@
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { createClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
+import { ActionResult, actionSuccess, actionOk, actionError } from "@/lib/action-result";
 
 // Helper to create admin client consistently
 const getAdminClient = () => {
@@ -13,7 +14,7 @@ const getAdminClient = () => {
     );
 };
 
-export async function fetchRelationshipsAction(tenantId: string, entityId: string) {
+export async function fetchRelationshipsAction(tenantId: string, entityId: string): Promise<ActionResult<any[]>> {
     const supabase = await createServerClient();
 
     try {
@@ -80,19 +81,19 @@ export async function fetchRelationshipsAction(tenantId: string, entityId: strin
                         metadata: rel?.metadata // Include Metadata
                     };
                 });
-                return { data: enriched };
+                return actionSuccess(enriched);
             }
         }
 
-        return { data: [] }; // No relationships found
+        return actionSuccess([]); // No relationships found
     } catch (e: any) {
         console.error("fetchRelationships error", e);
-        return { error: e.message };
+        return actionError(e.message);
     }
 }
 
 // Update Add Action to accept Metadata
-export async function addRelationshipAction(tenantId: string, sourceId: string, targetId: string, typeName: string, metadata: any = {}) {
+export async function addRelationshipAction(tenantId: string, sourceId: string, targetId: string, typeName: string, metadata: any = {}): Promise<ActionResult<void>> {
     const supabase = await createServerClient();
 
     // RPC Logic
@@ -107,32 +108,32 @@ export async function addRelationshipAction(tenantId: string, sourceId: string, 
 
         if (error) throw error;
         revalidatePath('/dashboard');
-        return { success: true };
+        return actionOk();
     };
 
     try {
         return await execute(supabase);
     } catch (e: any) {
         console.error("Add relationship failed", e);
-        return { error: e.message };
+        return actionError(e.message);
     }
 }
 
-export async function removeRelationshipAction(tenantId: string, relId: string) {
+export async function removeRelationshipAction(tenantId: string, relId: string): Promise<ActionResult<void>> {
     const supabase = await createServerClient();
 
     try {
         const { error } = await supabase.from('entity_relationships').delete().eq('id', relId);
         if (error) throw error;
         revalidatePath('/dashboard');
-        return { success: true };
+        return actionOk();
     } catch (e: any) {
         console.error("Remove relationship failed", e);
-        return { error: e.message };
+        return actionError(e.message);
     }
 }
 
-export async function updateRelationshipAction(tenantId: string, relId: string, typeName: string, metadata: any = null) {
+export async function updateRelationshipAction(tenantId: string, relId: string, typeName: string, metadata: any = null): Promise<ActionResult<void>> {
     const supabase = await createServerClient();
 
     const execute = async (client: any) => {
@@ -145,13 +146,13 @@ export async function updateRelationshipAction(tenantId: string, relId: string, 
 
         if (error) throw error;
         revalidatePath('/dashboard');
-        return { success: true };
+        return actionOk();
     };
 
     try {
         return await execute(supabase);
     } catch (e: any) {
         console.error("Update relationship failed", e);
-        return { error: e.message };
+        return actionError(e.message);
     }
 }

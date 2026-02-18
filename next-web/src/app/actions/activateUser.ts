@@ -1,9 +1,10 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ActionResult, actionOk, actionError } from "@/lib/action-result";
 
-export async function activateUser(userId: string) {
-    if (!userId) return;
+export async function activateUser(userId: string): Promise<ActionResult<void>> {
+    if (!userId) return actionError("User ID is required", "VALIDATION_ERROR");
 
     try {
         const adminClient = createAdminClient();
@@ -17,7 +18,7 @@ export async function activateUser(userId: string) {
 
         if (fetchError || !profile) {
             console.error("ActivateUser: Failed to fetch profile", fetchError);
-            return;
+            return actionError("Failed to fetch profile", "DB_ERROR");
         }
 
         // 2. Only activate if 'invited'
@@ -30,9 +31,13 @@ export async function activateUser(userId: string) {
 
             if (updateError) {
                 console.error("ActivateUser: Update failed", updateError);
+                return actionError(updateError.message, "DB_ERROR");
             }
         }
-    } catch (err) {
+
+        return actionOk();
+    } catch (err: any) {
         console.error("ActivateUser: Exception", err);
+        return actionError(err.message || "Unknown error");
     }
 }

@@ -1,8 +1,9 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { ActionResult, actionSuccess, actionError } from "@/lib/action-result";
 
-export async function fetchPeopleGrouped(tenantId: string, groupField: string) {
+export async function fetchPeopleGrouped(tenantId: string, groupField: string): Promise<ActionResult<{ groups: any[] }>> {
     const supabase = await createClient();
 
     try {
@@ -13,11 +14,11 @@ export async function fetchPeopleGrouped(tenantId: string, groupField: string) {
 
         if (error) {
             console.error('Group Fetch Error:', error);
-            return { error: error.message };
+            return actionError(error.message, "DB_ERROR");
         }
 
-        return { groups: data };
+        return actionSuccess({ groups: data });
     } catch (e: any) {
-        return { error: e.message };
+        return actionError(e.message);
     }
 }

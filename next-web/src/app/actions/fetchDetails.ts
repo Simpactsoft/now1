@@ -1,8 +1,9 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { ActionResult, actionSuccess, actionError } from "@/lib/action-result";
 
-export async function fetchPersonDetails(tenantId: string, personId: string) {
+export async function fetchPersonDetails(tenantId: string, personId: string): Promise<ActionResult<{ profile: any; timeline: any[] }>> {
     const supabase = await createClient();
 
     // Parallel fetch for profile, timeline, and direct custom_fields (fallback for stale RPC)
@@ -32,7 +33,7 @@ export async function fetchPersonDetails(tenantId: string, personId: string) {
 
     if (profileResult.error) {
         console.error("fetch_person_profile error:", profileResult.error);
-        return { error: profileResult.error.message };
+        return actionError(profileResult.error.message, "DB_ERROR");
     }
 
     if (timelineResult.error) {
@@ -80,13 +81,13 @@ export async function fetchPersonDetails(tenantId: string, personId: string) {
         }
     }
 
-    return {
+    return actionSuccess({
         profile,
         timeline: timelineResult.data || []
-    };
+    });
 }
 
-export async function fetchOrganizationDetails(tenantId: string, orgId: string) {
+export async function fetchOrganizationDetails(tenantId: string, orgId: string): Promise<ActionResult<{ profile: any; timeline: any[] }>> {
     const supabase = await createClient();
 
     const [profileResult, timelineResult, directCardResult] = await Promise.all([
@@ -109,12 +110,12 @@ export async function fetchOrganizationDetails(tenantId: string, orgId: string) 
 
     if (profileResult.error) {
         console.error("fetchOrganizationDetails error:", profileResult.error);
-        return { error: profileResult.error.message };
+        return actionError(profileResult.error.message, "DB_ERROR");
     }
 
     const org = profileResult.data?.[0];
 
-    if (!org) return { profile: null, timeline: [] };
+    if (!org) return actionSuccess({ profile: null, timeline: [] });
 
     // [New] Merge Logic (Same as Person)
     // We prefer directCardResult if available (freshest), but fallback to RPC returned raw fields (ret_*) if RLS blocks direct fetch.
@@ -150,8 +151,8 @@ export async function fetchOrganizationDetails(tenantId: string, orgId: string) 
     if (!org.phone && rawCustomFields?.phone) org.phone = rawCustomFields.phone;
     if (!org.website && rawCustomFields?.website) org.website = rawCustomFields.website;
 
-    return {
+    return actionSuccess({
         profile: org,
         timeline: timelineResult.data || []
-    };
+    });
 }

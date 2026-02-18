@@ -1,8 +1,9 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { ActionResult, actionSuccess, actionError } from "@/lib/action-result";
 
-export async function fetchOrgAnalytics(tenantId: string, basePath: string = "") {
+export async function fetchOrgAnalytics(tenantId: string, basePath: string = ""): Promise<ActionResult<{ data: any[]; latency: number }>> {
     const supabase = await createClient();
     const startTime = Date.now();
 
@@ -18,14 +19,14 @@ export async function fetchOrgAnalytics(tenantId: string, basePath: string = "")
         }
 
         const latency = Date.now() - startTime;
-        return { data: data || [], latency };
+        return actionSuccess({ data: data || [], latency });
     } catch (err: any) {
         console.error("fetchOrgAnalytics Critical Failure:", err);
-        return { data: [], latency: 0, error: err.message || "Unknown error" };
+        return actionError(err.message || "Unknown error");
     }
 }
 
-export async function fetchTenantSummary(tenantId: string) {
+export async function fetchTenantSummary(tenantId: string): Promise<ActionResult<{ data: any; latency: number }>> {
     const supabase = await createClient();
     const startTime = Date.now();
 
@@ -40,9 +41,9 @@ export async function fetchTenantSummary(tenantId: string) {
         }
 
         const latency = Date.now() - startTime;
-        return { data: data?.[0] || null, latency };
+        return actionSuccess({ data: data?.[0] || null, latency });
     } catch (err: any) {
         console.error("fetchTenantSummary Critical Failure:", err);
-        return { data: null, latency: 0, error: err.message || "Unknown error" };
+        return actionError(err.message || "Unknown error");
     }
 }

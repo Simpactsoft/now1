@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { optionSchema } from "@/lib/cpq/validators";
+import { validateInput } from "@/lib/cpq/CPQValidationService";
 
 // ============================================================================
 // TYPES
@@ -88,7 +88,7 @@ export async function createOption(
         }
 
         // 3. Validate with Zod
-        const validation = optionSchema.safeParse({
+        const validation = validateInput("option", {
             groupId: groupId,
             name: params.name,
             description: params.description,
@@ -100,10 +100,9 @@ export async function createOption(
         });
 
         if (!validation.success) {
-            const firstError = validation.error?.issues?.[0];
             return {
                 success: false,
-                error: firstError?.message || "Validation failed",
+                error: validation.error || "Validation failed",
             };
         }
 

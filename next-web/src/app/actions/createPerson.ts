@@ -4,8 +4,10 @@ import { createClient } from "@/lib/supabase/server";
 import { CreatePersonSchema, CreatePersonInput } from "@/lib/schemas";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { ActionResult, actionSuccess, actionError } from "@/lib/action-result";
+import { customFieldsSchema } from "@/lib/schemas/custom-fields";
 
-export async function createPerson(params: CreatePersonInput) {
+export async function createPerson(params: CreatePersonInput): Promise<ActionResult<any>> {
     const supabase = await createClient();
 
     // 1. Validate Input (Manual Validation to bypass Zod crash)
@@ -20,11 +22,18 @@ export async function createPerson(params: CreatePersonInput) {
 
     if (errors.length > 0) {
         console.warn("createPerson: Validation failed:", errors);
-        return { success: false, error: errors.join(', ') };
+        return actionError(errors.join(', '), "VALIDATION_ERROR");
+    }
+
+    if (customFields !== undefined && customFields !== null) {
+        const customFieldsValidation = customFieldsSchema.safeParse(customFields);
+        if (!customFieldsValidation.success) {
+            return actionError(`Invalid custom_fields: ${customFieldsValidation.error.errors[0].message}`, "VALIDATION_ERROR");
+        }
     }
 
     // Remove result.data access since we have params
-    // const { firstName, lastName, email, phone, tenantId } = result.data; 
+    // const { firstName, lastName, email, phone, tenantId } = result.data;
     // ^ Already destructured above
 
     try {
@@ -101,17 +110,17 @@ export async function createPerson(params: CreatePersonInput) {
                 }
 
                 revalidatePath('/dashboard/people');
-                return { success: true, data: fallbackData };
+                return actionSuccess(fallbackData);
             }
             throw error;
         }
 
         // 3. Revalidate & Return
         revalidatePath('/dashboard/people');
-        return { success: true, data };
+        return actionSuccess(data);
 
     } catch (error: any) {
         console.error("createPerson Exception:", error);
-        return { success: false, error: error.message };
+        return actionError(error.message, "DB_ERROR");
     }
 }

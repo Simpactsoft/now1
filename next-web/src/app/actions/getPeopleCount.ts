@@ -1,9 +1,10 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { ActionResult, actionSuccess, actionError } from "@/lib/action-result";
 
-export async function getPeopleCount(tenantId: string) {
-    if (!tenantId) return 0;
+export async function getPeopleCount(tenantId: string): Promise<ActionResult<number>> {
+    if (!tenantId) return actionError("Tenant ID is required", "VALIDATION_ERROR");
 
     const supabase = await createClient();
 
@@ -15,10 +16,8 @@ export async function getPeopleCount(tenantId: string) {
 
     if (error) {
         console.error("Error fetching people count:", error);
-        return 0;
+        return actionError(error.message, "DB_ERROR");
     }
 
-    return data || 0;
-
-
+    return actionSuccess(data || 0);
 }

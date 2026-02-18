@@ -3,6 +3,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { customFieldsSchema } from "@/lib/schemas/custom-fields";
+import { ActionResult, actionOk, actionError } from "@/lib/action-result";
 
 const UpdateOrgSchema = z.object({
     id: z.string(),
@@ -17,7 +19,7 @@ const UpdateOrgSchema = z.object({
 
 export type UpdateOrgInput = z.infer<typeof UpdateOrgSchema>;
 
-export async function updateOrganization(rawInput: any) {
+export async function updateOrganization(rawInput: any): Promise<ActionResult<void>> {
     console.log("[updateOrganization] Received Raw Input:", JSON.stringify(rawInput, null, 2));
     const supabase = await createClient();
 
@@ -42,7 +44,7 @@ export async function updateOrganization(rawInput: any) {
         console.error("Validation Failed:", result.error);
         const firstError = result.error.errors[0];
         const errorMessage = firstError ? `${firstError.path.join('.')}: ${firstError.message}` : "Validation failed";
-        return { success: false, error: errorMessage };
+        return actionError(errorMessage, "VALIDATION_ERROR");
     }
 
     const { id, tenantId, displayName, email, phone, website, tags, customFields: inputCustomFields } = result.data;
@@ -50,7 +52,7 @@ export async function updateOrganization(rawInput: any) {
 
     try {
         const user = (await supabase.auth.getUser()).data.user;
-        if (!user) return { success: false, error: "Unauthorized" };
+        if (!user) return actionError("Unauthorized", "AUTH_ERROR");
 
         // 1. Fetch current data (WITH RLS)
         const { data: currentCard, error: fetchError } = await supabase
@@ -62,11 +64,11 @@ export async function updateOrganization(rawInput: any) {
 
         if (fetchError) {
             console.error("Fetch Error:", fetchError);
-            return { success: false, error: `Fetch failed: ${fetchError.message}` };
+            return actionError(`Fetch failed: ${fetchError.message}`, "DB_ERROR");
         }
 
         if (!currentCard) {
-            return { success: false, error: "Organization not found" };
+            return actionError("Organization not found", "NOT_FOUND");
         }
 
         const cardData = currentCard;
@@ -84,6 +86,11 @@ export async function updateOrganization(rawInput: any) {
         if (website !== undefined) updatedCustomFields.website = website;
         if (email !== undefined) updatedCustomFields.email = email;
         if (phone !== undefined) updatedCustomFields.phone = phone;
+
+        const customFieldsValidation = customFieldsSchema.safeParse(updatedCustomFields);
+        if (!customFieldsValidation.success) {
+            return actionError(`Invalid custom_fields: ${customFieldsValidation.error.errors[0].message}`, "VALIDATION_ERROR");
+        }
 
         // Ensure Status is Uppercase
         let newStatus = updatedCustomFields.status || cardData.status || 'PROSPECT';
@@ -115,7 +122,7 @@ export async function updateOrganization(rawInput: any) {
         console.log("updateOrganization calling cards update with:", JSON.stringify(cardUpdatePayload, null, 2));
 
         // 3. Update via Direct Table Access with Optimistic Locking
-        // Note: We relaxed strict optimistic locking for improved UX if lastKnownUpdatedAt is null/old, 
+        // Note: We relaxed strict optimistic locking for improved UX if lastKnownUpdatedAt is null/old,
         // but generally it's good practice. For now, trusting RLS and ID.
         const { data: updatedRows, error: updateError } = await supabase
             .from('cards')
@@ -128,16 +135,16 @@ export async function updateOrganization(rawInput: any) {
 
         if (!updatedRows || updatedRows.length === 0) {
             // If we relaxed optimistic locking but still got 0, it means ID/Tenant didn't match or RLS blocked.
-            return { success: false, error: "Update failed (Record not found or access denied)" };
+            return actionError("Update failed (Record not found or access denied)", "NOT_FOUND");
         }
 
         revalidatePath(`/dashboard/organizations/${id}`);
         revalidatePath('/dashboard/organizations');
 
-        return { success: true };
+        return actionOk();
 
     } catch (error: any) {
         console.error("updateOrganization Error:", error);
-        return { success: false, error: error.message };
+        return actionError(error.message, "DB_ERROR");
     }
 }

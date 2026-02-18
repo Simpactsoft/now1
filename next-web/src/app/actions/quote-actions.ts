@@ -4,6 +4,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { ActionResult, actionSuccess, actionError } from '@/lib/action-result';
 
 // Helper to get authenticated user client
 async function getAuthClient() {
@@ -36,7 +37,7 @@ function getAdminClient() {
     );
 }
 
-export async function getProductsForTenant(tenantId: string) {
+export async function getProductsForTenant(tenantId: string): Promise<ActionResult<{ products: any[]; categories: any[] }>> {
     const authClient = await getAuthClient();
     const adminClient = getAdminClient();
 
@@ -44,7 +45,7 @@ export async function getProductsForTenant(tenantId: string) {
     const { data: { user }, error: authError } = await authClient.auth.getUser();
     if (authError || !user) {
         console.error('Server Action: Auth failed', authError);
-        throw new Error('Unauthorized');
+        return actionError('Unauthorized', 'AUTH_ERROR');
     }
 
     console.log(`[ServerAction] User: ${user.id} (${user.email}), Tenant: ${tenantId}`);
@@ -60,7 +61,7 @@ export async function getProductsForTenant(tenantId: string) {
 
     if (memberError) {
         console.error('[ServerAction] Membership Query Error:', memberError);
-        throw new Error(`Membership Check Failed: ${memberError.message}`);
+        return actionError(`Membership Check Failed: ${memberError.message}`, 'DB_ERROR');
     }
 
     // In-memory check
@@ -73,7 +74,7 @@ export async function getProductsForTenant(tenantId: string) {
         const debugMsg = `Access Denied. User: ${user.id}, Tenant: ${tenantId}, SvcKey: ${isServiceKeySet}, FoundMembers: [${memberUserIds}]`;
         console.error(`[ServerAction] ${debugMsg}`);
 
-        throw new Error(debugMsg);
+        return actionError(debugMsg, 'AUTH_ERROR');
     }
 
     console.log('[ServerAction] Membership verified:', membership);
@@ -84,7 +85,7 @@ export async function getProductsForTenant(tenantId: string) {
         .select('*')
         .eq('tenant_id', tenantId);
 
-    if (prodError) throw prodError;
+    if (prodError) return actionError(prodError.message, 'DB_ERROR');
 
     // 4. Fetch Inventory Ledger (Bypass RLS)
     const productIds = products.map(p => p.id);
@@ -111,11 +112,11 @@ export async function getProductsForTenant(tenantId: string) {
         .order('path');
 
     // Return combined data
-    return {
+    return actionSuccess({
         products: products.map(p => ({
             ...p,
             current_stock: stockMap[p.id] || 0
         })),
         categories: categories || []
-    };
+    });
 }

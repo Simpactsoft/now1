@@ -1,8 +1,9 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { ActionResult, actionSuccess, actionError } from '@/lib/action-result';
 
-export async function getCurrentUser() {
+export async function getCurrentUser(): Promise<ActionResult<any>> {
     try {
         const supabase = await createClient();
         // Primary Check: Strict Validation (Network Call)
@@ -20,17 +21,17 @@ export async function getCurrentUser() {
 
             if (session?.user) {
                 console.log('[getCurrentUser] Recovered via getSession(). User:', session.user.email);
-                return session.user;
+                return actionSuccess(session.user);
             }
 
             console.error('[getCurrentUser] All Auth failed. Session Error:', sessionError?.message);
-            return null;
+            return actionError("Not authenticated", "AUTH_ERROR");
         }
 
         console.log('[getCurrentUser] Success (getUser):', user.email);
-        return user;
-    } catch (err) {
+        return actionSuccess(user);
+    } catch (err: any) {
         console.error('[getCurrentUser] Unexpected error:', err);
-        return null;
+        return actionError(err.message || "Unknown error");
     }
 }
