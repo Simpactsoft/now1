@@ -479,6 +479,11 @@ export async function getConfigurations(params?: {
             return { success: false, error: "Authentication required" };
         }
 
+        const tenantId = await getTenantId(user, supabase);
+        if (!tenantId) {
+            return { success: false, error: "Tenant not found" };
+        }
+
         const page = params?.page || 1;
         const pageSize = Math.min(params?.pageSize || DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
 
@@ -486,7 +491,7 @@ export async function getConfigurations(params?: {
             .from("configurations")
             .select("*", { count: "exact" })
             .eq("user_id", user.id)
-            .eq("tenant_id", (await getTenantId(user, supabase)) || "")
+            .eq("tenant_id", tenantId)
             .order("updated_at", { ascending: false });
 
         if (params?.status) {
