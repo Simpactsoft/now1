@@ -50,6 +50,9 @@ interface UseActionReturn<TInput, TOutput> {
 /**
  * Hook that wraps a server action with loading, error, and retry state.
  * 
+ * Callbacks (onSuccess, onError) are stored in refs to avoid recreating
+ * the execute function when consumers pass inline callbacks.
+ * 
  * @param action - The server action function to wrap
  * @param options - Optional callbacks and configuration
  */
@@ -57,13 +60,21 @@ export function useAction<TInput = void, TOutput = void>(
     action: (...args: any[]) => Promise<ActionResult<TOutput>>,
     options: UseActionOptions<TOutput> = {}
 ): UseActionReturn<TInput, TOutput> {
-    const { onSuccess, onError, resetOnExecute = true } = options;
+    const { resetOnExecute = true } = options;
 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [errorCode, setErrorCode] = useState<string | null>(null);
     const [data, setData] = useState<TOutput | null>(null);
     const lastArgsRef = useRef<any[]>([]);
+
+    // Store callbacks and action in refs to prevent stale closures
+    const actionRef = useRef(action);
+    actionRef.current = action;
+    const onSuccessRef = useRef(options.onSuccess);
+    onSuccessRef.current = options.onSuccess;
+    const onErrorRef = useRef(options.onError);
+    onErrorRef.current = options.onError;
 
     const execute = useCallback(
         async (...args: any[]): Promise<ActionResult<TOutput>> => {
@@ -74,39 +85,39 @@ export function useAction<TInput = void, TOutput = void>(
             if (resetOnExecute) setData(null);
 
             try {
-                const result = await action(...args);
+                const result = await actionRef.current(...args);
 
                 if (result.success) {
                     setData(result.data);
-                    onSuccess?.(result.data);
+                    onSuccessRef.current?.(result.data);
                 } else {
                     setError(result.error);
                     setErrorCode(result.code ?? null);
-                    onError?.(result.error, result.code);
+                    onErrorRef.current?.(result.error, result.code);
                 }
 
                 return result;
             } catch (err: any) {
                 const errorMsg = err?.message || "An unexpected error occurred";
                 setError(errorMsg);
-                onError?.(errorMsg);
+                onErrorRef.current?.(errorMsg);
                 return { success: false, error: errorMsg };
             } finally {
                 setLoading(false);
             }
         },
-        [action, onSuccess, onError, resetOnExecute]
+        [resetOnExecute]
     );
 
     const retry = useCallback(async (): Promise<ActionResult<TOutput> | null> => {
-        if (lastArgsRef.current.length === 0 && !action.length) {
+        if (lastArgsRef.current.length === 0 && !actionRef.current.length) {
             return execute();
         }
         if (lastArgsRef.current.length > 0) {
             return execute(...lastArgsRef.current);
         }
         return null;
-    }, [execute, action]);
+    }, [execute]);
 
     const reset = useCallback(() => {
         setLoading(false);

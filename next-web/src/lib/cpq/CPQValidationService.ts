@@ -82,7 +82,7 @@ const schemas: SchemaMap = {
 export function validateInput<K extends keyof SchemaMap>(
     schemaName: K,
     data: unknown
-): ActionResult<z.infer<SchemaMap[K]>> {
+): ActionResult<z.output<SchemaMap[K]>> {
     const schema = schemas[schemaName];
     const result = schema.safeParse(data);
 
@@ -96,7 +96,7 @@ export function validateInput<K extends keyof SchemaMap>(
         };
     }
 
-    return { success: true, data: result.data as any };
+    return { success: true, data: result.data as z.output<SchemaMap[K]> };
 }
 
 // ============================================================================
