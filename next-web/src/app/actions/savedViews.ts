@@ -7,19 +7,26 @@ import { ActionResult, actionSuccess, actionOk, actionError } from "@/lib/action
 export interface SavedView {
     id: string;
     tenant_id: string;
+    entity_type: string;
     name: string;
     config: any; // { filterModel, sortModel, viewMode }
     created_at: string;
 }
 
-export async function getSavedViews(tenantId: string): Promise<ActionResult<SavedView[]>> {
+export async function getSavedViews(tenantId: string, entityType?: string): Promise<ActionResult<SavedView[]>> {
     try {
         const supabase = await createClient();
-        const { data, error } = await supabase
+        let query = supabase
             .from('saved_views')
             .select('*')
-            .eq('tenant_id', tenantId)
-            .order('name', { ascending: true });
+            .eq('tenant_id', tenantId);
+
+        // Scope by entity type if provided
+        if (entityType) {
+            query = query.eq('entity_type', entityType);
+        }
+
+        const { data, error } = await query.order('name', { ascending: true });
 
         if (error) throw error;
         return actionSuccess(data as SavedView[]);
@@ -29,25 +36,19 @@ export async function getSavedViews(tenantId: string): Promise<ActionResult<Save
     }
 }
 
-export async function saveView(tenantId: string, name: string, config: any): Promise<ActionResult<SavedView>> {
+export async function saveView(tenantId: string, name: string, config: any, entityType: string = 'people'): Promise<ActionResult<SavedView>> {
     try {
         const supabase = await createClient();
 
         const user = await supabase.auth.getUser();
         console.log("[saveView] User:", user.data.user?.id || "ANONYMOUS", "Role:", user.data.user?.role);
-        console.log("[saveView] Tenant:", tenantId);
-
-        // Upsert by triggering unique constraint logic or just check existence?
-        // Let's use upsert based on constraint (tenant_id, name) if we want overwrite,
-        // OR insert and catch error for duplicate.
-        // For better UX, upsert is often nicer if user confirms "Overwrite",
-        // but simple "Save" usually implies new.
-        // Let's do simple INSERT for now, UI will handle conflicts (or DB error).
+        console.log("[saveView] Tenant:", tenantId, "Entity:", entityType);
 
         const { data, error } = await supabase
             .from('saved_views')
             .insert({
                 tenant_id: tenantId,
+                entity_type: entityType,
                 name: name,
                 config: config
             })

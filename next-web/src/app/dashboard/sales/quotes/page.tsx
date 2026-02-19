@@ -1,13 +1,13 @@
-import QuoteBuilder from '@/components/sales/QuoteBuilder';
 import { cookies } from 'next/headers';
+import { QuotesListClient } from './QuotesListClient';
+
+export const metadata = {
+    title: "Quotes | NOW System",
+};
 
 export default async function QuotesPage() {
     const cookieStore = await cookies();
     const tenantId = cookieStore.get('tenant_id')?.value;
 
-    return (
-        <div className="h-[calc(100vh-theme(spacing.16))]">
-            <QuoteBuilder initialTenantId={tenantId} />
-        </div>
-    );
+    return <QuotesListClient tenantId={tenantId} />;
 }

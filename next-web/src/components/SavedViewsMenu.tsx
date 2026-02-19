@@ -7,6 +7,7 @@ import { getSavedViews, saveView, deleteView, renameView, SavedView } from "@/ap
 
 interface SavedViewsMenuProps {
     tenantId: string;
+    entityType?: string;
     minimal?: boolean;
     className?: string;
     trigger?: React.ReactNode;
@@ -22,7 +23,7 @@ interface SavedViewsMenuProps {
     };
 }
 
-export default function SavedViewsMenu({ tenantId, minimal = false, className = "", trigger, configOverride }: SavedViewsMenuProps) {
+export default function SavedViewsMenu({ tenantId, entityType, minimal = false, className = "", trigger, configOverride }: SavedViewsMenuProps) {
     const filters = configOverride?.filters ?? [];
     const sort = configOverride?.sort ?? configOverride?.sorting ?? [];
     const viewMode = configOverride?.viewMode ?? 'tags';
@@ -41,7 +42,7 @@ export default function SavedViewsMenu({ tenantId, minimal = false, className = 
     // Load Views
     const loadViews = React.useCallback(async () => {
         setLoading(true);
-        const res = await getSavedViews(tenantId);
+        const res = await getSavedViews(tenantId, entityType);
         if (res.data) {
             setViews(res.data);
         }
@@ -64,7 +65,7 @@ export default function SavedViewsMenu({ tenantId, minimal = false, className = 
             viewMode,
             searchTerm
         };
-        const res = await saveView(tenantId, viewName, config);
+        const res = await saveView(tenantId, viewName, config, entityType || 'people');
         if (res.error) {
             alert(res.error);
         } else {

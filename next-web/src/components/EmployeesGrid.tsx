@@ -111,6 +111,7 @@ export default function EmployeesGrid({
                     maxBlocksInCache={10}
                     animateRows={true}
                     pagination={false}
+                    enableRtl={typeof document !== 'undefined' && document.documentElement.dir === 'rtl'}
                 />
             </div>
         </div>

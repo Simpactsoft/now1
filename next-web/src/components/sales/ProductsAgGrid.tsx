@@ -31,7 +31,7 @@ interface Product {
 interface ProductsAgGridProps {
     products: Product[];
     loading: boolean;
-    onAddToQuote: (product: Product) => void;
+    onAddToQuote: (product: Product) => void | Promise<void>;
     className?: string;
 }
 

@@ -43,7 +43,9 @@ export const translations = {
         organizations: "Organizations",
         products: "Products",
         cpq: "CPQ Configurator",
-        my_configurations: "My Configurations"
+        my_configurations: "My Configurations",
+        purchase_orders: "Purchase Orders",
+        payments: "Payments"
     },
     he: {
         dashboard: "לוח בקרה",
@@ -87,6 +89,8 @@ export const translations = {
         organizations: "ארגונים",
         products: "פריטים",
         cpq: "קונפיגורטור CPQ",
-        my_configurations: "הקונפיגורציות שלי"
+        my_configurations: "הקונפיגורציות שלי",
+        purchase_orders: "הזמנות רכש",
+        payments: "תשלומים"
     }
 };

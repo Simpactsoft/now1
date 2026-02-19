@@ -145,9 +145,10 @@ export default function EntityViewLayout({
                                 disabled={loading}
                                 className="group flex items-center gap-1.5 px-2 py-1 rounded-full bg-secondary/30 hover:bg-secondary border border-transparent hover:border-border transition-all disabled:opacity-50"
                                 title={lastRefreshed ? `Last updated: ${lastRefreshed.toLocaleTimeString()}` : ''}
+                                suppressHydrationWarning
                             >
                                 <RotateCcw className={`w-3 h-3 text-muted-foreground group-hover:text-primary transition-colors ${loading ? 'animate-spin' : ''}`} />
-                                <span className="text-[10px] text-muted-foreground whitespace-nowrap hidden sm:inline-block">
+                                <span className="text-[10px] text-muted-foreground whitespace-nowrap hidden sm:inline-block" suppressHydrationWarning>
                                     {lastRefreshed ? lastRefreshed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
                                 </span>
                             </button>

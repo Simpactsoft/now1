@@ -26,7 +26,7 @@ interface ProductSelectorProps {
     products: Product[];
     categories: { id: string; name: string }[];
     loading: boolean;
-    onAddToQuote: (product: Product) => void;
+    onAddToQuote: (product: Product) => void | Promise<void>;
     onAddConfiguration: (configuration: Configuration) => void; // NEW: Handle configurations
     onRefresh: () => void;
 }

@@ -10,7 +10,6 @@ import {
     type ValidationResult,
 } from "@/lib/cpq/CPQValidationService";
 
-export type { ValidationMessage, ValidationResult };
 
 // ============================================================================
 // ACTIONS

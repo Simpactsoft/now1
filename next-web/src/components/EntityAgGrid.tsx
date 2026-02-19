@@ -60,6 +60,7 @@ export default function EntityAgGrid({
     const { theme } = useTheme();
     const gridRef = useRef<AgGridReact>(null);
     const gridTheme = themeQuartz.withParams({ accentColor: '#6366f1' });
+    const isRtl = typeof document !== 'undefined' && document.documentElement.dir === 'rtl';
 
     // Default Column Definitions
     const defaultColDef = useMemo(() => ({
@@ -99,6 +100,7 @@ export default function EntityAgGrid({
                     masterDetail={masterDetail}
                     detailCellRenderer={detailCellRenderer}
                     detailRowHeight={detailRowHeight}
+                    enableRtl={isRtl}
                     theme={gridTheme}
                 />
 

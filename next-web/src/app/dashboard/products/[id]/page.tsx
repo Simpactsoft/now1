@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { redirect, notFound } from "next/navigation";
 import ProductCardWrapper from "@/components/products/ProductCardWrapper";
+import ProductVariantsPanel from "@/components/products/ProductVariantsPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -58,10 +59,17 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
     };
 
     return (
-        <div className="container mx-auto p-6">
+        <div className="container mx-auto p-6 space-y-6">
             <ProductCardWrapper
                 product={productData}
                 tenantId={tenantId}
+            />
+
+            {/* Product Variants Section */}
+            <ProductVariantsPanel
+                tenantId={tenantId}
+                productId={id}
+                productName={product.name}
             />
         </div>
     );

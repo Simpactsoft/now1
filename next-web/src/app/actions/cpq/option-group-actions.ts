@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getTenantId } from "@/lib/auth/tenant";
 import { validateInput } from "@/lib/cpq/CPQValidationService";
+import { verifyAuthWithTenant } from "../_shared/auth";
+import { isAuthError } from "../_shared/auth-utils";
 
 // ============================================================================
 // TYPES
@@ -247,6 +249,16 @@ export async function deleteOptionGroup(
 
         if (!user) {
             return { success: false, error: "Authentication required" };
+        }
+
+        // 1b. Verify tenant membership before using admin client
+        const tenantId = await getTenantId(user, supabase);
+        if (!tenantId) {
+            return { success: false, error: "Tenant not found" };
+        }
+        const tenantAuth = await verifyAuthWithTenant(tenantId);
+        if (isAuthError(tenantAuth)) {
+            return { success: false, error: tenantAuth.error };
         }
 
         // Use admin client for delete operations (bypasses RLS)

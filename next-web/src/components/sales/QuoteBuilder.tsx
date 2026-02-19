@@ -18,16 +18,21 @@ import {
     FileText,
     ChevronsUpDown,
     UserCircle,
-    Building2
+    Building2,
+    Loader2
 } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import { Command } from 'cmdk';
 import * as Popover from '@radix-ui/react-popover';
 import { getProductsForTenant } from "@/app/actions/quote-actions";
+import { getPriceLists, getEffectivePrice } from "@/app/actions/price-list-actions";
+import { validateQuoteMargin } from "@/app/actions/profitability-actions";
+import { createInvoiceFromQuote } from "@/app/actions/invoice-actions";
 import ProductsAgGrid from "./ProductsAgGrid";
 import ProductSelector from "./ProductSelector";
 import { ViewConfigProvider } from "@/components/universal/ViewConfigContext";
 import { ProductConfiguratorModal } from "@/components/cpq/ProductConfiguratorModal";
+import { formatCurrency, getCurrencySymbol } from "@/lib/format";
 import type { Configuration } from "@/app/actions/cpq/configuration-actions";
 
 // --- Types ---
@@ -47,6 +52,9 @@ interface Product {
     name: string;
     cost_price: number;
     list_price: number; // Base price
+    price?: number; // Effective price (from BOM/CPQ enrichment)
+    currency?: string; // Product currency
+    price_source?: 'bom' | 'cpq' | 'manual'; // Where the price came from
     track_inventory: boolean;
     category_id: string;
     // Computed / Joined fields
@@ -67,6 +75,8 @@ interface QuoteItem {
     discount_percent: number;
     line_total: number;
     configuration_id?: string; // Links to CPQ configuration if product is configured
+    price_source?: 'bom' | 'cpq' | 'manual' | 'customer_list' | 'general_list' | 'base_price';
+    price_list_name?: string; // Name of the price list that sourced this price
 }
 
 interface Customer {
@@ -108,6 +118,12 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
     const [quoteNumber, setQuoteNumber] = useState<string>('');
     const [quoteDate, setQuoteDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
+    // Currency & locale (RULE-03: no hardcoded symbols — driven by tenant settings)
+    // TODO: Read from tenant.base_currency / tenant.default_locale after TASK-002 is wired up
+    const [quoteCurrency, setQuoteCurrency] = useState<string>('ILS');
+    const [quoteLocale, setQuoteLocale] = useState<string>('he-IL');
+    const [minMarginPct, setMinMarginPct] = useState<number>(20); // Default, overridden by tenant
+
     // UI state
     const [loading, setLoading] = useState(true);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -117,6 +133,7 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
     // CPQ Configurator state
     const [configuratorOpen, setConfiguratorOpen] = useState(false);
     const [currentTemplateId, setCurrentTemplateId] = useState<string | null>(null);
+    const [submittingForApproval, setSubmittingForApproval] = useState(false);
 
     // --- Initialization ---
 
@@ -130,11 +147,12 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
                     // Set Config for RLS - SKIPPED for now as RPC is missing and we use explicit tenant_id
                     // await supabase.rpc('set_config', { name: 'app.current_tenant', value: initialTenantId });
 
-                    // B. Fetch Master Data
+                    // B. Fetch Master Data + Tenant Settings
                     await Promise.all([
                         fetchCustomers(initialTenantId),
                         fetchPriceLists(initialTenantId),
-                        fetchMasterData(initialTenantId)
+                        fetchMasterData(initialTenantId),
+                        fetchTenantSettings(initialTenantId),
                     ]);
                 } else {
                     console.warn('QuoteBuilder: No initialTenantId provided');
@@ -173,21 +191,24 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
     };
 
     const fetchPriceLists = async (tid: string) => {
-        // Note: Assuming 'price_lists' table exists, or using simple mock if V3 didn't implement it yet
-        // For now, allow selection (even if empty)
-        /* 
+        const result = await getPriceLists(tid);
+        if (result.success && result.data) {
+            setPriceLists(result.data.map(pl => ({ id: pl.id, name: pl.name })));
+        } else {
+            // Fallback if no price lists exist yet
+            setPriceLists([]);
+        }
+    };
+
+    const fetchTenantSettings = async (tid: string) => {
         const { data } = await supabase
-          .from('price_lists')
-          .select('id, name')
-          .eq('tenant_id', tid)
-          .eq('is_active', true);
-        if (data) setPriceLists(data);
-        */
-        // Mocking for now as Price Lists were V3 Scope but might not be migrated in 007
-        setPriceLists([
-            { id: 'standard', name: 'Standard Retail' },
-            { id: 'vip', name: 'VIP Customer' }
-        ]);
+            .from('tenants')
+            .select('min_margin_pct')
+            .eq('id', tid)
+            .single();
+        if (data?.min_margin_pct != null) {
+            setMinMarginPct(parseFloat(data.min_margin_pct));
+        }
     };
 
     // Moved to Server Action to bypass RLS issues
@@ -195,7 +216,14 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
     const fetchMasterData = async (tid: string) => {
         try {
             console.log('Fetching master data via Server Action for:', tid);
-            const { products: fetchedProducts, categories: fetchedCategories } = await getProductsForTenant(tid);
+            const result = await getProductsForTenant(tid);
+
+            if (!result.success) {
+                console.error('Failed to fetch master data:', result.error);
+                return;
+            }
+
+            const { products: fetchedProducts, categories: fetchedCategories } = result.data;
 
             // Set Categories
             if (fetchedCategories) {
@@ -217,13 +245,16 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
                     name: p.name,
                     cost_price: p.cost_price,
                     list_price: p.list_price || p.cost_price * 1.3,
+                    price: p.list_price || p.cost_price * 1.3, // ProductSelector expects 'price' field
+                    currency: p.currency || 'ILS',
+                    price_source: p.price_source || 'manual',
                     track_inventory: p.track_inventory,
                     category_id: p.category_id,
                     current_stock: p.current_stock
                 }));
                 setProducts(mappedProds);
             }
-            console.log('Master data loaded:', fetchedProducts.length, 'products');
+            console.log('Master data loaded:', fetchedProducts?.length ?? 0, 'products');
 
         } catch (error) {
             console.error('Failed to fetch master data:', error);
@@ -268,8 +299,37 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
         return result;
     }, [products, selectedCategoryPath, categories, searchTerm]);
 
-    // 3. Add to Quote
-    const addToQuote = (product: Product) => {
+    // 3. Resolve effective price via RPC
+    const resolveEffectivePrice = async (productId: string, quantity: number): Promise<{
+        price: number;
+        source: QuoteItem['price_source'];
+        listName?: string;
+    }> => {
+        if (!tenantId) return { price: 0, source: 'manual' };
+        try {
+            const result = await getEffectivePrice(
+                tenantId,
+                productId,
+                selectedCustomerId || undefined,
+                quantity
+            );
+            if (result.success && result.data) {
+                return {
+                    price: result.data.effectivePrice,
+                    source: result.data.priceSource,
+                    listName: result.data.priceListName,
+                };
+            }
+        } catch (err) {
+            console.warn('getEffectivePrice failed, falling back to base price:', err);
+        }
+        // Fallback: use product base price
+        const product = products.find(p => p.id === productId);
+        return { price: product?.list_price ?? 0, source: 'base_price' };
+    };
+
+    // 4. Add to Quote
+    const addToQuote = async (product: Product) => {
         // NEW: Check if product requires configuration
         if (product.is_configurable && product.template_id) {
             setCurrentTemplateId(product.template_id);
@@ -279,33 +339,42 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
 
         // Standard product flow
         if (product.track_inventory && (product.current_stock || 0) <= 0) {
-            // Optional: Allow backorder or block? For now warning only, we block in UI visually
+            // Optional: Allow backorder or block? For now warning only
         }
 
-        setQuoteItems(prev => {
-            // Check exist
-            const existing = prev.find(item => item.product_id === product.id);
-            if (existing) {
-                // Increment
-                const newQty = existing.quantity + 1;
-                return prev.map(item => item.product_id === product.id
-                    ? { ...item, quantity: newQty, line_total: calculateLineTotal(newQty, item.unit_price, item.discount_percent) }
-                    : item
-                );
-            }
-            // New Item
-            const price = product.list_price; // TODO: Apply Price List Logic here
-            return [...prev, {
-                id: crypto.randomUUID(),
-                product_id: product.id,
-                sku: product.sku,
-                name: product.name,
-                quantity: 1,
-                unit_price: price,
-                discount_percent: 0,
-                line_total: price // 1 * price
-            }];
-        });
+        // Check if product already in quote → increment qty and re-price
+        const existing = quoteItems.find(item => item.product_id === product.id);
+        if (existing) {
+            const newQty = existing.quantity + 1;
+            const resolved = await resolveEffectivePrice(product.id, newQty);
+            setQuoteItems(prev => prev.map(item => item.product_id === product.id
+                ? {
+                    ...item,
+                    quantity: newQty,
+                    unit_price: resolved.price,
+                    line_total: calculateLineTotal(newQty, resolved.price, item.discount_percent),
+                    price_source: resolved.source,
+                    price_list_name: resolved.listName,
+                }
+                : item
+            ));
+            return;
+        }
+
+        // New Item — resolve effective price
+        const resolved = await resolveEffectivePrice(product.id, 1);
+        setQuoteItems(prev => [...prev, {
+            id: crypto.randomUUID(),
+            product_id: product.id,
+            sku: product.sku,
+            name: product.name,
+            quantity: 1,
+            unit_price: resolved.price,
+            discount_percent: 0,
+            line_total: resolved.price,
+            price_source: resolved.source,
+            price_list_name: resolved.listName,
+        }]);
     };
 
     // Handle configured product addition
@@ -324,13 +393,32 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
         setConfiguratorOpen(false);
     };
 
-    const updateItem = (id: string, field: keyof QuoteItem, value: number) => {
-        setQuoteItems(prev => prev.map(item => {
-            if (item.id !== id) return item;
-            const updated = { ...item, [field]: value };
-            updated.line_total = calculateLineTotal(updated.quantity, updated.unit_price, updated.discount_percent);
-            return updated;
-        }));
+    const updateItem = async (id: string, field: keyof QuoteItem, value: number) => {
+        const item = quoteItems.find(i => i.id === id);
+        if (!item) return;
+
+        // If quantity changes, re-resolve effective price (different min_qty tier may apply)
+        if (field === 'quantity') {
+            const resolved = await resolveEffectivePrice(item.product_id, value);
+            setQuoteItems(prev => prev.map(i => {
+                if (i.id !== id) return i;
+                return {
+                    ...i,
+                    quantity: value,
+                    unit_price: resolved.price,
+                    line_total: calculateLineTotal(value, resolved.price, i.discount_percent),
+                    price_source: resolved.source,
+                    price_list_name: resolved.listName,
+                };
+            }));
+        } else {
+            setQuoteItems(prev => prev.map(i => {
+                if (i.id !== id) return i;
+                const updated = { ...i, [field]: value };
+                updated.line_total = calculateLineTotal(updated.quantity, updated.unit_price, updated.discount_percent);
+                return updated;
+            }));
+        }
     };
 
     const removeItem = (id: string) => {
@@ -341,7 +429,7 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
         return qty * price * (1 - disc / 100);
     };
 
-    // 4. Totals
+    // 4. Totals + Margin Warning (C3)
     const totals = useMemo(() => {
         const subtotal = quoteItems.reduce((acc, item) => acc + (item.quantity * item.unit_price), 0);
         const totalLineTotals = quoteItems.reduce((acc, item) => acc + item.line_total, 0);
@@ -349,14 +437,22 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
         const tax = totalLineTotals * 0.17; // 17% VAT
         const grandTotal = totalLineTotals + tax;
 
-        return { subtotal, discountAmount, tax, grandTotal };
-    }, [quoteItems]);
+        // Margin calculation: (revenue - cost) / revenue * 100
+        const totalCost = quoteItems.reduce((acc, item) => {
+            const product = products.find(p => p.id === item.product_id);
+            return acc + (product?.cost_price ?? 0) * item.quantity;
+        }, 0);
+        const marginPct = totalLineTotals > 0 ? ((totalLineTotals - totalCost) / totalLineTotals) * 100 : 0;
+        const isBelowMinMargin = marginPct < minMarginPct && quoteItems.length > 0;
+
+        return { subtotal, discountAmount, tax, grandTotal, marginPct, isBelowMinMargin };
+    }, [quoteItems, products, minMarginPct]);
 
     // 5. Save Logic
-    const handleSave = async () => {
+    const handleSave = async (): Promise<string | null> => {
         if (!tenantId || !selectedCustomerId) {
             alert('Missing Tenant or Customer');
-            return;
+            return null;
         }
 
         try {
@@ -371,8 +467,6 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
                     order_type: 'quote',
                     status: 'draft',
                     total_amount: totals.grandTotal,
-                    // Extra fields (if schema supports)
-                    // subtotal: totals.subtotal
                 })
                 .select()
                 .single();
@@ -380,26 +474,26 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
             if (orderError) throw orderError;
 
             // Create Items
-            const lines = quoteItems.map((item, idx) => ({
+            const lines = quoteItems.map((item) => ({
                 tenant_id: tenantId,
                 order_id: order.id,
                 product_id: item.product_id,
                 quantity: item.quantity,
                 unit_price: item.unit_price,
                 total_price: item.line_total
-                // discount? schema varies
             }));
 
             const { error: linesError } = await supabase.from('order_items').insert(lines);
             if (linesError) throw linesError;
 
             alert('Quote Saved Successfully!');
-            // Reset or redirect
             setQuoteItems([]);
+            return order.id;
 
         } catch (e: any) {
             console.error(e);
             alert('Failed to save quote: ' + e.message);
+            return null;
         } finally {
             setLoading(false);
         }
@@ -583,7 +677,23 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
                                     <div className="flex justify-between items-start mb-2">
                                         <div className="flex-1 min-w-0">
                                             <h4 className="font-medium text-slate-800 text-sm truncate">{item.name}</h4>
-                                            <p className="text-xs text-slate-400 font-mono">{item.sku}</p>
+                                            <div className="flex items-center gap-2">
+                                                <p className="text-xs text-slate-400 font-mono">{item.sku}</p>
+                                                {item.price_source && item.price_source !== 'manual' && (
+                                                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${item.price_source === 'bom' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                                                        : item.price_source === 'cpq' ? 'bg-violet-50 text-violet-600 border border-violet-200'
+                                                            : item.price_source === 'customer_list' ? 'bg-blue-50 text-blue-600 border border-blue-200'
+                                                                : item.price_source === 'general_list' ? 'bg-cyan-50 text-cyan-600 border border-cyan-200'
+                                                                    : 'bg-slate-50 text-slate-500 border border-slate-200'
+                                                        }`}
+                                                        title={item.price_list_name || undefined}
+                                                    >
+                                                        {item.price_source === 'bom' ? 'BOM'
+                                                            : item.price_source === 'cpq' ? 'CPQ'
+                                                                : item.price_list_name || (item.price_source === 'base_price' ? 'Base Price' : item.price_source)}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                         <button
                                             onClick={() => removeItem(item.id)}
@@ -591,6 +701,20 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
                                         >
                                             <X size={16} />
                                         </button>
+                                    </div>
+
+                                    {/* Unit Price (editable) */}
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="text-[10px] text-slate-400 uppercase tracking-wider">Price</span>
+                                        <div className="flex items-center border border-slate-200 rounded-md px-2 py-1 gap-1 flex-1">
+                                            <span className="text-xs text-slate-400">{getCurrencySymbol(quoteCurrency, quoteLocale)}</span>
+                                            <input
+                                                className="w-full text-right text-sm outline-none font-medium"
+                                                value={item.unit_price}
+                                                onChange={(e) => updateItem(item.id, 'unit_price', parseFloat(e.target.value) || 0)}
+                                                placeholder="0.00"
+                                            />
+                                        </div>
                                     </div>
 
                                     <div className="flex items-center gap-3">
@@ -627,7 +751,7 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
                                         </div>
 
                                         <div className="flex-1 text-right font-medium text-slate-700">
-                                            ${item.line_total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            {formatCurrency(item.line_total, quoteCurrency, quoteLocale)}
                                         </div>
                                     </div>
                                 </div>
@@ -639,25 +763,95 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
                     <div className="bg-slate-50 border-t border-slate-200 p-4 space-y-2">
                         <div className="flex justify-between text-sm text-slate-600">
                             <span>Subtotal</span>
-                            <span>${totals.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                            <span>{formatCurrency(totals.subtotal, quoteCurrency, quoteLocale)}</span>
                         </div>
                         {totals.discountAmount > 0 && (
                             <div className="flex justify-between text-sm text-green-600">
                                 <span>Discount</span>
-                                <span>-${totals.discountAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                <span>-{formatCurrency(totals.discountAmount, quoteCurrency, quoteLocale)}</span>
                             </div>
                         )}
                         <div className="flex justify-between text-sm text-slate-600">
                             <span>Tax (17%)</span>
-                            <span>${totals.tax.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                            <span>{formatCurrency(totals.tax, quoteCurrency, quoteLocale)}</span>
                         </div>
+
+                        {/* C3: Margin Warning Badge */}
+                        {quoteItems.length > 0 && (
+                            <div className={`flex items-center justify-between text-sm px-2 py-1.5 rounded-lg ${totals.isBelowMinMargin ? 'bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-800' : 'bg-emerald-50 border border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800'}`}>
+                                <span className={`flex items-center gap-1.5 font-medium ${totals.isBelowMinMargin ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
+                                    {totals.isBelowMinMargin && <AlertTriangle className="w-3.5 h-3.5" />}
+                                    Margin
+                                </span>
+                                <span className={`font-mono font-semibold ${totals.isBelowMinMargin ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
+                                    {totals.marginPct.toFixed(1)}%{totals.isBelowMinMargin ? ` (min ${minMarginPct}%)` : ''}
+                                </span>
+                            </div>
+                        )}
+
+                        {/* Submit for Approval button when margin is below threshold */}
+                        {totals.isBelowMinMargin && (
+                            <button
+                                onClick={async () => {
+                                    if (!quoteNumber) return;
+                                    setSubmittingForApproval(true);
+                                    try {
+                                        // 1. Save the quote first to ensure latest data is persisted
+                                        const savedQuoteId = await handleSave();
+
+                                        // 2. Call validateQuoteMargin with the saved quote ID
+                                        if (savedQuoteId) {
+                                            const result = await validateQuoteMargin(savedQuoteId);
+                                            if (result.success) {
+                                                alert('Quote submitted for margin approval.');
+                                            } else {
+                                                alert(`Approval submission failed: ${result.error}`);
+                                            }
+                                        }
+                                    } catch (err) {
+                                        alert('Failed to submit for approval');
+                                    }
+                                    setSubmittingForApproval(false);
+                                }}
+                                disabled={submittingForApproval || !selectedCustomerId}
+                                className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50 transition-colors"
+                            >
+                                {submittingForApproval ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    <AlertTriangle className="w-4 h-4" />
+                                )}
+                                Submit for Approval
+                            </button>
+                        )}
 
                         <div className="border-t border-slate-200 my-2 pt-2">
                             <div className="flex justify-between text-lg font-bold text-slate-900">
                                 <span>Total</span>
-                                <span>${totals.grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                <span>{formatCurrency(totals.grandTotal, quoteCurrency, quoteLocale)}</span>
                             </div>
                         </div>
+
+                        {/* Generate Invoice button — visible when quote has been saved */}
+                        {quoteNumber && selectedCustomerId && (
+                            <button
+                                onClick={async () => {
+                                    const savedQuoteId = await handleSave();
+                                    if (savedQuoteId) {
+                                        const result = await createInvoiceFromQuote(tenantId, savedQuoteId);
+                                        if (result.success) {
+                                            alert('Invoice created successfully. Go to Invoices to issue it.');
+                                        } else {
+                                            alert(`Failed to create invoice: ${result.error}`);
+                                        }
+                                    }
+                                }}
+                                className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                            >
+                                <FileText className="w-4 h-4" />
+                                Generate Invoice
+                            </button>
+                        )}
                     </div>
                 </aside>
 

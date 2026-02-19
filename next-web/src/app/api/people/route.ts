@@ -33,14 +33,14 @@ export async function POST(req: NextRequest) {
             if (!f.isEnabled) return;
             // Map 'status' -> rpcFilters.status
             if (f.field === 'status' && f.value) {
-                // Determine format based on operator, but usually RPC just wants the list of values
-                const val = Array.isArray(f.value) ? f.value : [f.value];
-                rpcFilters.status = val;
+                // SmartChip sends comma-separated string, e.g. "new,lead,contacted"
+                // Split into array for the RPC
+                const raw = typeof f.value === 'string' ? f.value.split(',').map((s: string) => s.trim()).filter(Boolean) : Array.isArray(f.value) ? f.value : [f.value];
+                rpcFilters.status = raw;
             }
             else if (f.field === 'role' || f.field === 'role_name') {
-                const val = Array.isArray(f.value) ? f.value : [f.value];
-                // RPC might call it 'role_name' or 'role' - fetchPeople.ts used 'role_name'
-                rpcFilters.role_name = val;
+                const raw = typeof f.value === 'string' ? f.value.split(',').map((s: string) => s.trim()).filter(Boolean) : Array.isArray(f.value) ? f.value : [f.value];
+                rpcFilters.role_name = raw;
             }
             else if (f.field === 'first_name' || f.field === 'name') {
                 const val = Array.isArray(f.value) ? f.value : [f.value];

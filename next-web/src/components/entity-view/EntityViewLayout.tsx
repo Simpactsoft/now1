@@ -372,6 +372,7 @@ export default function EntityViewLayout<T = any>({
                     >
                         <SavedViewsMenu
                             tenantId={tenantId}
+                            entityType={entityType}
                             configOverride={{
                                 filters: config.filters,
                                 sorting: config.sorting,

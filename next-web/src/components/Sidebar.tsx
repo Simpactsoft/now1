@@ -21,7 +21,9 @@ import {
     FileText,
     Plus,
     Package,
-    Sliders
+    Sliders,
+    ClipboardList,
+    DollarSign,
 } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useLanguage } from '@/context/LanguageContext';
@@ -41,6 +43,8 @@ const NAV_CONFIG = [
     { key: 'system_admin', href: '/dashboard/admin', icon: ShieldCheck },
     { key: 'settings', href: '/dashboard/settings', icon: Settings },
     { key: 'quotes', href: '/dashboard/sales/quotes', icon: FileText },
+    { key: 'purchase_orders', href: '/dashboard/purchase-orders', icon: ClipboardList },
+    { key: 'payments', href: '/dashboard/payments', icon: DollarSign },
 ] as const;
 
 import TenantSwitcher from "./TenantSwitcher";
@@ -113,7 +117,7 @@ export default function Sidebar({
                 <div className="p-6 pb-2">
                     <div className="flex items-center justify-between mb-4">
                         <h1 className="text-xl font-bold gradient-text tracking-tight flex items-center gap-2">
-                            <Activity className="text-brand-primary" />
+                            <img src="/icon.png" alt="NOW System" className="w-7 h-7 rounded-md" />
                             NOW System
                         </h1>
 

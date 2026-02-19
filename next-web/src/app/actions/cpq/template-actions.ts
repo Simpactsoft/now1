@@ -3,6 +3,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getTenantId } from "@/lib/auth/tenant";
+import { verifyAuthWithTenant } from "../_shared/auth";
+import { isAuthError } from "../_shared/auth-utils";
 
 // ============================================================================
 // TYPES
@@ -682,6 +684,17 @@ export async function deleteTemplates(
 
         // Use admin client to bypass RLS for delete operations
         const admin = createAdminClient();
+        const supabase = await createClient();
+
+        // Verify the user is authenticated and belongs to a tenant
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return { success: false, error: "Authentication required" };
+
+        const tenantId = await getTenantId(user, supabase);
+        if (!tenantId) return { success: false, error: "Tenant not found" };
+
+        const tenantAuth = await verifyAuthWithTenant(tenantId);
+        if (isAuthError(tenantAuth)) return { success: false, error: tenantAuth.error };
 
         // 1. Get all option groups for these templates
         const { data: groups } = await admin
@@ -756,9 +769,15 @@ export async function duplicateTemplate(
         const supabase = await createClient();
         const admin = createAdminClient();
 
-        // 1. Auth check
+        // 1. Auth check + tenant verification
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return { success: false, error: "Authentication required" };
+
+        const tenantId = await getTenantId(user, supabase);
+        if (!tenantId) return { success: false, error: "Tenant not found" };
+
+        const tenantAuth = await verifyAuthWithTenant(tenantId);
+        if (isAuthError(tenantAuth)) return { success: false, error: tenantAuth.error };
 
         // 2. Fetch the complete template
         const result = await getTemplateById(templateId);
@@ -954,6 +973,10 @@ export async function importTemplateFromJson(
         // 2. Get tenant ID
         const tenantId = await getTenantId(user, supabase);
         if (!tenantId) return { success: false, error: "Tenant not found" };
+
+        // 2b. Verify tenant membership before admin operations
+        const tenantAuth = await verifyAuthWithTenant(tenantId);
+        if (isAuthError(tenantAuth)) return { success: false, error: tenantAuth.error };
 
         // 3. Parse JSON
         let importData: any;
