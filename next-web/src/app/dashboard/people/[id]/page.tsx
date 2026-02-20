@@ -31,10 +31,11 @@ export default async function PersonProfilePage({ params }: PageProps) {
         );
     }
 
-    const { profile, timeline, error } = await fetchPersonDetails(tenantId, id);
-    const { data: attributes } = await getTenantAttributes('person');
+    const personRes = await fetchPersonDetails(tenantId, id);
+    const attrRes = await getTenantAttributes('person');
+    const attributes = attrRes.success ? attrRes.data : null;
 
-    if (error || !profile) {
+    if (!personRes.success || !personRes.data?.profile) {
         return (
             <div className="flex flex-col gap-8">
                 <Link href="/dashboard/people" className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors">
@@ -43,11 +44,13 @@ export default async function PersonProfilePage({ params }: PageProps) {
                 </Link>
                 <div className="p-8 glass rounded-3xl border border-red-500/20 text-center">
                     <h2 className="text-xl font-bold text-red-400">Profile Not Found</h2>
-                    <p className="text-slate-500 mt-2">{error || "The requested person does not exist or you do not have permission."}</p>
+                    <p className="text-slate-500 mt-2">{!personRes.success ? personRes.error : "The requested person does not exist or you do not have permission."}</p>
                 </div>
             </div>
         );
     }
+
+    const { profile, timeline } = personRes.data;
 
     return (
         <div className="flex flex-col gap-8 px-6">

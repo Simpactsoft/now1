@@ -8,8 +8,10 @@ import {
     getTemplateById,
     type ProductTemplate,
     type OptionGroup,
-    type Option
+    type Option,
+    type ConfigurationRule
 } from "@/app/actions/cpq/template-actions";
+import { validateConfigurationClientSide, type ValidationResult, type ValidationMessage } from "../configurator/hooks/client-validation";
 import {
     saveConfiguration,
     getConfigurationTemplates,
@@ -41,6 +43,8 @@ export function ProductConfiguratorModal({
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [currentConfigurationId, setCurrentConfigurationId] = useState<string | null>(null);
+    const [rules, setRules] = useState<ConfigurationRule[]>([]);
+    const [validation, setValidation] = useState<ValidationResult | null>(null);
     const { toast } = useToast();
 
     useEffect(() => {
@@ -58,6 +62,7 @@ export function ProductConfiguratorModal({
         if (result.success && result.data) {
             setTemplate(result.data.template);
             setOptionGroups(result.data.optionGroups);
+            setRules(result.data.rules || []);
 
             // Set default selections
             const defaults: Record<string, string> = {};
@@ -75,17 +80,41 @@ export function ProductConfiguratorModal({
         setLoading(false);
     }
 
-    function handleOptionSelect(groupId: string, optionId: string) {
-        setSelectedOptions((prev) => ({
-            ...prev,
-            [groupId]: optionId,
-        }));
-    }
+    useEffect(() => {
+        if (!template || optionGroups.length === 0) return;
+        const res = validateConfigurationClientSide(optionGroups, selectedOptions, rules);
+        setValidation(res);
 
+        if (Object.keys(res.autoSelections).length > 0) {
+            let changes = false;
+            const newSelections = { ...selectedOptions };
+            for (const [groupId, optionId] of Object.entries(res.autoSelections) as [string, string][]) {
+                if (newSelections[groupId] !== optionId) {
+                    newSelections[groupId] = optionId;
+                    changes = true;
+                }
+            }
+            if (changes) {
+                // To avoid loops with useEffect, delay state update slightly
+                setTimeout(() => setSelectedOptions(newSelections), 0);
+            }
+        }
+    }, [selectedOptions, optionGroups, rules, template]);
+
+    function handleOptionSelect(groupId: string, optionId: string) {
+        setSelectedOptions((prev) => {
+            const next = { ...prev };
+            // Optional: toggle off if multi-select was supported, but currently it's radio-like
+            next[groupId] = optionId;
+            return next;
+        });
+    }
     function calculateTotalPrice(): number {
         if (!template) return 0;
 
-        let total = template.basePrice * quantity;
+        let basePrice = template.basePrice;
+        let additiveTotal = 0;
+        let multiplicativeFactor = 1;
 
         optionGroups.forEach((group) => {
             const selectedOptionId = selectedOptions[group.id];
@@ -96,18 +125,40 @@ export function ProductConfiguratorModal({
 
             switch (selectedOption.priceModifierType) {
                 case "add":
-                    total += selectedOption.priceModifierAmount * quantity;
+                    additiveTotal += selectedOption.priceModifierAmount;
                     break;
                 case "multiply":
-                    total *= selectedOption.priceModifierAmount;
+                    multiplicativeFactor *= selectedOption.priceModifierAmount;
                     break;
                 case "replace":
-                    total = selectedOption.priceModifierAmount * quantity;
+                    basePrice = selectedOption.priceModifierAmount;
                     break;
             }
         });
 
-        return total;
+        // Base + additives
+        let subtotal = basePrice + additiveTotal;
+        // Multiplicative
+        subtotal = subtotal * multiplicativeFactor;
+
+        // Apply price_tier rules (discounts based on quantity)
+        if (rules && rules.length > 0) {
+            const applicableTiers = rules
+                .filter(r => r.ruleType === "price_tier" && r.isActive && r.quantityMin !== null && r.quantityMin <= quantity)
+                .sort((a, b) => (b.quantityMin || 0) - (a.quantityMin || 0));
+
+            if (applicableTiers.length > 0) {
+                const tier = applicableTiers[0];
+                if (tier.discountType === "percentage" && tier.discountValue) {
+                    const discountAmount = subtotal * (tier.discountValue / 100);
+                    subtotal -= discountAmount;
+                } else if (tier.discountType === "fixed_amount" && tier.discountValue) {
+                    subtotal -= tier.discountValue;
+                }
+            }
+        }
+
+        return subtotal * quantity;
     }
 
     async function handleAddToQuote() {
@@ -140,7 +191,11 @@ export function ProductConfiguratorModal({
     }
 
     function handleLoadTemplate(config: Configuration) {
-        setSelectedOptions(config.selectedOptions);
+        const safeSelections: Record<string, string> = {};
+        Object.entries(config.selectedOptions).forEach(([k, v]) => {
+            safeSelections[k] = Array.isArray(v) ? v[0] : v;
+        });
+        setSelectedOptions(safeSelections);
         setQuantity(config.quantity);
         toast({
             title: "Template loaded",
@@ -156,9 +211,7 @@ export function ProductConfiguratorModal({
     }
 
     const totalPrice = calculateTotalPrice();
-    const isValid = optionGroups
-        .filter((g) => g.isRequired)
-        .every((g) => selectedOptions[g.id]);
+    const isValid = validation?.isValid ?? false;
 
     return (
         <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -236,68 +289,94 @@ export function ProductConfiguratorModal({
                         </div>
 
                         {/* Option Groups */}
-                        {optionGroups.map((group) => (
-                            <div key={group.id} className="border rounded-lg p-4">
-                                <div className="mb-3">
-                                    <h3 className="font-semibold flex items-center gap-2">
-                                        {group.name}
-                                        {group.isRequired && (
-                                            <span className="text-xs text-red-500">*</span>
-                                        )}
-                                    </h3>
-                                    {group.description && (
-                                        <p className="text-sm text-muted-foreground mt-1">
-                                            {group.description}
-                                        </p>
-                                    )}
-                                </div>
+                        {optionGroups.map((group) => {
+                            if (validation?.hiddenGroups.includes(group.id)) return null;
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    {group.options.map((option) => {
-                                        const isSelected = selectedOptions[group.id] === option.id;
-                                        return (
-                                            <button
-                                                key={option.id}
-                                                onClick={() => handleOptionSelect(group.id, option.id)}
-                                                disabled={!option.isAvailable}
-                                                className={`
+                            const groupErrors = validation?.errors.filter((e: ValidationMessage) => e.groupId === group.id && !e.optionId) || [];
+
+                            return (
+                                <div key={group.id} className="border rounded-lg p-4">
+                                    <div className="mb-3">
+                                        <h3 className="font-semibold flex items-center gap-2">
+                                            {group.name}
+                                            {group.isRequired && (
+                                                <span className="text-xs text-red-500">*</span>
+                                            )}
+                                        </h3>
+                                        {group.description && (
+                                            <p className="text-sm text-muted-foreground mt-1">
+                                                {group.description}
+                                            </p>
+                                        )}
+                                        {groupErrors.map((err: ValidationMessage, i: number) => (
+                                            <p key={i} className="text-sm text-destructive mt-1 font-medium">{err.message}</p>
+                                        ))}
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {group.options.map((option) => {
+                                            if (validation?.hiddenOptions.includes(option.id)) return null;
+
+                                            const isSelected = selectedOptions[group.id] === option.id;
+                                            const isDisabledByRule = validation?.disabledOptions.includes(option.id);
+                                            const isDisabled = !option.isAvailable || isDisabledByRule;
+                                            const optionError = validation?.errors.find((e: ValidationMessage) => e.groupId === group.id && e.optionId === option.id);
+
+                                            return (
+                                                <button
+                                                    key={option.id}
+                                                    onClick={() => handleOptionSelect(group.id, option.id)}
+                                                    disabled={isDisabled}
+                                                    className={`
                           text-left p-3 rounded-lg border-2 transition-all
                           ${isSelected
-                                                        ? "border-primary bg-primary/5"
-                                                        : "border-border hover:border-primary/50"
-                                                    }
-                          ${!option.isAvailable && "opacity-50 cursor-not-allowed"}
+                                                            ? "border-primary bg-primary/5"
+                                                            : "border-border hover:border-primary/50"
+                                                        }
+                          ${isDisabled && "opacity-50 cursor-not-allowed"}
+                          ${optionError && "border-destructive/50 bg-destructive/5"}
                         `}
-                                            >
-                                                <div className="flex items-start justify-between">
-                                                    <div className="flex-1">
-                                                        <p className="font-medium">{option.name}</p>
-                                                        {option.description && (
-                                                            <p className="text-xs text-muted-foreground mt-1">
-                                                                {option.description}
-                                                            </p>
-                                                        )}
-                                                        {!option.isAvailable && option.availabilityNote && (
-                                                            <p className="text-xs text-destructive mt-1">
-                                                                {option.availabilityNote}
-                                                            </p>
-                                                        )}
+                                                >
+                                                    <div className="flex items-start justify-between">
+                                                        <div className="flex-1">
+                                                            <p className="font-medium">{option.name}</p>
+                                                            {option.description && (
+                                                                <p className="text-xs text-muted-foreground mt-1">
+                                                                    {option.description}
+                                                                </p>
+                                                            )}
+                                                            {!option.isAvailable && option.availabilityNote && (
+                                                                <p className="text-xs text-destructive mt-1">
+                                                                    {option.availabilityNote}
+                                                                </p>
+                                                            )}
+                                                            {isDisabledByRule && !isSelected && (
+                                                                <p className="text-xs text-muted-foreground mt-1">
+                                                                    Not available with current selections
+                                                                </p>
+                                                            )}
+                                                            {optionError && (
+                                                                <p className="text-xs text-destructive mt-1 font-medium">
+                                                                    {optionError.message}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-right ml-2">
+                                                            {option.priceModifierAmount !== 0 && (
+                                                                <p className="text-sm font-semibold">
+                                                                    {option.priceModifierType === "add" && "+"}
+                                                                    ${option.priceModifierAmount.toFixed(2)}
+                                                                </p>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                    <div className="text-right ml-2">
-                                                        {option.priceModifierAmount !== 0 && (
-                                                            <p className="text-sm font-semibold">
-                                                                {option.priceModifierType === "add" && "+"}
-                                                                ${option.priceModifierAmount.toFixed(2)}
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </button>
-                                        );
-                                    })}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
 

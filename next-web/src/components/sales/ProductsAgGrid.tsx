@@ -23,6 +23,7 @@ interface Product {
     price: number;
     currency: string;
     stock_quantity: number;
+    track_inventory?: boolean;
     category_id?: string;
     category?: Category;
     sku?: string;
@@ -52,25 +53,22 @@ export default function ProductsAgGrid({
                 filter: false,
                 cellRenderer: (params: ICellRendererParams) => {
                     const product = params.data;
-                    const isOutOfStock = product.stock_quantity <= 0;
+                    const isOutOfStock = product.track_inventory && product.stock_quantity <= 0;
 
                     return (
                         <div className="w-full h-full flex items-center justify-center">
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    if (!isOutOfStock) {
-                                        onAddToQuote(product);
-                                    }
+                                    onAddToQuote(product);
                                 }}
-                                disabled={isOutOfStock}
                                 className={cn(
                                     "p-1.5 rounded-full transition-colors",
                                     isOutOfStock
-                                        ? "bg-muted text-muted-foreground opacity-50 cursor-not-allowed"
+                                        ? "bg-amber-100 text-amber-600 hover:bg-amber-200"
                                         : "bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground"
                                 )}
-                                title={isOutOfStock ? "Out of Stock" : "Add to Quote"}
+                                title={isOutOfStock ? "Add to Quote (Out of Stock)" : "Add to Quote"}
                             >
                                 <Plus size={16} />
                             </button>
@@ -132,8 +130,15 @@ export default function ProductsAgGrid({
                 headerName: "Stock",
                 width: 100,
                 filter: 'agNumberColumnFilter',
-                cellClass: (params) => params.value <= 0 ? "text-destructive font-medium" : "text-success",
-                valueFormatter: (params: ValueFormatterParams) => params.value <= 0 ? "Out of Stock" : `${params.value} in stock`
+                cellClass: (params) => {
+                    const isOutOfStock = params.data.track_inventory && params.value <= 0;
+                    if (!params.data.track_inventory) return "text-muted-foreground";
+                    return isOutOfStock ? "text-amber-600 font-medium" : "text-success";
+                },
+                valueFormatter: (params: ValueFormatterParams) => {
+                    if (!params.data.track_inventory) return "N/A";
+                    return params.value <= 0 ? "Out of Stock" : `${params.value} in stock`;
+                }
             }
         ];
     }, [onAddToQuote]);

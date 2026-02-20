@@ -1,0 +1,99 @@
+-- ============================================================================
+-- Combined Pending Migrations — Run in Supabase SQL Editor
+-- ============================================================================
+-- This script applies all Phase 3 migrations that haven't been applied yet.
+-- Each section is wrapped in its own transaction via BEGIN/COMMIT.
+-- Safe to re-run: uses IF NOT EXISTS, ON CONFLICT, CREATE OR REPLACE.
+-- ============================================================================
+-- ORDER:
+--   1. 20260219_financial_reports     (fiscal periods)
+--   2. 20260219_multi_warehouse       (warehouses)
+--   3. 20260219_quotes_table          (quotes, quote_items)
+--   4. 20260219_invoice_generation    (invoices, document sequences)
+--   5. 20260220_price_lists           (price lists)
+--   6. 20260221_product_variants      (product variants)
+--   7. 20260222_profitability_validator (margin guard)
+--   8. 20260220_invoice_account_fix   (fix issue_invoice)
+--   9. 20260220_purchase_orders       (POs, vendors)
+--  10. 20260220_payment_tracking      (payments, allocations)
+--  11. 20260220_account_type_resolution (account_sub_type + fix all RPCs)
+--  12. 20260224_atomic_journal_entry   (atomic JE RPC)
+--  13. 20260225_rpc_tenant_guards      (tenant guards on RPCs)
+-- ============================================================================
+
+-- ⚠️  NOTE: This file is too large for a single paste into the SQL editor.
+--    Run each migration file separately, in order, via the SQL editor.
+--    The files are listed below in the correct dependency order.
+--    
+--    IMPORTANT: Some files use BEGIN/COMMIT — the SQL editor handles that.
+--    Just paste the ENTIRE content of each file and run it.
+-- ============================================================================
+
+-- ============================================================================
+-- STEP 1: Check what's already applied
+-- ============================================================================
+-- Run this query first to see which tables already exist:
+
+-- SELECT tablename FROM pg_tables WHERE schemaname = 'public' 
+-- AND tablename IN (
+--   'fiscal_periods','warehouses','quotes','quote_items',
+--   'invoices','invoice_items','document_number_sequences',
+--   'price_lists','price_list_items','customer_price_list',
+--   'product_variants','variant_attributes','variant_attribute_values',
+--   'margin_approvals',
+--   'purchase_orders','purchase_order_items','vendors',
+--   'payments','payment_allocations',
+--   'chart_of_accounts','journal_entries','journal_lines'
+-- )
+-- ORDER BY tablename;
+
+-- If chart_of_accounts exists but NOT purchase_orders,
+-- then migrations 1-13 above are pending.
+
+-- ============================================================================
+-- STEP 2: Apply each migration file in order
+-- ============================================================================
+-- Paste the content of each file below into the SQL editor and run:
+--
+-- 1. supabase/migrations/20260219_financial_reports.sql
+-- 2. supabase/migrations/20260219_multi_warehouse.sql
+-- 3. supabase/migrations/20260219_quotes_table.sql
+-- 4. supabase/migrations/20260219_invoice_generation.sql
+-- 5. supabase/migrations/20260220_price_lists.sql
+-- 6. supabase/migrations/20260221_product_variants.sql
+-- 7. supabase/migrations/20260222_profitability_validator.sql
+-- 8. supabase/migrations/20260220_invoice_account_fix.sql
+-- 9. supabase/migrations/20260220_purchase_orders.sql
+-- 10. supabase/migrations/20260220_payment_tracking.sql
+-- 11. supabase/migrations/20260220_account_type_resolution.sql
+-- 12. supabase/migrations/20260224_atomic_journal_entry.sql
+-- 13. supabase/migrations/20260225_rpc_tenant_guards.sql
+--
+-- After all migrations, run the seed script:
+-- 14. supabase/seeds/seed_e2e_test.sql
+
+-- ============================================================================
+-- STEP 3: Verify all tables and RPCs exist
+-- ============================================================================
+
+-- Check tables:
+-- SELECT tablename FROM pg_tables WHERE schemaname = 'public' 
+-- AND tablename IN ('purchase_orders','payments','payment_allocations','vendors',
+--   'warehouses','invoices','document_number_sequences','quotes','quote_items',
+--   'price_lists','product_variants','margin_approvals')
+-- ORDER BY tablename;
+
+-- Check RPCs:
+-- SELECT routine_name FROM information_schema.routines 
+-- WHERE routine_schema = 'public' 
+-- AND routine_name IN ('issue_invoice','receive_purchase_order','post_payment',
+--   'void_payment','generate_document_number','create_journal_entry',
+--   'validate_quote_margin','approve_margin','reject_margin',
+--   'get_effective_price','get_product_variants')
+-- ORDER BY routine_name;
+
+-- Check seed data:
+-- SELECT 'products' as entity, count(*) FROM products
+-- UNION ALL SELECT 'accounts', count(*) FROM chart_of_accounts
+-- UNION ALL SELECT 'warehouses', count(*) FROM warehouses
+-- UNION ALL SELECT 'tax_zones', count(*) FROM tax_zones;

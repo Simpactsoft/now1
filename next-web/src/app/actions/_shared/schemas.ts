@@ -7,8 +7,7 @@ import { z } from "zod";
 // ============================================================================
 // SHARED
 // ============================================================================
-
-export const uuidSchema = z.string().uuid("Invalid UUID format");
+export const uuidSchema = z.string().regex(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/, "Invalid UUID format");
 export const tenantIdSchema = uuidSchema;
 
 // ============================================================================
@@ -181,6 +180,44 @@ export const paymentAllocationSchema = z.object({
     invoiceId: uuidSchema.optional().nullable(),
     poId: uuidSchema.optional().nullable(),
     amount: z.number().min(0.01, "Allocation amount must be positive"),
+});
+
+// ============================================================================
+// QUOTE SCHEMAS
+// ============================================================================
+
+export const saveQuoteItemSchema = z.object({
+    productId: uuidSchema.optional().nullable(),
+    sku: z.string().max(100),
+    name: z.string().max(300),
+    unitPrice: z.number().min(0),
+    quantity: z.number().min(1),
+    discountPercent: z.number().min(0).max(100),
+    lineTotal: z.number().min(0),
+    unitCost: z.number().min(0),
+    costSource: z.string().max(50),
+    configurationId: uuidSchema.optional().nullable(),
+    isRecurring: z.boolean().optional().default(false),
+    billingFrequency: z.enum(['monthly', 'quarterly', 'yearly']).optional().nullable(),
+});
+
+export const saveQuoteSchema = z.object({
+    existingQuoteId: uuidSchema.optional(),
+    tenantId: uuidSchema,
+    quoteNumber: z.string().min(1).max(50),
+    customerId: uuidSchema,
+    customerName: z.string().max(200),
+    currency: z.string().length(3).toUpperCase(),
+    subtotal: z.number().min(0),
+    discountTotal: z.number().min(0),
+    taxTotal: z.number().min(0),
+    grandTotal: z.number().min(0),
+    recurringTotalMonthly: z.number().min(0).optional().default(0),
+    recurringTotalYearly: z.number().min(0).optional().default(0),
+    totalCost: z.number().min(0),
+    marginPct: z.number(),
+    notes: z.string().optional(),
+    items: z.array(saveQuoteItemSchema),
 });
 
 // ============================================================================

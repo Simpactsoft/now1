@@ -4,7 +4,18 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ActionResult, actionSuccess, actionError } from "@/lib/action-result";
 
-export async function fetchUsers(tenantId: string): Promise<ActionResult<{ users: any[] }>> {
+export interface UserProfile {
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
+    email: string;
+    role: string;
+    status: string;
+    tenants?: { name: string } | null;
+    [key: string]: any;
+}
+
+export async function fetchUsers(tenantId: string): Promise<ActionResult<{ users: UserProfile[] }>> {
     const supabase = await createClient();
     const adminClient = createAdminClient();
 

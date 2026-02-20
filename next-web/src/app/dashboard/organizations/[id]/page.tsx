@@ -28,9 +28,9 @@ export default async function OrganizationProfilePage({ params }: PageProps) {
         );
     }
 
-    const { profile, timeline, error } = await fetchOrganizationDetails(tenantId, id);
+    const orgRes = await fetchOrganizationDetails(tenantId, id);
 
-    if (error || !profile) {
+    if (!orgRes.success || !orgRes.data?.profile) {
         return (
             <div className="flex flex-col gap-8">
                 <Link href="/dashboard/organizations" className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors">
@@ -39,11 +39,13 @@ export default async function OrganizationProfilePage({ params }: PageProps) {
                 </Link>
                 <div className="p-8 bg-card rounded-3xl border border-destructive/20 text-center">
                     <h2 className="text-xl font-bold text-destructive">Organization Not Found</h2>
-                    <p className="text-muted-foreground mt-2">{error || "The requested organization does not exist."}</p>
+                    <p className="text-muted-foreground mt-2">{!orgRes.success ? orgRes.error : "The requested organization does not exist."}</p>
                 </div>
             </div>
         );
     }
+
+    const { profile, timeline } = orgRes.data;
 
     return (
         <div className="flex flex-col gap-8 p-6 md:p-8">

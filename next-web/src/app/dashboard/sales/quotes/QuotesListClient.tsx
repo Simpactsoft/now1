@@ -9,7 +9,8 @@ import {
     RefreshCw,
     ChevronRight,
     Search,
-    AlertCircle
+    AlertCircle,
+    ExternalLink
 } from 'lucide-react';
 import { fetchQuotes, type QuoteSummary } from '@/app/actions/fetchQuotes';
 
@@ -87,7 +88,7 @@ export function QuotesListClient({ tenantId }: { tenantId?: string }) {
         const s = search.toLowerCase();
         return (
             q.customer_name?.toLowerCase().includes(s) ||
-            String(q.order_number).includes(s) ||
+            q.quote_number?.toLowerCase().includes(s) ||
             q.status.toLowerCase().includes(s)
         );
     });
@@ -196,15 +197,27 @@ export function QuotesListClient({ tenantId }: { tenantId?: string }) {
                                         key={quote.id}
                                         className="border-b border-border last:border-0 hover:bg-secondary/20 cursor-pointer transition-colors group"
                                         onClick={() => {
-                                            // Future: navigate to quote detail view
-                                            // router.push(`/dashboard/sales/quotes/${quote.id}`);
+                                            router.push(`/dashboard/sales/quotes/new?quoteId=${quote.id}`);
                                         }}
                                     >
                                         <td className="px-4 py-3 font-mono text-muted-foreground">
-                                            Q-{String(quote.order_number).padStart(4, '0')}
+                                            {quote.quote_number}
                                         </td>
                                         <td className="px-4 py-3 font-medium text-foreground">
-                                            {quote.customer_name || <span className="text-muted-foreground italic">ללא לקוח</span>}
+                                            {quote.customer_id ? (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        router.push(`/dashboard/people/${quote.customer_id}`);
+                                                    }}
+                                                    className="inline-flex items-center gap-1 text-brand-primary hover:underline hover:text-brand-primary/80 transition-colors"
+                                                >
+                                                    {quote.customer_name || 'Unknown'}
+                                                    <ExternalLink size={12} className="opacity-50" />
+                                                </button>
+                                            ) : (
+                                                <span className="text-muted-foreground italic">ללא לקוח</span>
+                                            )}
                                         </td>
                                         <td className="px-4 py-3">
                                             <StatusBadge status={quote.status} />
@@ -213,7 +226,7 @@ export function QuotesListClient({ tenantId }: { tenantId?: string }) {
                                             {quote.items_count} פריטים
                                         </td>
                                         <td className="px-4 py-3 font-semibold tabular-nums">
-                                            {formatCurrency(quote.total_amount, quote.currency)}
+                                            {formatCurrency(quote.grand_total, quote.currency)}
                                         </td>
                                         <td className="px-4 py-3 text-muted-foreground text-xs">
                                             {formatDate(quote.created_at)}

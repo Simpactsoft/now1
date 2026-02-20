@@ -19,7 +19,10 @@ import {
     ChevronsUpDown,
     UserCircle,
     Building2,
-    Loader2
+    Loader2,
+    Link,
+    Copy,
+    Repeat
 } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import { Command } from 'cmdk';
@@ -27,7 +30,10 @@ import * as Popover from '@radix-ui/react-popover';
 import { getProductsForTenant } from "@/app/actions/quote-actions";
 import { getPriceLists, getEffectivePrice } from "@/app/actions/price-list-actions";
 import { validateQuoteMargin } from "@/app/actions/profitability-actions";
+import { saveQuote } from "@/app/actions/saveQuote";
+import { fetchQuoteById } from "@/app/actions/fetchQuoteById";
 import { createInvoiceFromQuote } from "@/app/actions/invoice-actions";
+import { getRecommendations, type RecommendationItem } from "@/app/actions/recommendations";
 import ProductsAgGrid from "./ProductsAgGrid";
 import ProductSelector from "./ProductSelector";
 import { ViewConfigProvider } from "@/components/universal/ViewConfigContext";
@@ -52,22 +58,24 @@ interface Product {
     name: string;
     cost_price: number;
     list_price: number; // Base price
-    price?: number; // Effective price (from BOM/CPQ enrichment)
-    currency?: string; // Product currency
+    price: number; // Effective price (from BOM/CPQ enrichment)
+    currency: string; // Product currency
     price_source?: 'bom' | 'cpq' | 'manual'; // Where the price came from
     track_inventory: boolean;
     category_id: string;
+    category?: { id: string; name: string };
     // Computed / Joined fields
     current_stock?: number;
     price_list_price?: number; // Price from specific list
     // CPQ fields
     is_configurable?: boolean;
     template_id?: string;
+    stock_quantity: number;
 }
 
 interface QuoteItem {
     id: string; // random UUID for key
-    product_id: string;
+    product_id: string | null;
     sku: string;
     name: string;
     quantity: number;
@@ -77,11 +85,14 @@ interface QuoteItem {
     configuration_id?: string; // Links to CPQ configuration if product is configured
     price_source?: 'bom' | 'cpq' | 'manual' | 'customer_list' | 'general_list' | 'base_price';
     price_list_name?: string; // Name of the price list that sourced this price
+    isRecurring?: boolean;
+    billingFrequency?: 'monthly' | 'quarterly' | 'yearly';
 }
 
 interface Customer {
     id: string;
     name: string; // display_name
+    type?: 'person' | 'organization';
 }
 
 interface PriceList {
@@ -96,7 +107,7 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
 // --- Component ---
 
-export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: string }) {
+export default function QuoteBuilder({ initialTenantId, quoteId }: { initialTenantId?: string; quoteId?: string }) {
     // Initialize standard browser client to share session
     const supabase = createBrowserClient(supabaseUrl, supabaseKey);
     // context
@@ -134,6 +145,13 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
     const [configuratorOpen, setConfiguratorOpen] = useState(false);
     const [currentTemplateId, setCurrentTemplateId] = useState<string | null>(null);
     const [submittingForApproval, setSubmittingForApproval] = useState(false);
+    const [generatedQuoteToken, setGeneratedQuoteToken] = useState<string | null>(null);
+    const [notes, setNotes] = useState<string>('');
+    const [generatingTerms, setGeneratingTerms] = useState(false);
+
+    // AI Recommendations state
+    const [recommendations, setRecommendations] = useState<RecommendationItem[]>([]);
+    const [loadingRecommendations, setLoadingRecommendations] = useState(false);
 
     // --- Initialization ---
 
@@ -144,8 +162,6 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
             try {
                 if (initialTenantId) {
                     setTenantId(initialTenantId);
-                    // Set Config for RLS - SKIPPED for now as RPC is missing and we use explicit tenant_id
-                    // await supabase.rpc('set_config', { name: 'app.current_tenant', value: initialTenantId });
 
                     // B. Fetch Master Data + Tenant Settings
                     await Promise.all([
@@ -158,10 +174,45 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
                     console.warn('QuoteBuilder: No initialTenantId provided');
                 }
 
-                // C. Generate Quote Number
-                const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-                const randomSuffix = Math.floor(Math.random() * 999).toString().padStart(3, '0');
-                setQuoteNumber(`QT-${dateStr}-${randomSuffix}`);
+                // C. Load existing quote OR generate new number
+                if (quoteId) {
+                    const result = await fetchQuoteById(quoteId);
+                    if (result.success && result.data) {
+                        const q = result.data;
+                        setQuoteNumber(q.quote_number);
+                        setSelectedCustomerId(q.customer_id || '');
+                        setQuoteCurrency(q.currency || 'ILS');
+                        setQuoteDate(q.quote_date || new Date().toISOString().split('T')[0]);
+
+                        // Populate items
+                        const loadedItems: QuoteItem[] = q.items.map(item => ({
+                            id: item.id,
+                            product_id: item.product_id,
+                            sku: item.sku || '',
+                            name: item.description || '',
+                            quantity: item.quantity,
+                            unit_price: item.unit_price,
+                            discount_percent: item.discount_percent,
+                            line_total: item.line_total,
+                            configuration_id: item.configuration_id || undefined,
+                            price_source: (item.cost_source as QuoteItem['price_source']) || 'manual',
+                            isRecurring: item.is_recurring,
+                            billingFrequency: item.billing_frequency,
+                        }));
+                        setQuoteItems(loadedItems);
+                        if (q.public_token) {
+                            setGeneratedQuoteToken(q.public_token);
+                        }
+                        setNotes(q.notes || '');
+                        console.log(`[QuoteBuilder] Loaded existing quote: ${q.quote_number} with ${q.items.length} items`);
+                    } else if (!result.success) {
+                        console.error('[QuoteBuilder] Failed to load quote:', result.error);
+                    }
+                } else {
+                    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+                    const randomSuffix = Math.floor(Math.random() * 999).toString().padStart(3, '0');
+                    setQuoteNumber(`QT-${dateStr}-${randomSuffix}`);
+                }
 
             } catch (error) {
                 console.error('Initialization Error:', error);
@@ -170,7 +221,7 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
             }
         };
         init();
-    }, [initialTenantId]);
+    }, [initialTenantId, quoteId]);
 
     // --- Data Fetching ---
 
@@ -201,11 +252,14 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
     };
 
     const fetchTenantSettings = async (tid: string) => {
-        const { data } = await supabase
+        const { data, error } = await supabase
             .from('tenants')
             .select('min_margin_pct')
             .eq('id', tid)
-            .single();
+            .maybeSingle();
+        if (error) {
+            console.warn('[QuoteBuilder] Tenant settings fetch error (non-blocking):', error.message);
+        }
         if (data?.min_margin_pct != null) {
             setMinMarginPct(parseFloat(data.min_margin_pct));
         }
@@ -249,7 +303,9 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
                     currency: p.currency || 'ILS',
                     price_source: p.price_source || 'manual',
                     track_inventory: p.track_inventory,
+                    stock_quantity: p.current_stock || 0,
                     category_id: p.category_id,
+                    category: p.category_id ? { id: p.category_id, name: fetchedCategories?.find((c: any) => c.id === p.category_id)?.name || 'Unknown' } : undefined,
                     current_stock: p.current_stock
                 }));
                 setProducts(mappedProds);
@@ -262,6 +318,44 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
     };
 
     // --- Logic ---
+
+    // 0. AI Recommendations effect
+    useEffect(() => {
+        if (!tenantId || quoteItems.length === 0) {
+            setRecommendations([]);
+            return;
+        }
+
+        const fetchRecs = async () => {
+            setLoadingRecommendations(true);
+            try {
+                // Get unique product IDs currently in cart
+                const productIdsInCart = Array.from(new Set(
+                    quoteItems.filter(i => i.product_id != null).map(i => i.product_id as string)
+                ));
+
+                if (productIdsInCart.length === 0) {
+                    setRecommendations([]);
+                    setLoadingRecommendations(false);
+                    return;
+                }
+
+                const result = await getRecommendations({ tenantId, cartProductIds: productIdsInCart });
+                if (result.success && result.data) {
+                    setRecommendations(result.data.recommendations);
+                } else {
+                    setRecommendations([]);
+                }
+            } catch (err) {
+                console.error("Failed to load recommendations", err);
+            } finally {
+                setLoadingRecommendations(false);
+            }
+        };
+
+        const timer = setTimeout(fetchRecs, 500); // 500ms debounce
+        return () => clearTimeout(timer);
+    }, [quoteItems, tenantId]);
 
     // 1. Build Tree
     const categoryTree = useMemo(() => {
@@ -381,7 +475,7 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
     const handleConfiguredProductAdd = (configuration: Configuration) => {
         setQuoteItems(prev => [...prev, {
             id: crypto.randomUUID(),
-            product_id: configuration.templateId,
+            product_id: null,
             configuration_id: configuration.id,
             sku: configuration.id.substring(0, 8), // Use config ID as SKU
             name: `Configured Product`, // TODO: Get template name
@@ -393,13 +487,38 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
         setConfiguratorOpen(false);
     };
 
-    const updateItem = async (id: string, field: keyof QuoteItem, value: number) => {
+    const addToCartFromRecommendation = (rec: RecommendationItem) => {
+        const newItem: QuoteItem = {
+            id: crypto.randomUUID(),
+            product_id: rec.id,
+            sku: rec.sku,
+            name: rec.name,
+            quantity: 1,
+            unit_price: rec.list_price,
+            discount_percent: 0,
+            line_total: rec.list_price,
+            price_source: 'manual'
+        };
+        setQuoteItems(prev => [...prev, newItem]);
+    };
+
+    const updateItem = async (id: string, field: keyof QuoteItem, value: any) => {
         const item = quoteItems.find(i => i.id === id);
         if (!item) return;
 
         // If quantity changes, re-resolve effective price (different min_qty tier may apply)
         if (field === 'quantity') {
-            const resolved = await resolveEffectivePrice(item.product_id, value);
+            let resolved: { price: number; source: QuoteItem['price_source']; listName?: string } = {
+                price: item.unit_price,
+                source: item.price_source,
+                listName: item.price_list_name
+            };
+
+            // Only resolve standard pricing if it has a real catalog product_id
+            if (item.product_id) {
+                resolved = await resolveEffectivePrice(item.product_id, value);
+            }
+
             setQuoteItems(prev => prev.map(i => {
                 if (i.id !== id) return i;
                 return {
@@ -431,21 +550,36 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
 
     // 4. Totals + Margin Warning (C3)
     const totals = useMemo(() => {
-        const subtotal = quoteItems.reduce((acc, item) => acc + (item.quantity * item.unit_price), 0);
-        const totalLineTotals = quoteItems.reduce((acc, item) => acc + item.line_total, 0);
+        let subtotal = 0;
+        let totalLineTotals = 0;
+        let recurring_monthly = 0;
+        let recurring_yearly = 0;
+        let totalCost = 0;
+
+        quoteItems.forEach(item => {
+            const product = products.find(p => p.id === item.product_id);
+            const cost = (product?.cost_price ?? 0) * item.quantity;
+            totalCost += cost;
+
+            if (item.isRecurring) {
+                if (item.billingFrequency === 'monthly') recurring_monthly += item.line_total;
+                else if (item.billingFrequency === 'yearly') recurring_yearly += item.line_total;
+                // Defaults to not adding to the upfront one-time payment required today
+            } else {
+                subtotal += (item.quantity * item.unit_price);
+                totalLineTotals += item.line_total;
+            }
+        });
+
         const discountAmount = subtotal - totalLineTotals;
         const tax = totalLineTotals * 0.17; // 17% VAT
         const grandTotal = totalLineTotals + tax;
 
         // Margin calculation: (revenue - cost) / revenue * 100
-        const totalCost = quoteItems.reduce((acc, item) => {
-            const product = products.find(p => p.id === item.product_id);
-            return acc + (product?.cost_price ?? 0) * item.quantity;
-        }, 0);
         const marginPct = totalLineTotals > 0 ? ((totalLineTotals - totalCost) / totalLineTotals) * 100 : 0;
         const isBelowMinMargin = marginPct < minMarginPct && quoteItems.length > 0;
 
-        return { subtotal, discountAmount, tax, grandTotal, marginPct, isBelowMinMargin };
+        return { subtotal, discountAmount, tax, grandTotal, marginPct, isBelowMinMargin, recurring_monthly, recurring_yearly };
     }, [quoteItems, products, minMarginPct]);
 
     // 5. Save Logic
@@ -457,41 +591,54 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
 
         try {
             setLoading(true);
-            // Create Order
-            const { data: order, error: orderError } = await supabase
-                .from('orders')
-                .insert({
-                    tenant_id: tenantId,
-                    customer_id: selectedCustomerId,
-                    order_number: quoteNumber,
-                    order_type: 'quote',
-                    status: 'draft',
-                    total_amount: totals.grandTotal,
-                })
-                .select()
-                .single();
 
-            if (orderError) throw orderError;
+            const customerName = customers.find(c => c.id === selectedCustomerId)?.name || '';
 
-            // Create Items
-            const lines = quoteItems.map((item) => ({
-                tenant_id: tenantId,
-                order_id: order.id,
-                product_id: item.product_id,
-                quantity: item.quantity,
-                unit_price: item.unit_price,
-                total_price: item.line_total
-            }));
+            const result = await saveQuote({
+                existingQuoteId: quoteId,
+                tenantId,
+                quoteNumber,
+                customerId: selectedCustomerId,
+                customerName,
+                currency: quoteCurrency,
+                subtotal: totals.subtotal - totals.discountAmount,
+                discountTotal: totals.discountAmount,
+                taxTotal: totals.tax,
+                grandTotal: totals.grandTotal,
+                totalCost: quoteItems.reduce((acc, item) => {
+                    const product = products.find(p => p.id === item.product_id);
+                    return acc + (product?.cost_price ?? 0) * item.quantity;
+                }, 0),
+                marginPct: totals.marginPct,
+                notes: notes,
+                items: quoteItems.map(item => ({
+                    productId: item.product_id,
+                    sku: item.sku,
+                    name: item.name,
+                    unitPrice: item.unit_price,
+                    quantity: item.quantity,
+                    discountPercent: item.discount_percent,
+                    lineTotal: item.line_total,
+                    unitCost: products.find(p => p.id === item.product_id)?.cost_price ?? 0,
+                    costSource: item.price_source || 'manual',
+                    configurationId: item.configuration_id || null,
+                })),
+            });
 
-            const { error: linesError } = await supabase.from('order_items').insert(lines);
-            if (linesError) throw linesError;
+            if (!result.success) {
+                throw new Error(result.error || 'Unknown error');
+            }
 
+            console.log('[QuoteBuilder] Quote saved via server action:', result.data.quoteId, quoteNumber);
             alert('Quote Saved Successfully!');
+            if (result.data.publicToken) {
+                setGeneratedQuoteToken(result.data.publicToken);
+            }
             setQuoteItems([]);
-            return order.id;
+            return result.data.quoteId;
 
         } catch (e: any) {
-            console.error(e);
+            console.error('[QuoteBuilder] Save error:', e);
             alert('Failed to save quote: ' + e.message);
             return null;
         } finally {
@@ -531,7 +678,7 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
     };
 
     return (
-        <div className="flex flex-col h-screen bg-slate-50 text-slate-900 font-sans">
+        <div className="flex flex-col h-full bg-slate-50 text-slate-900 font-sans">
 
             {/* --- HEADER --- */}
             <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm z-10">
@@ -648,13 +795,16 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
                                 products={products}
                                 categories={categories}
                                 loading={loading}
-                                onAddToQuote={addToQuote}
+                                onAddToQuote={(p) => addToQuote(p as Product)}
                                 onAddConfiguration={handleConfiguredProductAdd}
                                 onRefresh={() => {
-                                    setLoading(true);
-                                    loadData();
+                                    if (tenantId) {
+                                        setLoading(true);
+                                        fetchMasterData(tenantId);
+                                    }
                                 }}
                             />
+
                         </ViewConfigProvider>
                     </div>
                 </main>
@@ -667,100 +817,197 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
 
                     <div className="flex-1 overflow-y-auto p-4 space-y-3">
                         {quoteItems.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-2">
-                                <ShoppingCart size={48} className="opacity-20" />
-                                <p>Your quote is empty</p>
+                            <div className="text-center py-10 bg-slate-50 border border-dashed border-slate-200 rounded-lg text-slate-400 text-sm">
+                                <ShoppingCart className="mx-auto mb-2 text-slate-300" size={24} />
+                                No items added yet.<br />Select a product from the left to start building.
                             </div>
                         ) : (
-                            quoteItems.map(item => (
-                                <div key={item.id} className="bg-white border border-slate-100 rounded-lg p-3 shadow-sm hover:border-slate-300 transition-colors group">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <div className="flex-1 min-w-0">
-                                            <h4 className="font-medium text-slate-800 text-sm truncate">{item.name}</h4>
-                                            <div className="flex items-center gap-2">
-                                                <p className="text-xs text-slate-400 font-mono">{item.sku}</p>
-                                                {item.price_source && item.price_source !== 'manual' && (
-                                                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${item.price_source === 'bom' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
-                                                        : item.price_source === 'cpq' ? 'bg-violet-50 text-violet-600 border border-violet-200'
-                                                            : item.price_source === 'customer_list' ? 'bg-blue-50 text-blue-600 border border-blue-200'
-                                                                : item.price_source === 'general_list' ? 'bg-cyan-50 text-cyan-600 border border-cyan-200'
-                                                                    : 'bg-slate-50 text-slate-500 border border-slate-200'
-                                                        }`}
-                                                        title={item.price_list_name || undefined}
-                                                    >
-                                                        {item.price_source === 'bom' ? 'BOM'
-                                                            : item.price_source === 'cpq' ? 'CPQ'
-                                                                : item.price_list_name || (item.price_source === 'base_price' ? 'Base Price' : item.price_source)}
-                                                    </span>
-                                                )}
+                            <div className="space-y-3">
+                                {quoteItems.map((item, index) => (
+                                    <div key={item.id} className="bg-white border border-slate-100 rounded-lg p-3 shadow-sm hover:border-slate-300 transition-colors group">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div className="flex-1 min-w-0">
+                                                <h4 className="font-medium text-slate-800 text-sm truncate">{item.name}</h4>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-xs text-slate-400 font-mono">{item.sku}</p>
+                                                    {item.price_source && item.price_source !== 'manual' && (
+                                                        <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${item.price_source === 'bom' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                                                            : item.price_source === 'cpq' ? 'bg-violet-50 text-violet-600 border border-violet-200'
+                                                                : item.price_source === 'customer_list' ? 'bg-blue-50 text-blue-600 border border-blue-200'
+                                                                    : item.price_source === 'general_list' ? 'bg-cyan-50 text-cyan-600 border border-cyan-200'
+                                                                        : 'bg-slate-50 text-slate-500 border border-slate-200'
+                                                            }`}
+                                                            title={item.price_list_name || undefined}
+                                                        >
+                                                            {item.price_source === 'bom' ? 'BOM'
+                                                                : item.price_source === 'cpq' ? 'CPQ'
+                                                                    : item.price_list_name || (item.price_source === 'base_price' ? 'Base Price' : item.price_source)}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => removeItem(item.id)}
+                                                className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                                            >
+                                                <X size={16} />
+                                            </button>
+                                        </div>
+
+                                        {/* Unit Price (editable) */}
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className="text-[10px] text-slate-400 uppercase tracking-wider">Price</span>
+                                            <div className="flex items-center border border-slate-200 rounded-md px-2 py-1 gap-1 flex-1 bg-white">
+                                                <span className="text-xs text-slate-400">{getCurrencySymbol(quoteCurrency, quoteLocale)}</span>
+                                                <input
+                                                    className="w-full text-right text-sm outline-none font-medium bg-transparent"
+                                                    value={item.unit_price}
+                                                    onChange={(e) => updateItem(item.id, 'unit_price', parseFloat(e.target.value) || 0)}
+                                                    placeholder="0.00"
+                                                />
+                                            </div>
+
+                                            {/* Recurring Toggle */}
+                                            <button
+                                                onClick={() => {
+                                                    if (item.isRecurring) {
+                                                        updateItem(item.id, 'isRecurring', false);
+                                                    } else {
+                                                        updateItem(item.id, 'isRecurring', true);
+                                                        if (!item.billingFrequency) updateItem(item.id, 'billingFrequency', 'monthly');
+                                                    }
+                                                }}
+                                                className={`p-1.5 rounded-md transition-colors border ${item.isRecurring ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : 'bg-slate-50 text-slate-400 hover:text-slate-600 border-slate-200'}`}
+                                                title="Mark as Subscription"
+                                            >
+                                                <Repeat size={16} />
+                                            </button>
+
+                                            {item.isRecurring && (
+                                                <select
+                                                    value={item.billingFrequency || 'monthly'}
+                                                    onChange={(e) => updateItem(item.id, 'billingFrequency', e.target.value as any)}
+                                                    className="text-xs border border-indigo-200 bg-indigo-50 text-indigo-700 rounded-md py-1 px-1.5 outline-none font-medium cursor-pointer"
+                                                >
+                                                    <option value="monthly">Monthly</option>
+                                                    <option value="quarterly">Quarterly</option>
+                                                    <option value="yearly">Yearly</option>
+                                                </select>
+                                            )}
+                                        </div>
+
+                                        <div className="flex items-center gap-3">
+                                            {/* Qty Control */}
+                                            <div className="flex items-center border border-slate-200 rounded-md">
+                                                <button
+                                                    className="px-2 py-1 text-slate-500 hover:bg-slate-100"
+                                                    onClick={() => updateItem(item.id, 'quantity', Math.max(1, item.quantity - 1))}
+                                                >
+                                                    <Minus size={14} />
+                                                </button>
+                                                <input
+                                                    className="w-10 text-center text-sm font-medium outline-none"
+                                                    value={item.quantity}
+                                                    onChange={(e) => updateItem(item.id, 'quantity', parseInt(e.target.value) || 1)}
+                                                />
+                                                <button
+                                                    className="px-2 py-1 text-slate-500 hover:bg-slate-100"
+                                                    onClick={() => updateItem(item.id, 'quantity', item.quantity + 1)}
+                                                >
+                                                    <Plus size={14} />
+                                                </button>
+                                            </div>
+
+                                            {/* Disc Control */}
+                                            <div className="flex items-center border border-slate-200 rounded-md px-2 py-1 gap-1 w-20">
+                                                <span className="text-xs text-slate-400">%</span>
+                                                <input
+                                                    className="w-full text-right text-sm outline-none"
+                                                    value={item.discount_percent}
+                                                    onChange={(e) => updateItem(item.id, 'discount_percent', parseFloat(e.target.value) || 0)}
+                                                    placeholder="0"
+                                                />
+                                            </div>
+
+                                            <div className="flex-1 text-right font-medium text-slate-700">
+                                                {formatCurrency(item.line_total, quoteCurrency, quoteLocale)}
                                             </div>
                                         </div>
-                                        <button
-                                            onClick={() => removeItem(item.id)}
-                                            className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-                                        >
-                                            <X size={16} />
-                                        </button>
                                     </div>
-
-                                    {/* Unit Price (editable) */}
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <span className="text-[10px] text-slate-400 uppercase tracking-wider">Price</span>
-                                        <div className="flex items-center border border-slate-200 rounded-md px-2 py-1 gap-1 flex-1">
-                                            <span className="text-xs text-slate-400">{getCurrencySymbol(quoteCurrency, quoteLocale)}</span>
-                                            <input
-                                                className="w-full text-right text-sm outline-none font-medium"
-                                                value={item.unit_price}
-                                                onChange={(e) => updateItem(item.id, 'unit_price', parseFloat(e.target.value) || 0)}
-                                                placeholder="0.00"
-                                            />
-                                        </div>
+                                ))}
+                            </div>
+                        )}
+                        {/* AI Recommendations Panel Inside Cart */}
+                        {
+                            recommendations.length > 0 && (
+                                <div className="mt-4 border border-indigo-100 bg-indigo-50/50 rounded-lg p-3">
+                                    <div className="flex items-center gap-2 mb-2 text-indigo-700 font-semibold text-xs uppercase tracking-wider mt-2">
+                                        <span>💡 Top Recommendations</span>
+                                        {loadingRecommendations && <Loader2 size={12} className="animate-spin text-indigo-400" />}
                                     </div>
-
-                                    <div className="flex items-center gap-3">
-                                        {/* Qty Control */}
-                                        <div className="flex items-center border border-slate-200 rounded-md">
-                                            <button
-                                                className="px-2 py-1 text-slate-500 hover:bg-slate-100"
-                                                onClick={() => updateItem(item.id, 'quantity', Math.max(1, item.quantity - 1))}
-                                            >
-                                                <Minus size={14} />
-                                            </button>
-                                            <input
-                                                className="w-10 text-center text-sm font-medium outline-none"
-                                                value={item.quantity}
-                                                onChange={(e) => updateItem(item.id, 'quantity', parseInt(e.target.value) || 1)}
-                                            />
-                                            <button
-                                                className="px-2 py-1 text-slate-500 hover:bg-slate-100"
-                                                onClick={() => updateItem(item.id, 'quantity', item.quantity + 1)}
-                                            >
-                                                <Plus size={14} />
-                                            </button>
-                                        </div>
-
-                                        {/* Disc Control */}
-                                        <div className="flex items-center border border-slate-200 rounded-md px-2 py-1 gap-1 w-20">
-                                            <span className="text-xs text-slate-400">%</span>
-                                            <input
-                                                className="w-full text-right text-sm outline-none"
-                                                value={item.discount_percent}
-                                                onChange={(e) => updateItem(item.id, 'discount_percent', parseFloat(e.target.value) || 0)}
-                                                placeholder="0"
-                                            />
-                                        </div>
-
-                                        <div className="flex-1 text-right font-medium text-slate-700">
-                                            {formatCurrency(item.line_total, quoteCurrency, quoteLocale)}
-                                        </div>
+                                    <div className="space-y-2">
+                                        {recommendations.slice(0, 3).map(rec => (
+                                            <div key={rec.id} className="flex flex-col gap-2 text-sm bg-white border border-indigo-100 p-2 rounded shadow-sm hover:border-indigo-300 transition-colors">
+                                                <div className="flex justify-between items-start">
+                                                    <div className="pr-2">
+                                                        <span className="font-medium text-slate-800 line-clamp-2 leading-tight">{rec.name}</span>
+                                                        <span className="text-[10px] text-slate-500 font-mono mt-0.5 block">{rec.sku}</span>
+                                                    </div>
+                                                    <span className="font-semibold text-indigo-700 whitespace-nowrap">{formatCurrency(rec.list_price, quoteCurrency, quoteLocale)}</span>
+                                                </div>
+                                                <button
+                                                    onClick={() => addToCartFromRecommendation(rec)}
+                                                    className="w-full flex items-center justify-center gap-1.5 text-xs bg-white border border-indigo-200 hover:bg-indigo-50 text-indigo-700 py-1.5 px-2 rounded font-medium transition-colors"
+                                                >
+                                                    <Plus size={14} /> Add to Quote
+                                                </button>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
-                            ))
-                        )}
-                    </div>
+                            )
+                        }
+
+                    </div >
+
+                    {/* Terms & Conditions Section */}
+                    {
+                        quoteItems.length > 0 && (
+                            <div className="bg-white border-t border-slate-200 p-4 space-y-3 shrink-0">
+                                <div className="flex justify-between items-center">
+                                    <h3 className="text-sm font-bold text-slate-700">Terms & Conditions</h3>
+                                    <button
+                                        onClick={async () => {
+                                            setGeneratingTerms(true);
+                                            const { generateTermsForProducts } = await import("@/app/actions/terms");
+                                            const productIds = quoteItems.map(i => i.product_id).filter(Boolean) as string[];
+                                            if (productIds.length > 0 && tenantId) {
+                                                const res = await generateTermsForProducts({ productIds, tenantId });
+                                                if (res.success && res.data.terms) {
+                                                    setNotes(prev => prev ? prev + "\n\n" + res.data.terms : res.data.terms);
+                                                }
+                                            }
+                                            setGeneratingTerms(false);
+                                        }}
+                                        disabled={generatingTerms}
+                                        className="flex items-center gap-1.5 text-xs text-brand-primary bg-brand-primary/10 hover:bg-brand-primary/20 px-2 py-1 rounded-md transition-colors"
+                                    >
+                                        {generatingTerms ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />}
+                                        Auto-Generate Terms
+                                    </button>
+                                </div>
+                                <textarea
+                                    value={notes}
+                                    onChange={(e) => setNotes(e.target.value)}
+                                    placeholder="Add special terms, SLA, or warranty info..."
+                                    className="w-full h-24 text-sm p-3 border border-slate-200 rounded-lg outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary resize-none"
+                                />
+                            </div>
+                        )
+                    }
 
                     {/* SUMMARY FOOTER */}
-                    <div className="bg-slate-50 border-t border-slate-200 p-4 space-y-2">
+                    <div className="bg-slate-50 border-t border-slate-200 p-4 space-y-2 overflow-y-auto max-h-[45vh] shrink-0">
                         <div className="flex justify-between text-sm text-slate-600">
                             <span>Subtotal</span>
                             <span>{formatCurrency(totals.subtotal, quoteCurrency, quoteLocale)}</span>
@@ -775,6 +1022,29 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
                             <span>Tax (17%)</span>
                             <span>{formatCurrency(totals.tax, quoteCurrency, quoteLocale)}</span>
                         </div>
+                        <div className="flex justify-between text-sm font-bold text-slate-900 border-t border-slate-200 pt-2 mt-2">
+                            <span>Amount Due Today</span>
+                            <span>{formatCurrency(totals.grandTotal, quoteCurrency, quoteLocale)}</span>
+                        </div>
+
+                        {/* Recurring Totals */}
+                        {(totals.recurring_monthly > 0 || totals.recurring_yearly > 0) && (
+                            <div className="border-t border-indigo-100 pt-3 mt-3 space-y-2">
+                                <h4 className="text-xs font-bold text-indigo-900 uppercase tracking-wider">Subscription Costs</h4>
+                                {totals.recurring_monthly > 0 && (
+                                    <div className="flex justify-between text-sm font-semibold text-indigo-700">
+                                        <span>Monthly Recurring</span>
+                                        <span>{formatCurrency(totals.recurring_monthly, quoteCurrency, quoteLocale)}</span>
+                                    </div>
+                                )}
+                                {totals.recurring_yearly > 0 && (
+                                    <div className="flex justify-between text-sm font-semibold text-indigo-700">
+                                        <span>Yearly Recurring</span>
+                                        <span>{formatCurrency(totals.recurring_yearly, quoteCurrency, quoteLocale)}</span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         {/* C3: Margin Warning Badge */}
                         {quoteItems.length > 0 && (
@@ -837,7 +1107,7 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
                             <button
                                 onClick={async () => {
                                     const savedQuoteId = await handleSave();
-                                    if (savedQuoteId) {
+                                    if (savedQuoteId && tenantId) {
                                         const result = await createInvoiceFromQuote(tenantId, savedQuoteId);
                                         if (result.success) {
                                             alert('Invoice created successfully. Go to Invoices to issue it.');
@@ -852,20 +1122,38 @@ export default function QuoteBuilder({ initialTenantId }: { initialTenantId?: st
                                 Generate Invoice
                             </button>
                         )}
-                    </div>
-                </aside>
 
-            </div>
+                        {/* Zero-Touch Quotes: Share Digital Link */}
+                        {generatedQuoteToken && (
+                            <button
+                                onClick={() => {
+                                    const baseUrl = window.location.origin;
+                                    const url = `${baseUrl}/quote/${generatedQuoteToken}`;
+                                    navigator.clipboard.writeText(url);
+                                    alert('Public Quote Link copied to clipboard!');
+                                }}
+                                className="w-full mt-2 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition-colors"
+                            >
+                                <Link className="w-4 h-4" />
+                                Copy Public Link
+                            </button>
+                        )}
+                    </div>
+                </aside >
+
+            </div >
 
             {/* CPQ Product Configurator Modal */}
-            {currentTemplateId && (
-                <ProductConfiguratorModal
-                    isOpen={configuratorOpen}
-                    templateId={currentTemplateId}
-                    onClose={() => setConfiguratorOpen(false)}
-                    onAddToQuote={handleConfiguredProductAdd}
-                />
-            )}
-        </div>
+            {
+                currentTemplateId && (
+                    <ProductConfiguratorModal
+                        isOpen={configuratorOpen}
+                        templateId={currentTemplateId}
+                        onClose={() => setConfiguratorOpen(false)}
+                        onAddToQuote={handleConfiguredProductAdd}
+                    />
+                )
+            }
+        </div >
     );
 }

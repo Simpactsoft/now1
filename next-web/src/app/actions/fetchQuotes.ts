@@ -1,18 +1,23 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { verifyAuthWithTenant } from './_shared/auth';
+import { isAuthError } from './_shared/auth-utils';
 import { GridResult } from '@/lib/action-result';
+import { uuidSchema } from './_shared/schemas';
 
 export interface QuoteSummary {
     id: string;
-    order_number: number;
+    quote_number: string;
     status: string;
-    order_type: string;
-    total_amount: number;
+    grand_total: number;
     currency: string;
     customer_id: string | null;
     customer_name: string | null;
+    margin_pct: number | null;
     items_count: number;
+    quote_date: string;
+    valid_until: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -20,75 +25,71 @@ export interface QuoteSummary {
 export async function fetchQuotes(tenantId: string): Promise<GridResult<QuoteSummary>> {
     const t0 = Date.now();
     try {
-        const supabase = await createClient();
-
-        // Fetch quotes (orders with order_type = 'quote')
-        const { data: orders, error: ordersError } = await supabase
-            .from('orders')
-            .select('*')
-            .eq('tenant_id', tenantId)
-            .eq('order_type', 'quote')
-            .order('created_at', { ascending: false });
-
-        if (ordersError) {
-            console.error('[fetchQuotes] Error:', ordersError);
-            return { rowData: [], rowCount: 0, error: ordersError.message, latency: Date.now() - t0 };
+        // 1. Zod Validation
+        const parsedTenantId = uuidSchema.safeParse(tenantId);
+        if (!parsedTenantId.success) {
+            return { rowData: [], rowCount: 0, error: 'Invalid tenant ID', latency: Date.now() - t0 };
         }
 
-        if (!orders || orders.length === 0) {
+        // 2. Auth & Membership check (Pattern B)
+        const auth = await verifyAuthWithTenant(parsedTenantId.data);
+        if (isAuthError(auth)) {
+            return { rowData: [], rowCount: 0, error: auth.error, latency: Date.now() - t0 };
+        }
+
+        const adminClient = createAdminClient();
+
+        // 3. Fetch quotes from the quotes table
+        const { data: quotes, error: quotesError } = await adminClient
+            .from('quotes')
+            .select('*')
+            .eq('tenant_id', parsedTenantId.data)
+            .order('created_at', { ascending: false });
+
+        if (quotesError) {
+            console.error('[fetchQuotes] Error:', quotesError);
+            return { rowData: [], rowCount: 0, error: quotesError.message, latency: Date.now() - t0 };
+        }
+
+        if (!quotes || quotes.length === 0) {
             return { rowData: [], rowCount: 0, latency: Date.now() - t0 };
         }
 
-        // Fetch customer names
-        const customerIds = [...new Set(orders.filter(o => o.customer_id).map(o => o.customer_id))];
-        let customerMap: Record<string, string> = {};
-
-        if (customerIds.length > 0) {
-            const { data: customers } = await supabase
-                .from('cards')
-                .select('id, display_name')
-                .in('id', customerIds);
-
-            if (customers) {
-                customers.forEach((c: any) => {
-                    customerMap[c.id] = c.display_name || 'Unknown';
-                });
-            }
-        }
-
-        // Fetch item counts per order
-        const orderIds = orders.map(o => o.id);
+        // 4. Fetch item counts per quote
+        const quoteIds = quotes.map(q => q.id);
         let itemCountMap: Record<string, number> = {};
 
-        if (orderIds.length > 0) {
-            const { data: items } = await supabase
-                .from('order_items')
-                .select('order_id')
-                .in('order_id', orderIds);
+        if (quoteIds.length > 0) {
+            const { data: items } = await adminClient
+                .from('quote_items')
+                .select('quote_id')
+                .in('quote_id', quoteIds);
 
             if (items) {
                 items.forEach((item: any) => {
-                    itemCountMap[item.order_id] = (itemCountMap[item.order_id] || 0) + 1;
+                    itemCountMap[item.quote_id] = (itemCountMap[item.quote_id] || 0) + 1;
                 });
             }
         }
 
-        // Combine
-        const quotes: QuoteSummary[] = orders.map(o => ({
-            id: o.id,
-            order_number: o.order_number,
-            status: o.status,
-            order_type: o.order_type || 'quote',
-            total_amount: o.total_amount || 0,
-            currency: o.currency || 'ILS',
-            customer_id: o.customer_id,
-            customer_name: o.customer_id ? (customerMap[o.customer_id] || 'Unknown') : null,
-            items_count: itemCountMap[o.id] || 0,
-            created_at: o.created_at,
-            updated_at: o.updated_at,
+        // 5. Build result
+        const result: QuoteSummary[] = quotes.map(q => ({
+            id: q.id,
+            quote_number: q.quote_number,
+            status: q.status,
+            grand_total: q.grand_total || 0,
+            currency: q.currency || 'ILS', // Default to ILS if not set
+            customer_id: q.customer_id,
+            customer_name: q.customer_name || null,
+            margin_pct: q.margin_pct,
+            items_count: itemCountMap[q.id] || 0,
+            quote_date: q.quote_date,
+            valid_until: q.valid_until,
+            created_at: q.created_at,
+            updated_at: q.updated_at,
         }));
 
-        return { rowData: quotes, rowCount: quotes.length, latency: Date.now() - t0 };
+        return { rowData: result, rowCount: result.length, latency: Date.now() - t0 };
     } catch (err: any) {
         console.error('[fetchQuotes] Unexpected error:', err);
         return { rowData: [], rowCount: 0, error: err.message, latency: Date.now() - t0 };

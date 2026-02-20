@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { fetchUsers } from "@/app/actions/fetchUsers";
+import { fetchUsers, UserProfile } from "@/app/actions/fetchUsers";
 import { inviteUser } from "@/app/actions/inviteUser";
 import { toast } from "sonner";
 import { UserPlus, Mail, Shield, Trash2, Check, X, MoreHorizontal, Building2 } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
 
 export default function UserManagement({ tenantId }: { tenantId?: string }) {
-    const [users, setUsers] = useState<any[]>([]);
+    const [users, setUsers] = useState<UserProfile[]>([]);
     const [loading, setLoading] = useState(true);
     const [pageError, setPageError] = useState<string | null>(null);
 
@@ -26,7 +26,7 @@ export default function UserManagement({ tenantId }: { tenantId?: string }) {
         setLoading(true);
         const res = await fetchUsers(tenantId!);
         if (res.success) {
-            setUsers(res.users);
+            setUsers(res.data?.users || []);
         } else {
             setPageError(res.error || "Failed to load users");
         }
@@ -54,13 +54,13 @@ export default function UserManagement({ tenantId }: { tenantId?: string }) {
     };
 
     // Group Users by Tenant
-    const groupedUsers = users.reduce((acc, user) => {
+    const groupedUsers = (users || []).reduce((acc, user) => {
         // user.tenants is an object { name: ... } from the join
         const tName = user.tenants?.name || "Unknown Organization";
         if (!acc[tName]) acc[tName] = [];
         acc[tName].push(user);
         return acc;
-    }, {} as Record<string, typeof users>);
+    }, {} as Record<string, UserProfile[]>);
 
     if (pageError) {
         return <div className="p-8 text-center text-destructive">{pageError}</div>;
@@ -99,7 +99,7 @@ export default function UserManagement({ tenantId }: { tenantId?: string }) {
                 </div>
             ) : (
                 <div className="grid gap-8">
-                    {Object.entries(groupedUsers).map(([tenantName, tenantUsers]) => (
+                    {(Object.entries(groupedUsers) as [string, UserProfile[]][]).map(([tenantName, tenantUsers]) => (
                         <div key={tenantName} className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
                             <div className="flex items-center gap-3 pb-2 border-b border-border/50">
                                 <div className="p-2 bg-blue-500/10 rounded-lg">
@@ -114,7 +114,7 @@ export default function UserManagement({ tenantId }: { tenantId?: string }) {
                             </div>
 
                             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                                {tenantUsers.map((user: any) => (
+                                {tenantUsers.map((user) => (
                                     <div key={user.id} className="relative p-5 rounded-xl border border-border bg-card text-card-foreground shadow-sm flex flex-col gap-4 group hover:border-blue-500/30 hover:shadow-md transition-all">
                                         <div className="flex items-start justify-between">
                                             <div className="flex items-center gap-3">
@@ -191,8 +191,8 @@ export default function UserManagement({ tenantId }: { tenantId?: string }) {
                                             key={role}
                                             onClick={() => setInviteRole(role)}
                                             className={`relative flex items-center p-3 rounded-xl border transition-all text-left group ${inviteRole === role
-                                                    ? 'bg-primary/5 border-primary shadow-[0_0_0_1px_rgba(var(--primary),1)]'
-                                                    : 'bg-background border-border hover:border-primary/50 hover:bg-secondary/50'
+                                                ? 'bg-primary/5 border-primary shadow-[0_0_0_1px_rgba(var(--primary),1)]'
+                                                : 'bg-background border-border hover:border-primary/50 hover:bg-secondary/50'
                                                 }`}
                                         >
                                             <div className={`w-4 h-4 rounded-full border flex items-center justify-center mr-3 ${inviteRole === role ? 'border-primary' : 'border-muted-foreground'}`}>

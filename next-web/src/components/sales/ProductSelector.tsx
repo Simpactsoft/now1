@@ -18,6 +18,7 @@ interface Product {
     category?: { id: string; name: string };
     sku?: string;
     stock_quantity: number;
+    track_inventory?: boolean;
     description?: string;
     [key: string]: any;
 }
@@ -54,7 +55,7 @@ export default function ProductSelector({ products, categories, loading, onAddTo
 
             if (filter.field === 'category') {
                 // Category filter (multi-select logic if comma separated, or single)
-                const selectedIds = filter.value.split(',').map(s => s.trim().toLowerCase());
+                const selectedIds = filter.value.split(',').map((s: string) => s.trim().toLowerCase());
                 if (selectedIds.length > 0 && selectedIds[0] !== '') {
                     res = res.filter(p => {
                         const catId = p.category_id || p.category?.id;
@@ -75,7 +76,7 @@ export default function ProductSelector({ products, categories, loading, onAddTo
     // -- Render Views --
 
     const renderGrid = () => (
-        <div className="h-[600px] w-full">
+        <div className="h-full w-full">
             <ProductsAgGrid
                 products={filteredProducts}
                 loading={loading}
@@ -86,16 +87,16 @@ export default function ProductSelector({ products, categories, loading, onAddTo
     );
 
     const renderCards = () => (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 p-4 pb-20 overflow-y-auto h-[600px]">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 p-4 pb-20 overflow-y-auto h-full">
             {filteredProducts.map(product => {
-                const isOutOfStock = product.stock_quantity <= 0;
+                const isOutOfStock = product.track_inventory && product.stock_quantity <= 0;
                 return (
                     <div
                         key={product.id}
-                        onClick={() => !isOutOfStock && onAddToQuote(product)}
+                        onClick={() => onAddToQuote(product)}
                         className={cn(
                             "group relative flex flex-col justify-between p-4 rounded-xl border transition-all duration-200 bg-card hover:shadow-md cursor-pointer",
-                            isOutOfStock ? "opacity-60 grayscale cursor-not-allowed" : "hover:border-primary/50"
+                            isOutOfStock ? "border-amber-200 hover:border-amber-400" : "hover:border-primary/50"
                         )}
                     >
                         <div className="flex justify-between items-start mb-2">
@@ -103,7 +104,7 @@ export default function ProductSelector({ products, categories, loading, onAddTo
                                 <Package className="w-5 h-5" />
                             </div>
                             {isOutOfStock && (
-                                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-destructive/10 text-destructive border border-destructive/20">
+                                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
                                     Out of Stock
                                 </span>
                             )}
@@ -128,11 +129,9 @@ export default function ProductSelector({ products, categories, loading, onAddTo
                             <div className="font-bold text-lg">
                                 {new Intl.NumberFormat('en-US', { style: 'currency', currency: product.currency || 'USD' }).format(product.price)}
                             </div>
-                            {!isOutOfStock && (
-                                <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Plus className="w-4 h-4" />
-                                </div>
-                            )}
+                            <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Plus className="w-4 h-4" />
+                            </div>
                         </div>
                     </div>
                 );
@@ -150,7 +149,7 @@ export default function ProductSelector({ products, categories, loading, onAddTo
         <ProductTags
             products={filteredProducts}
             loading={loading}
-            onAddToQuote={onAddToQuote}
+            onAddToQuote={(p: any) => onAddToQuote(p)}
         />
     );
 

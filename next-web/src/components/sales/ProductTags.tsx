@@ -12,6 +12,7 @@ interface Product {
     category?: { name: string };
     sku?: string;
     stock_quantity: number;
+    track_inventory?: boolean;
     [key: string]: any;
 }
 
@@ -44,15 +45,15 @@ export default function ProductTags({ products, loading, onAddToQuote }: Product
 }
 
 function ProductTag({ product, onAddToQuote }: { product: Product, onAddToQuote: (product: Product) => void }) {
-    const isOutOfStock = product.stock_quantity <= 0;
+    const isOutOfStock = product.track_inventory && product.stock_quantity <= 0;
 
     return (
         <div
-            onClick={() => !isOutOfStock && onAddToQuote(product)}
+            onClick={() => onAddToQuote(product)}
             className={cn(
                 "group relative flex items-center gap-2 pl-2 pr-4 py-1.5 rounded-full border transition-all duration-200 cursor-pointer bg-card hover:shadow-sm select-none",
                 isOutOfStock
-                    ? "opacity-60 grayscale border-dashed cursor-not-allowed bg-muted/30"
+                    ? "border-amber-200 hover:border-amber-400 hover:bg-amber-50"
                     : "border-border hover:border-primary/50 hover:bg-primary/5"
             )}
             title={product.description || product.name}
@@ -73,11 +74,9 @@ function ProductTag({ product, onAddToQuote }: { product: Product, onAddToQuote:
                 </span>
             </div>
 
-            {!isOutOfStock && (
-                <div className="ml-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Plus size={12} className="text-primary" />
-                </div>
-            )}
+            <div className="ml-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Plus size={12} className={isOutOfStock ? "text-amber-600" : "text-primary"} />
+            </div>
         </div>
     );
 }

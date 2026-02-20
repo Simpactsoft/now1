@@ -38,9 +38,9 @@ export async function verifyAuthWithTenant(
         .select("user_id")
         .eq("tenant_id", tenantId)
         .eq("user_id", user.id)
-        .maybeSingle();
+        .limit(1);
 
-    if (!membership) {
+    if (!membership || membership.length === 0) {
         return { error: "Access denied: not a member of this tenant" };
     }
 

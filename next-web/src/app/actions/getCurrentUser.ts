@@ -10,10 +10,9 @@ export async function getCurrentUser(): Promise<ActionResult<any>> {
         const { data: { user }, error } = await supabase.auth.getUser();
 
         if (error || !user) {
-            console.error('[getCurrentUser] getUser failed:', {
-                msg: error?.message,
-                status: error?.status
-            });
+            // It's normal for no user to exist on public routes. 
+            // We keep it as a debug/info log instead of an error to prevent console spam.
+            // console.debug('[getCurrentUser] No primary user session found.', error?.message || '');
 
             // Secondary Check: Local Session Validation (Faster, reliable for pure display)
             // This mirrors how RPCs/Data Fetching might succeed even if Auth API fails
@@ -24,7 +23,7 @@ export async function getCurrentUser(): Promise<ActionResult<any>> {
                 return actionSuccess(session.user);
             }
 
-            console.error('[getCurrentUser] All Auth failed. Session Error:', sessionError?.message);
+            // console.debug('[getCurrentUser] No local session either. User is unauthenticated.');
             return actionError("Not authenticated", "AUTH_ERROR");
         }
 

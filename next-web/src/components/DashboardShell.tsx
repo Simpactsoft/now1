@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Sidebar, { UserProfileData } from "@/components/Sidebar";
+import { usePathname } from "next/navigation";
 
 interface DashboardShellProps {
     children: React.ReactNode;
@@ -16,8 +17,15 @@ export default function DashboardShell({
     peopleCount,
     userProfile
 }: DashboardShellProps) {
+    const pathname = usePathname();
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isMobile, setIsMobile] = useState(false);
+
+    // Bypass DashboardShell entirely for login or public quote pages
+    const isPublicRoute = pathname?.startsWith('/login') || pathname?.startsWith('/quote');
+    if (isPublicRoute) {
+        return <>{children}</>;
+    }
 
     // Initial check for screen size & Auto-Heal Tenant
     useEffect(() => {

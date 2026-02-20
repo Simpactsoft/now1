@@ -1,30 +1,64 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { verifyAuthWithTenant } from "./_shared/auth";
+import { isAuthError } from "./_shared/auth-utils";
 import { ActionResult, actionSuccess, actionError } from "@/lib/action-result";
 
-export async function fetchPersonDetails(tenantId: string, personId: string): Promise<ActionResult<{ profile: any; timeline: any[] }>> {
-    const supabase = await createClient();
+export interface TimelineEvent {
+    id: string;
+    event_type: string;
+    event_message: string;
+    metadata: any;
+    created_at: string;
+}
+
+export interface ProfileData {
+    id: string;
+    first_name?: string;
+    last_name?: string;
+    name?: string; // Organization name
+    email?: string;
+    phone?: string;
+    website?: string;
+    status?: string;
+    custom_fields?: Record<string, any>;
+    job_title?: string;
+    [key: string]: any; // Catch-all for other RPC columns
+}
+
+export async function fetchPersonDetails(tenantId: string, personId: string): Promise<ActionResult<{ profile: ProfileData | null; timeline: TimelineEvent[] }>> {
+    console.log(`[fetchPersonDetails] Invoked with tenantId: ${tenantId}, personId: ${personId}`);
+
+    const auth = await verifyAuthWithTenant(tenantId);
+    if (isAuthError(auth)) {
+        console.error(`[fetchPersonDetails] Auth failed:`, auth.error);
+        return actionError(auth.error, "AUTH_ERROR");
+    }
+
+    const adminClient = createAdminClient();
+    console.log(`[fetchPersonDetails] Auth passed. Executing queries...`);
 
     // Parallel fetch for profile, timeline, and direct custom_fields (fallback for stale RPC)
     const [profileResult, timelineResult, directCardResult, membershipResult] = await Promise.all([
-        supabase.rpc("fetch_person_profile", {
+        adminClient.rpc("fetch_person_profile", {
             arg_tenant_id: tenantId,
             arg_person_id: personId
         }),
-        supabase.rpc("fetch_person_timeline", {
+        adminClient.rpc("fetch_person_timeline", {
             arg_tenant_id: tenantId,
             arg_person_id: personId,
             arg_limit: 50
         }),
-        // Use Standard Client (Respects RLS)
-        supabase.from('cards')
+        // Use Admin Client to bypass RLS
+        adminClient.from('cards')
             .select('custom_fields, contact_methods, status')
             .eq('id', personId)
             .eq('tenant_id', tenantId)
             .maybeSingle(),
         // [New] Fetch Role (Job Title) manually
-        supabase.from('party_memberships')
+        adminClient.from('party_memberships')
             .select('role_name')
             .eq('person_id', personId)
             .eq('tenant_id', tenantId)
@@ -32,16 +66,23 @@ export async function fetchPersonDetails(tenantId: string, personId: string): Pr
     ]);
 
     if (profileResult.error) {
-        console.error("fetch_person_profile error:", profileResult.error);
+        console.error("[fetchPersonDetails] fetch_person_profile error:", profileResult.error);
         return actionError(profileResult.error.message, "DB_ERROR");
     }
 
     if (timelineResult.error) {
-        console.error("fetch_person_timeline error:", timelineResult.error);
+        console.error("[fetchPersonDetails] fetch_person_timeline error:", timelineResult.error);
         // We don't fail the whole page if timeline fails, just return empty
     }
 
+    console.log(`[fetchPersonDetails] profileResult data length:`, profileResult.data?.length);
     const profile = profileResult.data?.[0] || null;
+
+    if (!profile) {
+        console.error(`[fetchPersonDetails] Found NO profile data for person: ${personId} in tenant: ${tenantId}`);
+        // Let's also check if it exists in cards at all just to debug
+        console.log(`[fetchPersonDetails] directCardResult:`, directCardResult.data ? `Yes, type: ${directCardResult.data.status}` : directCardResult.error);
+    }
 
     // Merge custom_fields if missing from RPC but found in direct fetch
     if (profile && directCardResult.data) {
@@ -87,21 +128,31 @@ export async function fetchPersonDetails(tenantId: string, personId: string): Pr
     });
 }
 
-export async function fetchOrganizationDetails(tenantId: string, orgId: string): Promise<ActionResult<{ profile: any; timeline: any[] }>> {
-    const supabase = await createClient();
+export async function fetchOrganizationDetails(tenantId: string, orgId: string): Promise<ActionResult<{ profile: ProfileData | null; timeline: TimelineEvent[] }>> {
+    console.log(`[fetchOrganizationDetails] Invoked with tenantId: ${tenantId}, orgId: ${orgId}`);
+
+    const auth = await verifyAuthWithTenant(tenantId);
+    if (isAuthError(auth)) {
+        console.error(`[fetchOrganizationDetails] Auth failed:`, auth.error);
+        return actionError(auth.error, "AUTH_ERROR");
+    }
+
+    const adminClient = createAdminClient();
+    console.log(`[fetchOrganizationDetails] Auth passed. Executing queries...`);
 
     const [profileResult, timelineResult, directCardResult] = await Promise.all([
-        supabase.rpc("fetch_organization_profile", {
+        adminClient.rpc("fetch_organization_profile", {
             arg_tenant_id: tenantId,
             arg_org_id: orgId
         }),
-        supabase.rpc("fetch_person_timeline", {
+        // NOTE: fetch_person_timeline is polymorphic and works for organizations (entities) too, reading from action_timeline.entity_id referencing parties.id
+        adminClient.rpc("fetch_person_timeline", {
             arg_tenant_id: tenantId,
             arg_person_id: orgId,
             arg_limit: 50
         }),
         // [New] Direct Fetch Fallback
-        supabase.from('cards')
+        adminClient.from('cards')
             .select('custom_fields, contact_methods, status')
             .eq('id', orgId)
             .eq('tenant_id', tenantId)
@@ -109,13 +160,17 @@ export async function fetchOrganizationDetails(tenantId: string, orgId: string):
     ]);
 
     if (profileResult.error) {
-        console.error("fetchOrganizationDetails error:", profileResult.error);
+        console.error("[fetchOrganizationDetails] error:", profileResult.error);
         return actionError(profileResult.error.message, "DB_ERROR");
     }
 
+    console.log(`[fetchOrganizationDetails] profileResult data length:`, profileResult.data?.length);
     const org = profileResult.data?.[0];
 
-    if (!org) return actionSuccess({ profile: null, timeline: [] });
+    if (!org) {
+        console.error(`[fetchOrganizationDetails] Found NO profile data for org: ${orgId} in tenant: ${tenantId}`);
+        return actionSuccess({ profile: null, timeline: [] });
+    }
 
     // [New] Merge Logic (Same as Person)
     // We prefer directCardResult if available (freshest), but fallback to RPC returned raw fields (ret_*) if RLS blocks direct fetch.
