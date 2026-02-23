@@ -31,23 +31,16 @@ export async function fetchActivities(
 
   const adminClient = createAdminClient();
 
-  // New generic polymorphic approach
+  // We fetch via activity_links
   const { data, error } = await adminClient
-    .from("activities")
+    .from("activity_links")
     .select(`
-      *,
-      activity_participants_v2 (
-        id,
-        participant_type,
-        participant_id,
-        role,
-        rsvp_status
+      activities (
+        *
       )
     `)
     .eq("tenant_id", parsed.data.tenantId)
-    .eq("entity_type", parsed.data.entityType)
-    .eq("entity_id", parsed.data.entityId)
-    .order("created_at", { ascending: false })
+    .eq(`${parsed.data.entityType}_id`, parsed.data.entityId)
     .limit(parsed.data.limit);
 
   if (error) {
@@ -55,7 +48,13 @@ export async function fetchActivities(
     return { error: "Failed to fetch activities" };
   }
 
-  return { success: true, data };
+  const activitiesData = data.flatMap((d: any) => {
+    const acts = d.activities;
+    return Array.isArray(acts) ? acts : [acts];
+  }).filter(Boolean);
+  activitiesData.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+  return { success: true, data: activitiesData };
 }
 
 const CreateActivitySchema = z.object({
@@ -81,7 +80,6 @@ const CreateActivitySchema = z.object({
 export async function createActivity(data: z.infer<typeof CreateActivitySchema>) {
   const parsed = CreateActivitySchema.safeParse(data);
   if (!parsed.success) {
-    console.error("DEBUG Activity Validation Error:", parsed.error);
     return { error: `Invalid input: ${(parsed.error as any).errors[0].message}` };
   }
 
@@ -92,6 +90,15 @@ export async function createActivity(data: z.infer<typeof CreateActivitySchema>)
     return { error: "Unauthorized for this tenant" };
   }
   const userId = auth.userId;
+
+  // Determine assignee
+  let assignee = userId;
+  if (participants && participants.length > 0) {
+    const pAssignee = participants.find(p => p.role === "assignee");
+    if (pAssignee && pAssignee.type === "user") {
+      assignee = pAssignee.id;
+    }
+  }
 
   const adminClient = createAdminClient();
 
@@ -106,10 +113,8 @@ export async function createActivity(data: z.infer<typeof CreateActivitySchema>)
       due_at: dueAt || null,
       is_task: isTask,
       priority: priority || "normal",
-      entity_type: entityType || null,
-      entity_id: entityId || null,
       created_by: userId,
-      assigned_to: userId,
+      assigned_to: assignee,
       commission_eligible: false,
     })
     .select("id")
@@ -120,42 +125,23 @@ export async function createActivity(data: z.infer<typeof CreateActivitySchema>)
     return { error: "Failed to create activity" };
   }
 
-  // Insert participants if any (plus default owner/initiator)
+  // Insert link if any
   const inserts = [];
 
-  // 1. Always add the creator as initiator
-  inserts.push({
-    tenant_id: tenantId,
-    activity_id: newActivity.id,
-    participant_type: "user",
-    participant_id: userId,
-    role: "initiator",
-    rsvp_status: "accepted"
-  });
+  if (entityId && entityType) {
+    if (['card', 'opportunity', 'lead'].includes(entityType)) {
+      const payload: any = {
+        tenant_id: tenantId,
+        activity_id: newActivity.id,
+        link_type: 'related'
+      };
+      payload[`${entityType}_id`] = entityId;
 
-  // 2. Add other participants
-  if (participants && participants.length > 0) {
-    for (const p of participants) {
-      if (!(p.id === userId && p.role === "initiator")) { // avoid dupe
-        inserts.push({
-          tenant_id: tenantId,
-          activity_id: newActivity.id,
-          participant_type: p.type === 'user' ? 'user' : 'contact',
-          participant_id: p.id,
-          role: p.role,
-          rsvp_status: p.rsvpStatus || "pending"
-        });
+      const { error: linkError } = await adminClient.from("activity_links").insert(payload);
+      if (linkError) {
+        console.error("Failed to link activity", linkError);
       }
     }
-  }
-
-  const { error: partError } = await adminClient
-    .from("activity_participants_v2")
-    .insert(inserts);
-
-  if (partError) {
-    console.error("Failed to add participants", partError);
-    // Don't fail the whole action, but log it
   }
 
   return { success: true, activityId: newActivity.id };

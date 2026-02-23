@@ -21,13 +21,8 @@ interface Activity {
     completed_at: string | null;
     priority: string;
     created_at: string;
-    activity_participants_v2?: Array<{
-        id: string;
-        participant_type: string;
-        participant_id: string;
-        role: string;
-        rsvp_status: string;
-    }>;
+    assigned_to?: string;
+    created_by?: string;
 }
 
 interface ActivitiesTimelineProps {
@@ -64,7 +59,7 @@ export function ActivitiesTimeline({ tenantId, entityId, entityType }: Activitie
 
             const res = await fetchActivities(tenantId, entityId, entityType);
             if (res.success && res.data) {
-                setActivities(res.data);
+                setActivities(res.data as Activity[]);
             } else {
                 setError(res.error || "Failed to load activities");
             }
@@ -245,12 +240,12 @@ export function ActivitiesTimeline({ tenantId, entityId, entityType }: Activitie
                                             {formatDate(activity.created_at)}
                                         </span>
                                     </div>
-                                    {activity.activity_participants_v2 && activity.activity_participants_v2.some(p => p.role === "assignee") && (
+                                    {activity.assigned_to && (
                                         <div className="flex items-center gap-1 mb-2 text-xs text-indigo-600 font-medium">
                                             <User className="h-3 w-3" />
                                             <span>
                                                 Assigned to {
-                                                    users.find(u => u.id === activity.activity_participants_v2?.find(p => p.role === "assignee")?.participant_id)?.raw_user_meta_data?.full_name
+                                                    users.find(u => u.id === activity.assigned_to)?.raw_user_meta_data?.full_name
                                                     || "someone else"
                                                 }
                                             </span>
