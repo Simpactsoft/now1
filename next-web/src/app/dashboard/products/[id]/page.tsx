@@ -3,6 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect, notFound } from "next/navigation";
 import ProductCardWrapper from "@/components/products/ProductCardWrapper";
 import ProductVariantsPanel from "@/components/products/ProductVariantsPanel";
+import ProductRelationshipsClient from "@/components/products/ProductRelationshipsClient";
+import BomTab from "@/components/products/BomTab";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const dynamic = "force-dynamic";
 
@@ -60,17 +63,49 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
 
     return (
         <div className="container mx-auto p-6 space-y-6">
-            <ProductCardWrapper
-                product={productData}
-                tenantId={tenantId}
-            />
+            <h1 className="text-2xl font-bold mb-4">{product.name}</h1>
 
-            {/* Product Variants Section */}
-            <ProductVariantsPanel
-                tenantId={tenantId}
-                productId={id}
-                productName={product.name}
-            />
+            <Tabs defaultValue="edit" className="w-full" dir="rtl">
+                <TabsList className="mb-4">
+                    <TabsTrigger value="edit">עריכת מוצר</TabsTrigger>
+                    <TabsTrigger value="bom">הצג בום</TabsTrigger>
+                    <TabsTrigger value="inventory">היסטורית מלאי</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="edit" className="space-y-6 mt-0">
+                    <ProductCardWrapper
+                        product={productData}
+                        tenantId={tenantId}
+                    />
+
+                    {/* Product Variants Section */}
+                    <ProductVariantsPanel
+                        tenantId={tenantId}
+                        productId={id}
+                        productName={product.name}
+                    />
+
+                    {/* AI Relationships Section */}
+                    <ProductRelationshipsClient
+                        tenantId={tenantId}
+                        productId={id}
+                        productName={product.name}
+                    />
+                </TabsContent>
+
+                <TabsContent value="bom" className="mt-0">
+                    <BomTab
+                        productId={id}
+                        productName={product.name}
+                    />
+                </TabsContent>
+
+                <TabsContent value="inventory" className="mt-0">
+                    <div className="p-12 text-center bg-card border border-border rounded-lg text-muted-foreground">
+                        <p>היסטורית מלאי תתווסף בקרוב לשירות...</p>
+                    </div>
+                </TabsContent>
+            </Tabs>
         </div>
     );
 }

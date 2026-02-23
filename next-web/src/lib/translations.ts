@@ -48,7 +48,10 @@ export const translations = {
         payments: "Payments",
         pipelines: "Pipelines",
         leads: "Leads Inbox",
-        tasks: "My Tasks"
+        tasks: "My Tasks",
+        teams_admin: "Teams & Users",
+        commissions_admin: "Commission Plans",
+        commissions_ledger: "My Commissions"
     },
     he: {
         dashboard: "לוח בקרה",
@@ -97,6 +100,9 @@ export const translations = {
         payments: "תשלומים",
         pipelines: "תהליכי מכר",
         leads: "תיבת אנשי קשר (לידים)",
-        tasks: "המשימות שלי"
+        tasks: "המשימות שלי",
+        teams_admin: "צוותים ומשתמשים",
+        commissions_admin: "תוכניות עמלה",
+        commissions_ledger: "העמלות שלי"
     }
 };

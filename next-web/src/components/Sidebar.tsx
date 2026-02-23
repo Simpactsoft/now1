@@ -44,6 +44,7 @@ const NAV_CONFIG = [
     { key: 'leads', href: '/dashboard/sales/leads', icon: Inbox },
     { key: 'pipelines', href: '/dashboard/sales/pipelines', icon: Kanban },
     { key: 'quotes', href: '/dashboard/sales/quotes', icon: FileText },
+    { key: 'commissions_ledger', href: '/dashboard/commissions', icon: DollarSign },
     { key: 'purchase_orders', href: '/dashboard/purchase-orders', icon: ClipboardList },
     { key: 'payments', href: '/dashboard/payments', icon: DollarSign },
     { key: 'logs', href: '/dashboard/logs', icon: Activity },
@@ -51,6 +52,8 @@ const NAV_CONFIG = [
     { key: 'infrastructure', href: '/dashboard/infra', icon: Database },
     { key: 'system_admin', href: '/dashboard/admin', icon: ShieldCheck },
     { key: 'settings', href: '/dashboard/settings', icon: Settings },
+    { key: 'teams_admin', href: '/dashboard/admin/teams', icon: Users },
+    { key: 'commissions_admin', href: '/dashboard/admin/commissions', icon: DollarSign },
 ] as const;
 
 import TenantSwitcher from "./TenantSwitcher";

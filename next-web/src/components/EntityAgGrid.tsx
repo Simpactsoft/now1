@@ -59,7 +59,7 @@ export default function EntityAgGrid({
 }: EntityAgGridProps) {
     const { theme } = useTheme();
     const gridRef = useRef<AgGridReact>(null);
-    const gridTheme = themeQuartz.withParams({ accentColor: '#6366f1' });
+    const gridTheme = useMemo(() => themeQuartz.withParams({ accentColor: '#6366f1' }), []);
     const isRtl = typeof document !== 'undefined' && document.documentElement.dir === 'rtl';
 
     // Default Column Definitions

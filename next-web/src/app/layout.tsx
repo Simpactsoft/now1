@@ -13,6 +13,7 @@ import { getPeopleCount } from "@/app/actions/getPeopleCount";
 import { getCurrentUser } from "@/app/actions/getCurrentUser";
 import { createClient } from "@/lib/supabase/server";
 import { activateUser } from "@/app/actions/activateUser";
+import { QueryProvider } from "@/components/QueryProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -129,19 +130,21 @@ export default async function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <LanguageProvider>
-            <SessionProvider user={userProfile}>
-              <AgGridRegistry />
-              <DashboardShell
-                currentTenantId={tenantId}
-                peopleCount={peopleCount}
-                userProfile={userProfile}
-              >
-                {children}
-              </DashboardShell>
-              <Toaster position="top-right" theme="system" />
-            </SessionProvider>
-          </LanguageProvider>
+          <QueryProvider>
+            <LanguageProvider>
+              <SessionProvider user={userProfile}>
+                <AgGridRegistry />
+                <DashboardShell
+                  currentTenantId={tenantId}
+                  peopleCount={peopleCount}
+                  userProfile={userProfile}
+                >
+                  {children}
+                </DashboardShell>
+                <Toaster position="top-right" theme="system" />
+              </SessionProvider>
+            </LanguageProvider>
+          </QueryProvider>
         </ThemeProvider>
       </body>
     </html>

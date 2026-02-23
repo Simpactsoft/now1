@@ -28,6 +28,7 @@ import {
 import { createBrowserClient } from '@supabase/ssr';
 import { Command } from 'cmdk';
 import * as Popover from '@radix-ui/react-popover';
+import NextLink from 'next/link';
 import { getProductsForTenant } from "@/app/actions/quote-actions";
 import { getPriceLists, getEffectivePrice } from "@/app/actions/price-list-actions";
 import { validateQuoteMargin } from "@/app/actions/profitability-actions";
@@ -307,7 +308,9 @@ export default function QuoteBuilder({ initialTenantId, quoteId, initialCustomer
                     stock_quantity: p.current_stock || 0,
                     category_id: p.category_id,
                     category: p.category_id ? { id: p.category_id, name: fetchedCategories?.find((c: any) => c.id === p.category_id)?.name || 'Unknown' } : undefined,
-                    current_stock: p.current_stock
+                    current_stock: p.current_stock,
+                    is_configurable: p.is_configurable,
+                    template_id: p.template_id
                 }));
                 setProducts(mappedProds);
             }
@@ -700,64 +703,75 @@ export default function QuoteBuilder({ initialTenantId, quoteId, initialCustomer
                 <div className="flex items-center gap-4">
                     <div className="flex flex-col">
                         <label className="text-xs font-medium text-slate-500 mb-1">Customer</label>
-                        <Popover.Root open={openCustomer} onOpenChange={setOpenCustomer}>
-                            <Popover.Trigger asChild>
-                                <button
-                                    role="combobox"
-                                    aria-expanded={openCustomer}
-                                    className="flex items-center justify-between border border-slate-300 rounded px-2 py-1 text-sm bg-white min-w-[220px] hover:bg-slate-50 transition-colors"
-                                >
-                                    <div className="flex items-center gap-2 truncate">
-                                        {selectedCustomerId ? (
-                                            <>
-                                                {customers.find(c => c.id === selectedCustomerId)?.type === 'organization' ? <Building2 size={14} className="text-slate-400" /> : <UserCircle size={14} className="text-slate-400" />}
-                                                <span className="truncate max-w-[160px]">{customers.find(c => c.id === selectedCustomerId)?.name}</span>
-                                            </>
-                                        ) : (
-                                            <span className="text-slate-500">Select Customer...</span>
-                                        )}
-                                    </div>
-                                    <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
-                                </button>
-                            </Popover.Trigger>
-                            <Popover.Portal>
-                                <Popover.Content className="w-[220px] p-0 bg-white border border-slate-200 shadow-xl rounded-lg z-50 animate-in fade-in zoom-in-95" align="start">
-                                    <Command className="w-full">
-                                        <div className="flex items-center border-b border-slate-100 px-3">
-                                            <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                                            <Command.Input
-                                                placeholder="Search customers..."
-                                                className="flex h-9 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-50 border-none focus:ring-0"
-                                            />
+                        <div className="flex items-center gap-1">
+                            <Popover.Root open={openCustomer} onOpenChange={setOpenCustomer}>
+                                <Popover.Trigger asChild>
+                                    <button
+                                        role="combobox"
+                                        aria-expanded={openCustomer}
+                                        className="flex items-center justify-between border border-slate-300 rounded px-2 py-1 text-sm bg-white min-w-[220px] hover:bg-slate-50 transition-colors"
+                                    >
+                                        <div className="flex items-center gap-2 truncate">
+                                            {selectedCustomerId ? (
+                                                <>
+                                                    {customers.find(c => c.id === selectedCustomerId)?.type === 'organization' ? <Building2 size={14} className="text-slate-400" /> : <UserCircle size={14} className="text-slate-400" />}
+                                                    <span className="truncate max-w-[160px]">{customers.find(c => c.id === selectedCustomerId)?.name}</span>
+                                                </>
+                                            ) : (
+                                                <span className="text-slate-500">Select Customer...</span>
+                                            )}
                                         </div>
-                                        <Command.List className="max-h-[250px] overflow-y-auto overflow-x-hidden p-1">
-                                            <Command.Empty className="py-6 text-center text-sm text-slate-500">No customer found.</Command.Empty>
-                                            <Command.Group>
-                                                {customers.map((customer) => (
-                                                    <Command.Item
-                                                        key={customer.id}
-                                                        value={customer.name}
-                                                        onSelect={() => {
-                                                            setSelectedCustomerId(customer.id)
-                                                            setOpenCustomer(false)
-                                                        }}
-                                                        className="relative flex cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-sm outline-none hover:bg-indigo-50 hover:text-indigo-700 aria-selected:bg-indigo-50 aria-selected:text-indigo-700 transition-colors group"
-                                                    >
-                                                        <div className="mr-2 flex h-4 w-4 items-center justify-center opacity-50 group-hover:opacity-100">
-                                                            {customer.type === 'organization' ? <Building2 size={14} /> : <UserCircle size={14} />}
-                                                        </div>
-                                                        <span className="flex-1 truncate">{customer.name}</span>
-                                                        {selectedCustomerId === customer.id && (
-                                                            <Check className="ml-auto h-4 w-4 text-indigo-600" />
-                                                        )}
-                                                    </Command.Item>
-                                                ))}
-                                            </Command.Group>
-                                        </Command.List>
-                                    </Command>
-                                </Popover.Content>
-                            </Popover.Portal>
-                        </Popover.Root>
+                                        <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
+                                    </button>
+                                </Popover.Trigger>
+                                <Popover.Portal>
+                                    <Popover.Content className="w-[220px] p-0 bg-white border border-slate-200 shadow-xl rounded-lg z-50 animate-in fade-in zoom-in-95" align="start">
+                                        <Command className="w-full">
+                                            <div className="flex items-center border-b border-slate-100 px-3">
+                                                <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                                                <Command.Input
+                                                    placeholder="Search customers..."
+                                                    className="flex h-9 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-50 border-none focus:ring-0"
+                                                />
+                                            </div>
+                                            <Command.List className="max-h-[250px] overflow-y-auto overflow-x-hidden p-1">
+                                                <Command.Empty className="py-6 text-center text-sm text-slate-500">No customer found.</Command.Empty>
+                                                <Command.Group>
+                                                    {customers.map((customer) => (
+                                                        <Command.Item
+                                                            key={customer.id}
+                                                            value={customer.name}
+                                                            onSelect={() => {
+                                                                setSelectedCustomerId(customer.id)
+                                                                setOpenCustomer(false)
+                                                            }}
+                                                            className="relative flex cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-sm outline-none hover:bg-indigo-50 hover:text-indigo-700 aria-selected:bg-indigo-50 aria-selected:text-indigo-700 transition-colors group"
+                                                        >
+                                                            <div className="mr-2 flex h-4 w-4 items-center justify-center opacity-50 group-hover:opacity-100">
+                                                                {customer.type === 'organization' ? <Building2 size={14} /> : <UserCircle size={14} />}
+                                                            </div>
+                                                            <span className="flex-1 truncate">{customer.name}</span>
+                                                            {selectedCustomerId === customer.id && (
+                                                                <Check className="ml-auto h-4 w-4 text-indigo-600" />
+                                                            )}
+                                                        </Command.Item>
+                                                    ))}
+                                                </Command.Group>
+                                            </Command.List>
+                                        </Command>
+                                    </Popover.Content>
+                                </Popover.Portal>
+                            </Popover.Root>
+                            {selectedCustomerId && (
+                                <NextLink
+                                    href={`/dashboard/${customers.find(c => c.id === selectedCustomerId)?.type === 'organization' ? 'organizations' : 'people'}/${selectedCustomerId}`}
+                                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                                    title="View Customer Card"
+                                >
+                                    <Link size={16} />
+                                </NextLink>
+                            )}
+                        </div>
                     </div>
 
                     <div className="flex flex-col">

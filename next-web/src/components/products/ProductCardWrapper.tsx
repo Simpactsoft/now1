@@ -24,8 +24,7 @@ export default function ProductCardWrapper({ product, tenantId }: ProductCardWra
     const router = useRouter();
 
     const handleEdit = (id: string) => {
-        // TODO: Open edit dialog or navigate to edit page
-        console.log("Edit product:", id);
+        router.push(`/dashboard/products/${id}/edit`);
     };
 
     const handleDelete = async (id: string) => {

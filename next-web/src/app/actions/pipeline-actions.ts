@@ -100,5 +100,76 @@ export async function updateOpportunityStage(tenantId: string, opportunityId: st
         console.error("Error updating opportunity stage:", error);
         return { success: false, error: error.message };
     }
+
+    try {
+        // --- COMMISSION CALCULATION HOOK ---
+        // Check if the new stage is "Closed Won" (probability = 100)
+        const { data: stage } = await adminClient
+            .from('pipeline_stages')
+            .select('probability')
+            .eq('id', newStageId)
+            .single();
+
+        if (stage && stage.probability === 100) {
+            // Find the active commission plan for this user's team or a global plan
+            // For MVP: We find ANY active plan targeted at the user's team, or target_team_id IS NULL
+
+            // 1. Get user's primary team
+            const { data: teamMember } = await adminClient
+                .from('team_members')
+                .select('team_id')
+                .eq('user_id', auth.userId)
+                .eq('tenant_id', parsed.data)
+                .is('removed_at', null)
+                .order('is_primary_team', { ascending: false })
+                .limit(1)
+                .single();
+
+            const userTeamId = teamMember?.team_id;
+
+            // 2. Find eligible active plan
+            let planQuery = adminClient
+                .from('commission_plans')
+                .select('*')
+                .eq('tenant_id', parsed.data)
+                .eq('is_active', true)
+                .lte('effective_from', new Date().toISOString().split('T')[0])
+                .order('created_at', { ascending: false });
+
+            const { data: plans } = await planQuery;
+
+            let bestPlan = null;
+            if (plans && plans.length > 0) {
+                // Prefer team-specific plan, fallback to global plan
+                bestPlan = plans.find(p => p.target_team_id === userTeamId)
+                    || plans.find(p => p.target_team_id === null);
+            }
+
+            if (bestPlan && data.amount > 0) {
+                const commissionAmount = data.amount * bestPlan.base_rate;
+
+                // 3. Insert into ledger
+                await adminClient
+                    .from('commission_ledger')
+                    .insert({
+                        tenant_id: parsed.data,
+                        user_id: auth.userId, // The rep who won it
+                        plan_id: bestPlan.id,
+                        entity_type: 'opportunity',
+                        entity_id: opportunityId,
+                        period_start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0], // First day of current month
+                        period_end: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0], // Last day of current month
+                        deal_value: data.amount,
+                        commission_rate: bestPlan.base_rate,
+                        commission_amount: commissionAmount,
+                        status: 'pending' // Requires manager approval
+                    });
+            }
+        }
+    } catch (hookError) {
+        console.error("Non-fatal error in commission hook:", hookError);
+        // Do not fail the overall action if the hook fails
+    }
+
     return { success: true, data };
 }

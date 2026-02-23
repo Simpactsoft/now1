@@ -93,7 +93,7 @@ export async function saveConfiguration(params: {
 
         // 3. Validate tenant access (defense in depth beyond RLS)
         const { data: template, error: templateError } = await supabase
-            .from('cpq_templates')
+            .from('product_templates')
             .select('tenant_id')
             .eq('id', params.templateId)
             .single();
@@ -133,6 +133,7 @@ export async function saveConfiguration(params: {
 
         // 4. Prepare configuration data
         const configData: any = {
+            tenant_id: template.tenant_id,
             template_id: params.templateId,
             selected_options: params.selectedOptions,
             base_price: pricing.basePrice,
@@ -840,6 +841,7 @@ export async function cloneConfiguration(sourceConfigurationId: string): Promise
 
         // Create new draft configuration with source reference + snapshot
         const newConfigData = {
+            tenant_id: source.tenant_id,
             template_id: source.template_id,
             user_id: user.id,
             selected_options: source.selected_options,

@@ -5,9 +5,11 @@ import RelationshipManager from "@/components/RelationshipManager";
 import ActionTimeline from "@/components/ActionTimeline";
 import { fetchOrganizationDetails } from "@/app/actions/fetchDetails";
 import BackButton from "@/components/BackButton";
-import { ActivitiesTimeline } from "@/components/ActivitiesTimeline";
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CustomerQuotes } from "@/components/CustomerQuotes";
+import { TimelineFeed } from "@/components/timeline/TimelineFeed";
 
 export const dynamic = "force-dynamic";
 
@@ -97,15 +99,24 @@ export default async function OrganizationProfilePage({ params }: PageProps) {
                         entityType="organization"
                     />
 
-                    <div className="mb-8">
-                        <ActivitiesTimeline
-                            tenantId={tenantId}
-                            entityId={id}
-                            entityType="card"
-                        />
-                    </div>
+                    <Tabs defaultValue="stream" className="w-full">
+                        <TabsList className="w-full grid grid-cols-2 mb-6">
+                            <TabsTrigger value="stream" className="text-base font-medium">זרם פעילויות (חדש)</TabsTrigger>
+                            <TabsTrigger value="quotes" className="text-base font-medium">הצעות מחיר</TabsTrigger>
+                        </TabsList>
 
-                    <ActionTimeline events={timeline} />
+                        <TabsContent value="stream" className="mt-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
+                            <ActionTimeline events={timeline} />
+
+                            <div className="bg-card p-6 rounded-2xl border border-border shadow-sm">
+                                <TimelineFeed entityId={id} />
+                            </div>
+                        </TabsContent>
+
+                        <TabsContent value="quotes" className="mt-0 focus-visible:outline-none focus-visible:ring-0">
+                            <CustomerQuotes tenantId={tenantId} customerId={id} />
+                        </TabsContent>
+                    </Tabs>
                 </div>
             </div>
         </div>

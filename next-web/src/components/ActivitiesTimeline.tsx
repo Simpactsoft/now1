@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Loader2, Phone, Mail, FileText, CheckSquare, Calendar, MessageSquare, Plus, User } from "lucide-react";
+import { GlobalActivityComposer } from "./activities/GlobalActivityComposer";
 import { fetchTenantDetails } from "@/app/actions/fetchTenantDetails";
 
 interface Activity {
@@ -34,15 +35,8 @@ interface ActivitiesTimelineProps {
 export function ActivitiesTimeline({ tenantId, entityId, entityType }: ActivitiesTimelineProps) {
     const [activities, setActivities] = useState<Activity[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isComposerOpen, setIsComposerOpen] = useState(false);
     const [error, setError] = useState<string | null>(null);
-
-    // Form state
-    const [activityType, setActivityType] = useState<string>("note");
-    const [subject, setSubject] = useState("");
-    const [body, setBody] = useState("");
-    const [assignedTo, setAssignedTo] = useState<string>("me");
-    const [isPrivate, setIsPrivate] = useState<boolean>(false);
     const [users, setUsers] = useState<any[]>([]);
 
     const loadActivities = async () => {
@@ -74,46 +68,8 @@ export function ActivitiesTimeline({ tenantId, entityId, entityType }: Activitie
         loadActivities();
     }, [tenantId, entityId, entityType]);
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!body.trim() && !subject.trim()) return;
-
-        setIsSubmitting(true);
-        try {
-            const payload = {
-                tenantId,
-                entityId,
-                entityType,
-                activityType: activityType as any,
-                title: subject.trim(),
-                description: body.trim(),
-                isTask: activityType === "task",
-                priority: "normal" as const,
-                participants: assignedTo === "me" ? [] : [{
-                    id: assignedTo,
-                    type: "user" as const,
-                    role: "assignee" as const
-                }]
-            };
-
-            const res = await createActivity(payload);
-
-            if (res.success) {
-                // Reset form
-                setSubject("");
-                setBody("");
-                setAssignedTo("me");
-                setIsPrivate(false);
-                // Reload
-                await loadActivities();
-            } else {
-                setError(res.error || "Failed to create activity");
-            }
-        } catch (e) {
-            setError("An unexpected error occurred while saving");
-        } finally {
-            setIsSubmitting(false);
-        }
+    const handleComposerSuccess = () => {
+        loadActivities();
     };
 
     const getIconForType = (type: string) => {
@@ -148,72 +104,24 @@ export function ActivitiesTimeline({ tenantId, entityId, entityType }: Activitie
                 </h3>
             </div>
 
-            <div className="bg-muted/30 border border-border/50 rounded-xl p-4">
-                <h3 className="text-sm font-medium mb-3 text-foreground">Add Activity</h3>
-                <form onSubmit={handleSubmit} className="space-y-3">
-                    <div className="flex gap-2">
-                        <Select value={activityType} onValueChange={setActivityType}>
-                            <SelectTrigger className="w-[140px]">
-                                <SelectValue placeholder="Type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="note">Note</SelectItem>
-                                <SelectItem value="call">Call</SelectItem>
-                                <SelectItem value="email">Email</SelectItem>
-                                <SelectItem value="meeting">Meeting</SelectItem>
-                                <SelectItem value="task">Task</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <Input
-                            placeholder="Subject (optional)"
-                            value={subject}
-                            onChange={(e) => setSubject(e.target.value)}
-                            className="flex-1"
-                        />
-                    </div>
-                    <Textarea
-                        placeholder="Write details here..."
-                        value={body}
-                        onChange={(e) => setBody(e.target.value)}
-                        className="min-h-[80px]"
-                    />
-
-                    {/* Extra options row: Assignee & Privacy */}
-                    <div className="flex flex-wrap items-center justify-between gap-4 py-2 border-y border-border/50">
-                        <div className="flex items-center gap-2">
-                            <User className="h-4 w-4 text-muted-foreground" />
-                            <Select value={assignedTo} onValueChange={setAssignedTo}>
-                                <SelectTrigger className="w-[180px] h-8 text-xs">
-                                    <SelectValue placeholder="Assign To..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="me">Assign to Me</SelectItem>
-                                    {users.filter(u => u.status === 'active').map((u) => (
-                                        <SelectItem key={u.id} value={u.id}>
-                                            {u.raw_user_meta_data?.full_name || u.email}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                            <Switch id="privacy-mode" checked={isPrivate} onCheckedChange={setIsPrivate} />
-                            <Label htmlFor="privacy-mode" className="text-xs cursor-pointer select-none text-muted-foreground">
-                                Private Activity
-                            </Label>
-                        </div>
-                    </div>
-
-                    <div className="flex justify-between items-center pt-1">
-                        {error ? <span className="text-sm text-red-500">{error}</span> : <span />}
-                        <Button type="submit" disabled={isSubmitting || (!body.trim() && !subject.trim())}>
-                            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
-                            Save Activity
-                        </Button>
-                    </div>
-                </form>
+            <div className="bg-muted/30 border border-border/50 rounded-xl p-4 flex items-center justify-between">
+                <div>
+                    <h3 className="text-sm font-medium text-foreground">Active Tracking</h3>
+                    <p className="text-xs text-muted-foreground">Log a call, schedule a meeting, or assign a task.</p>
+                </div>
+                <Button onClick={() => setIsComposerOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    New Activity
+                </Button>
             </div>
+
+            <GlobalActivityComposer
+                tenantId={tenantId}
+                isOpen={isComposerOpen}
+                onClose={() => setIsComposerOpen(false)}
+                onSuccess={handleComposerSuccess}
+                prefilledEntity={{ id: entityId, name: "Current Item", type: entityType }}
+            />
 
             <div className="space-y-4">
                 <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Timeline</h3>

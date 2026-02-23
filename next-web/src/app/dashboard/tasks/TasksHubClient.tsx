@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createActivity } from "@/app/actions/activity-actions";
+import { GlobalActivityComposer } from "@/components/activities/GlobalActivityComposer";
 
 interface Task {
     id: string;
@@ -26,8 +27,7 @@ export function TasksHubClient({ initialTasks, tenantId, userId }: { initialTask
     const [tasks, setTasks] = useState<Task[]>(initialTasks);
     const [filter, setFilter] = useState<'open' | 'completed'>('open');
     const [completingId, setCompletingId] = useState<string | null>(null);
-    const [newTaskSubject, setNewTaskSubject] = useState("");
-    const [isCreating, setIsCreating] = useState(false);
+    const [isComposerOpen, setIsComposerOpen] = useState(false);
 
     const supabase = createClient();
 
@@ -55,46 +55,10 @@ export function TasksHubClient({ initialTasks, tenantId, userId }: { initialTask
         setCompletingId(null);
     };
 
-    const handleCreateTask = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!newTaskSubject.trim()) return;
-
-        setIsCreating(true);
-        try {
-            const res = await createActivity({
-                tenantId,
-                activityType: "task",
-                title: newTaskSubject.trim(),
-                isTask: true,
-                participants: [{ id: userId, type: "user", role: "assignee" }],
-                priority: "normal",
-            });
-
-            if (res.success && res.activityId) {
-                toast.success("Task created!");
-                const newTask: Task = {
-                    id: res.activityId,
-                    title: newTaskSubject.trim(),
-                    description: null,
-                    due_date: null,
-                    priority: "normal",
-                    created_at: new Date().toISOString(),
-                    completed_at: null,
-                    owner_id: userId,
-                    assigned_to: userId,
-                    is_private: false,
-                };
-                setTasks(prev => [newTask, ...prev]);
-                setNewTaskSubject("");
-                setFilter('open'); // Switch to open tasks view to see the new task
-            } else {
-                toast.error(res.error || "Failed to create task");
-            }
-        } catch (error) {
-            toast.error("An unexpected error occurred");
-        } finally {
-            setIsCreating(false);
-        }
+    const handleComposerSuccess = () => {
+        // Optimistically reload the page or trigger a data refetch.
+        // For now, we simply refresh the window to fetch updated tasks array.
+        window.location.reload();
     };
 
     const filteredTasks = tasks.filter(t => filter === 'open' ? !t.completed_at : !!t.completed_at)
@@ -112,19 +76,20 @@ export function TasksHubClient({ initialTasks, tenantId, userId }: { initialTask
                 <h1 className="text-2xl font-bold tracking-tight">My Tasks</h1>
             </div>
 
-            <form onSubmit={handleCreateTask} className="flex gap-2 mb-6">
-                <Input
-                    placeholder="What needs to be done?"
-                    value={newTaskSubject}
-                    onChange={(e) => setNewTaskSubject(e.target.value)}
-                    className="flex-1 bg-card"
-                    disabled={isCreating}
-                />
-                <Button type="submit" disabled={isCreating || !newTaskSubject.trim()}>
-                    {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
-                    Add Task
+            <div className="flex justify-between items-center mb-6">
+                <Button onClick={() => setIsComposerOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    New Task
                 </Button>
-            </form>
+            </div>
+
+            <GlobalActivityComposer
+                tenantId={tenantId}
+                isOpen={isComposerOpen}
+                onClose={() => setIsComposerOpen(false)}
+                onSuccess={handleComposerSuccess}
+                defaultType="task"
+            />
 
             <div className="flex gap-2 mb-4">
                 <Button

@@ -95,14 +95,13 @@ export default function ConfigurationsList({
 
     if (configurations.length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center h-[600px] text-muted-foreground">
-                <Settings className="w-16 h-16 mb-4 opacity-20" />
-                <h3 className="text-lg font-semibold mb-2">No Configurations Yet</h3>
-                <p className="text-sm text-center max-w-md mb-4">
-                    Save configurations as templates while building quotes to quickly reuse them later.
-                </p>
-                <p className="text-xs text-center max-w-md">
-                    Configure a product and click "Save as Template" to create your first configuration.
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground animate-in fade-in-50">
+                <Settings className="w-12 h-12 mb-4 opacity-20" />
+                <h3 className="text-lg font-semibold mb-2">תבניות שמורות (Saved Templates)</h3>
+                <p className="text-sm text-center max-w-md mb-4 leading-relaxed">
+                    כאן יופיעו תבניות ששמרת מתוך הצעות מחיר (Saved configurations).
+                    <br /><br />
+                    הערה: כדי להוסיף מוצר שניתן להגדרה (Configurable Product) להצעת מחיר, חפש אותו בלשונית המוצרים הרגילה.
                 </p>
             </div>
         );

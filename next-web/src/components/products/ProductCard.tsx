@@ -5,6 +5,7 @@ import { Package, MoreHorizontal, Edit, Trash2, Settings } from 'lucide-react';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useLanguage } from '@/context/LanguageContext';
 import { useEntityView, EntityViewLayout, ColumnDef } from '@/components/entity-view';
+import { EntityTreeGrid } from '@/components/entity-view/EntityTreeGrid';
 
 interface ProductCardProps {
     product: {
@@ -425,6 +426,26 @@ export default function ProductCard({ product, tenantId, onEdit, onDelete, onCon
                                             </div>
                                         </div>
                                     ))}
+                                </div>
+                            )}
+                            renderTree={(props) => (
+                                <div className="w-full h-full flex flex-col p-4">
+                                    <EntityTreeGrid
+                                        data={props.data}
+                                        columns={bomColumns}
+                                        loading={props.loading}
+                                        selectedIds={props.selectedIds}
+                                        onSelectionChange={props.onSelectionChange}
+                                        getDataPath={(item: BomTreeNode) => item.path.split(' > ')}
+                                        autoGroupColumnDef={{
+                                            headerName: 'Component Hierarchy',
+                                            minWidth: 300,
+                                            cellRendererParams: {
+                                                suppressCount: false,
+                                            }
+                                        } as any}
+                                        className="flex-1"
+                                    />
                                 </div>
                             )}
                         />

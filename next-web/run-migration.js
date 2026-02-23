@@ -1,24 +1,41 @@
 const { Client } = require('pg');
-const fs = require('fs');
-require('dotenv').config({ path: '.env.local' });
+require('dotenv').config({ path: './.env.local' });
 
-async function run() {
-  const client = new Client({ connectionString: process.env.DATABASE_URL });
-  await client.connect();
-  console.log("Connected to DB.");
+// We assume there's a DIRECT_URL or DATABASE_URL in .env.local
+const connectionString = process.env.DIRECT_URL || process.env.DATABASE_URL;
 
-  const sql = fs.readFileSync('../supabase/migrations/20260222160000_portal_shareable_tokens.sql', 'utf8');
-  await client.query(sql);
-  
-  // Reload schema cache (Supabase specific)
-  try {
-     await client.query("NOTIFY pgrst, 'reload schema'");
-     console.log("Schema cache reloaded.");
-  } catch (e) {
-     console.log("Could not reload schema cache automatically:", e.message);
-  }
-
-  console.log("Migration applied successfully!");
-  await client.end();
+if (!connectionString) {
+   console.error("No DATABASE_URL or DIRECT_URL found in .env.local");
+   process.exit(1);
 }
-run().catch(console.error);
+
+const client = new Client({
+   connectionString: connectionString,
+   ssl: {
+      rejectUnauthorized: false
+   }
+});
+
+async function runMigration() {
+   try {
+      await client.connect();
+      console.log("Connected to DB. Running DDL...");
+
+      // Using a do block or simply standard drop statements
+      const sql = `
+        DROP FUNCTION IF EXISTS get_bom_tree(p_product_id UUID, p_version VARCHAR);
+        DROP FUNCTION IF EXISTS calculate_bom_cost(p_product_id UUID, p_version VARCHAR);
+        NOTIFY pgrst, 'reload schema';
+    `;
+
+      await client.query(sql);
+      console.log("Migration executed successfully!");
+
+   } catch (err) {
+      console.error("Migration error:", err);
+   } finally {
+      client.end();
+   }
+}
+
+runMigration();

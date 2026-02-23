@@ -32,6 +32,7 @@
     "@react-email/components": "^1.0.8",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.95.3",
+    "@tanstack/react-query": "^5.90.21",
     "@tanstack/react-table": "^8.21.3",
     "ag-grid-enterprise": "^35.0.0",
     "ag-grid-react": "^35.0.0",

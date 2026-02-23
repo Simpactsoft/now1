@@ -193,7 +193,7 @@ export default function EntityViewLayout({
                                 <CreditCard className="w-4 h-4" />
                             </button>
                             {renderConfigurations && (
-                                <button onClick={() => dispatch({ type: 'SET_VIEW_MODE', payload: 'configurations' as any })} className={`p-1.5 rounded-md transition-all ${(viewMode as any) === 'configurations' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`}>
+                                <button onClick={() => dispatch({ type: 'SET_VIEW_MODE', payload: 'configurations' as any })} className={`p-1.5 rounded-md transition-all ${(viewMode as any) === 'configurations' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`} title="תבניות שמורות (Saved Templates)">
                                     <Settings className="w-4 h-4" />
                                 </button>
                             )}

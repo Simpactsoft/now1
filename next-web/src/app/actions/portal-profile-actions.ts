@@ -29,32 +29,18 @@ export async function getPortalProfile(): Promise<ActionResult<any>> {
         const adminClient = createAdminClient();
 
         if (cardId) {
-            // First check parties
-            const { data: party } = await adminClient.from('parties').select(`*, people (*)`).eq('id', cardId).limit(1).single();
-            if (party) {
-                const pp = Array.isArray(party.people) ? party.people[0] : party.people;
-                const emailMethod = Array.isArray(party.contact_methods) ? party.contact_methods.find((m: any) => m.type === 'email') : null;
-                const phoneMethod = Array.isArray(party.contact_methods) ? party.contact_methods.find((m: any) => m.type === 'phone') : null;
-                const customFields = typeof party.custom_fields === 'object' && party.custom_fields !== null ? party.custom_fields : {};
-                return actionSuccess({
-                    id: party.id, email: emailMethod?.value, first_name: pp?.first_name || '', last_name: pp?.last_name || '',
-                    display_name: party.display_name || `${pp?.first_name} ${pp?.last_name}`.trim(), avatar_url: party.avatar_url,
-                    phone: phoneMethod?.value, status: (customFields as any).status || null, source: 'parties'
-                });
-            }
-
-            // Fallback to legacy cards
+            // First check cards (Source of truth in CRM)
             const { data: card } = await adminClient.from('cards').select('*').eq('id', cardId).limit(1).single();
             if (card) {
                 const customFields = typeof card.custom_fields === 'object' && card.custom_fields !== null ? card.custom_fields : {};
 
-                // Hydrate missing B2C fields from legacy data
+                // Hydrate B2C fields: force display_name to override first_name/last_name to avoid English/Hebrew splits
                 let firstName = card.first_name;
                 let lastName = card.last_name;
-                if (!firstName && !lastName && card.display_name) {
-                    const parts = card.display_name.split(' ');
-                    firstName = parts[0];
-                    lastName = parts.slice(1).join(' ');
+                if (card.display_name) {
+                    const parts = card.display_name.trim().split(' ');
+                    firstName = parts[0] || '';
+                    lastName = parts.slice(1).join(' ') || '';
                 }
 
                 let emailFromMethod = null;
@@ -76,7 +62,31 @@ export async function getPortalProfile(): Promise<ActionResult<any>> {
                     last_name: lastName,
                     email: email,
                     phone: phone,
-                    status: customFields.status || card.status || null
+                    status: customFields.status || card.status || null,
+                    source: 'cards'
+                });
+            }
+
+            // Fallback to legacy parties
+            const { data: party } = await adminClient.from('parties').select(`*, people (*)`).eq('id', cardId).limit(1).single();
+            if (party) {
+                const pp = Array.isArray(party.people) ? party.people[0] : party.people;
+                const emailMethod = Array.isArray(party.contact_methods) ? party.contact_methods.find((m: any) => m.type === 'email') : null;
+                const phoneMethod = Array.isArray(party.contact_methods) ? party.contact_methods.find((m: any) => m.type === 'phone') : null;
+                const customFields = typeof party.custom_fields === 'object' && party.custom_fields !== null ? party.custom_fields : {};
+
+                let firstName = pp?.first_name || '';
+                let lastName = pp?.last_name || '';
+                if (party.display_name) {
+                    const parts = party.display_name.trim().split(' ');
+                    firstName = parts[0] || '';
+                    lastName = parts.slice(1).join(' ') || '';
+                }
+
+                return actionSuccess({
+                    id: party.id, email: emailMethod?.value, first_name: firstName, last_name: lastName,
+                    display_name: party.display_name || `${firstName} ${lastName}`.trim(), avatar_url: party.avatar_url,
+                    phone: phoneMethod?.value, status: (customFields as any).status || null, source: 'parties'
                 });
             }
             return actionError("Profile not found", "NOT_FOUND");
@@ -90,11 +100,10 @@ export async function getPortalProfile(): Promise<ActionResult<any>> {
         if (!profileError && profile) {
             const currentProfile = Array.isArray(profile) ? profile[0] : profile;
 
-            // Hydrate missing B2C fields if RPC returned raw legacy row
             let firstName = currentProfile.first_name;
             let lastName = currentProfile.last_name;
-            if (!firstName && !lastName && currentProfile.display_name) {
-                const parts = currentProfile.display_name.split(' ');
+            if (currentProfile.display_name) {
+                const parts = currentProfile.display_name.trim().split(' ');
                 firstName = parts[0] || '';
                 lastName = parts.slice(1).join(' ') || '';
             }
@@ -116,14 +125,14 @@ export async function getPortalProfile(): Promise<ActionResult<any>> {
                 first_name: firstName,
                 last_name: lastName,
                 email: email,
-                phone: phone
+                phone: phone,
+                source: 'rpc'
             });
         }
 
-        // FALLBACK FOR PRODUCTION: If the RPC hasn't been deployed yet, run queries manually.
         console.warn("[getPortalProfile] RPC failed or absent. Using manual fallback.", profileError?.message);
 
-        // 1. Try legacy cards table
+        // 1. Try legacy cards table (Source of truth in CRM)
         const { data: cards } = await adminClient
             .from('cards')
             .select('*')
@@ -134,13 +143,12 @@ export async function getPortalProfile(): Promise<ActionResult<any>> {
             const card = cards[0];
             const customFields = typeof card.custom_fields === 'object' && card.custom_fields !== null ? card.custom_fields : {};
 
-            // Hydrate missing B2C fields from legacy data
             let firstName = card.first_name;
             let lastName = card.last_name;
-            if (!firstName && !lastName && card.display_name) {
-                const parts = card.display_name.split(' ');
-                firstName = parts[0];
-                lastName = parts.slice(1).join(' ');
+            if (card.display_name) {
+                const parts = card.display_name.trim().split(' ');
+                firstName = parts[0] || '';
+                lastName = parts.slice(1).join(' ') || '';
             }
 
             let emailFromMethod = null;
@@ -162,13 +170,13 @@ export async function getPortalProfile(): Promise<ActionResult<any>> {
                 last_name: lastName,
                 email: email,
                 phone: phone,
-                status: customFields.status || card.status || null // Extract status
+                status: customFields.status || card.status || null,
+                source: 'cards'
             });
         }
 
         // 2. Try modern parties table using raw pg connection to bypass PostgREST cache issues
         try {
-            // First, check if we even have a DB URL
             const dbUrl = process.env.DATABASE_URL || process.env.DIRECT_URL;
             if (dbUrl && dbUrl.startsWith('postgres')) {
                 const { Client } = require('pg');
@@ -192,11 +200,15 @@ export async function getPortalProfile(): Promise<ActionResult<any>> {
                     if (res.rows.length > 0) {
                         const p = res.rows[0];
 
-                        let displayName = p.display_name;
                         let firstName = p.first_name || '';
                         let lastName = p.last_name || '';
+                        let displayName = p.display_name;
 
-                        if (!displayName || displayName === '') {
+                        if (displayName) {
+                            const parts = displayName.trim().split(' ');
+                            firstName = parts[0] || '';
+                            lastName = parts.slice(1).join(' ') || '';
+                        } else {
                             displayName = `${firstName} ${lastName}`.trim();
                         }
 
@@ -223,7 +235,6 @@ export async function getPortalProfile(): Promise<ActionResult<any>> {
                     await client.end();
                 }
             } else {
-                // No valid postgres DB URL, try the old fallback just in case the cache cleared itself
                 const { data: parties, error: partyQueryError } = await adminClient
                     .from('parties')
                     .select(`
@@ -237,11 +248,15 @@ export async function getPortalProfile(): Promise<ActionResult<any>> {
                     const p = parties[0];
                     const pp = Array.isArray(p.people) ? p.people[0] : p.people;
 
-                    let displayName = p.display_name;
                     let firstName = pp?.first_name || '';
                     let lastName = pp?.last_name || '';
+                    let displayName = p.display_name;
 
-                    if (!displayName || displayName === '') {
+                    if (displayName) {
+                        const parts = displayName.trim().split(' ');
+                        firstName = parts[0] || '';
+                        lastName = parts.slice(1).join(' ') || '';
+                    } else {
                         displayName = `${firstName} ${lastName}`.trim();
                     }
 
@@ -265,11 +280,9 @@ export async function getPortalProfile(): Promise<ActionResult<any>> {
             console.warn("[getPortalProfile] Could not query parties table. Schema cache might be stale and pg fallback failed.", partyErr);
         }
 
-        // 3. AUTO-FALLBACK: If the user managed to log in, but has no CRM card (or schema cache is acting up),
-        // we should NOT kick them out of the portal. We return a basic profile synthesized from Auth.
         console.warn("[getPortalProfile] User authorized but no CRM profile found. Returning auto-fallback.");
         return actionSuccess({
-            id: cardId || userEmail || 'unknown', // Use auth ID as a stable placeholder
+            id: cardId || userEmail || 'unknown',
             email: userEmail,
             first_name: "Portal",
             last_name: "User",
@@ -378,7 +391,7 @@ export async function updatePortalProfile(
 
         const newDisplayName = `${data.first_name} ${data.last_name}`.trim();
 
-        // 1. Try Legacy Cards
+        // 1. Try Legacy Cards (Source of truth)
         let cardsQuery = adminClient.from('cards').select('id, custom_fields').limit(1);
         if (cardId) {
             cardsQuery = cardsQuery.eq('id', cardId);
@@ -401,13 +414,18 @@ export async function updatePortalProfile(
             }).eq('id', cards[0].id);
 
             // [Fix] Sync role to party memberships for CRM backwards compatibility
-            await adminClient.from('party_memberships').update({ role_name: data.job_title }).eq('person_id', cards[0].id);
+            // Also try to sync the legacy 'parties' table so they don't drift further
+            try {
+                await adminClient.from('party_memberships').update({ role_name: data.job_title }).eq('person_id', cards[0].id);
+                await adminClient.from('people').update({ first_name: data.first_name, last_name: data.last_name }).eq('party_id', cards[0].id);
+                await adminClient.from('parties').update({ display_name: newDisplayName, contact_methods: updatedContactMethods }).eq('id', cards[0].id);
+            } catch (ignore) { }
 
             revalidatePath('/portal/profile');
             return actionSuccess(undefined);
         }
 
-        // 2. Try Modern Parties using raw pg connection to bypass PostgREST cache issues
+        // 2. Try modern parties table using raw pg connection to bypass PostgREST cache issues
         try {
             const dbUrl = process.env.DATABASE_URL || process.env.DIRECT_URL;
             if (dbUrl && dbUrl.startsWith('postgres')) {

@@ -5,6 +5,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { verifyAuthWithTenant } from "./_shared/auth";
 import { isAuthError } from "./_shared/auth-utils";
+import { cookies } from "next/headers";
+import { getTenantId } from "@/lib/auth/tenant";
 
 const FetchActivitiesSchema = z.object({
   tenantId: z.string().min(1),
@@ -31,16 +33,19 @@ export async function fetchActivities(
 
   const adminClient = createAdminClient();
 
-  // We fetch via activity_links
+  // We fetch via activities directly to simplify filtering
   const { data, error } = await adminClient
-    .from("activity_links")
+    .from("activities")
     .select(`
-      activities (
-        *
+      *,
+      activity_links!inner (
+        card_id,
+        opportunity_id,
+        lead_id
       )
     `)
     .eq("tenant_id", parsed.data.tenantId)
-    .eq(`${parsed.data.entityType}_id`, parsed.data.entityId)
+    .eq(`activity_links.${parsed.data.entityType}_id`, parsed.data.entityId)
     .limit(parsed.data.limit);
 
   if (error) {
@@ -48,17 +53,14 @@ export async function fetchActivities(
     return { error: "Failed to fetch activities" };
   }
 
-  const activitiesData = data.flatMap((d: any) => {
-    const acts = d.activities;
-    return Array.isArray(acts) ? acts : [acts];
-  }).filter(Boolean);
+  const activitiesData = data || [];
   activitiesData.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   return { success: true, data: activitiesData };
 }
 
 const CreateActivitySchema = z.object({
-  tenantId: z.string().min(1),
+  tenantId: z.string().optional(),
   entityId: z.string().optional(),
   entityType: z.enum(["card", "opportunity", "lead"]).optional(),
   activityType: z.enum(["call", "email", "meeting", "note", "task", "sms", "whatsapp", "system"]),
@@ -83,7 +85,21 @@ export async function createActivity(data: z.infer<typeof CreateActivitySchema>)
     return { error: `Invalid input: ${(parsed.error as any).errors[0].message}` };
   }
 
-  const { tenantId, entityId, entityType, activityType, title, description, subject, body, isTask, dueAt, priority, participants } = parsed.data;
+  let { tenantId, entityId, entityType, activityType, title, description, subject, body, isTask, dueAt, priority, participants } = parsed.data;
+
+  // If the frontend passed an empty string or didn't pass it, retrieve it securely from the session
+  if (!tenantId) {
+    const cookieStore = await cookies();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Not authenticated" };
+
+    const rawTenantId = cookieStore.get("tenant_id")?.value;
+    const tId = rawTenantId?.replace(/['"]+/g, '') || await getTenantId(user, supabase);
+
+    if (!tId) return { error: "Missing tenant context" };
+    tenantId = tId;
+  }
 
   const auth = await verifyAuthWithTenant(tenantId);
   if (isAuthError(auth)) {
@@ -115,19 +131,16 @@ export async function createActivity(data: z.infer<typeof CreateActivitySchema>)
       priority: priority || "normal",
       created_by: userId,
       assigned_to: assignee,
-      commission_eligible: false,
     })
     .select("id")
     .single();
 
   if (activityError || !newActivity) {
     console.error("Failed to create activity", activityError);
-    return { error: "Failed to create activity" };
+    return { error: "Failed to create activity: " + activityError?.message };
   }
 
   // Insert link if any
-  const inserts = [];
-
   if (entityId && entityType) {
     if (['card', 'opportunity', 'lead'].includes(entityType)) {
       const payload: any = {
@@ -135,6 +148,8 @@ export async function createActivity(data: z.infer<typeof CreateActivitySchema>)
         activity_id: newActivity.id,
         link_type: 'related'
       };
+
+      // Match the exact columns in activity_links (`card_id`, `opportunity_id`, `lead_id`)
       payload[`${entityType}_id`] = entityId;
 
       const { error: linkError } = await adminClient.from("activity_links").insert(payload);

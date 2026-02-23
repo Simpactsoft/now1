@@ -70,7 +70,7 @@ function EntityAgGridInner<T = any>(props: EntityAgGridProps<T>) {
 
     const { theme } = useTheme();
     const gridRef = useRef<AgGridReact>(null);
-    const gridTheme = theme === 'dark' ? themeQuartz.withParams({ accentColor: '#6366f1' }) : themeQuartz.withParams({ accentColor: '#6366f1' });
+    const gridTheme = useMemo(() => theme === 'dark' ? themeQuartz.withParams({ accentColor: '#6366f1' }) : themeQuartz.withParams({ accentColor: '#6366f1' }), [theme]);
     const isRtl = typeof document !== 'undefined' && document.documentElement.dir === 'rtl';
 
     // ---- Map our ColumnDef<T> to ag-grid ColDef ----

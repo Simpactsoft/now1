@@ -84,7 +84,10 @@ function BomTreeViewInner<T = any>(props: BomTreeViewProps<T>) {
         data.forEach(item => {
             const id = getItemId(item);
             const node = nodeMap.get(id)!;
-            const pathParts = node.path.split(' > ');
+
+            // Normalize path into an array
+            const pathParts = (Array.isArray(node.path) ? node.path : (node.path as string).split(' > ')) as string[];
+            const pathString = pathParts.join(' > ');
 
             if (pathParts.length === 1) {
                 // This is a root node
@@ -92,8 +95,11 @@ function BomTreeViewInner<T = any>(props: BomTreeViewProps<T>) {
             } else {
                 // Find parent by matching path
                 // Parent might not exist if filtered out by search
-                const parentPath = pathParts.slice(0, -1).join(' > ');
-                const parent = Array.from(nodeMap.values()).find(n => n.path === parentPath);
+                const parentPathString = pathParts.slice(0, -1).join(' > ');
+                const parent = Array.from(nodeMap.values()).find(n => {
+                    const nPath = Array.isArray(n.path) ? n.path.join(' > ') : n.path;
+                    return nPath === parentPathString;
+                });
 
                 if (parent) {
                     parent.children.push(node);

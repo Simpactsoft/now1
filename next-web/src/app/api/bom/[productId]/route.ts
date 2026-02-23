@@ -60,26 +60,16 @@ export async function GET(
 
         console.log("[BOM API] Looking for BOM header:", { productId, version, tenantId });
 
-        // First get the BOM header ID
-        const { data: bomHeader, error: headerError } = await supabase
-            .from("bom_headers")
+        // Ensure the product belongs to the user's tenant
+        const { data: product, error: productError } = await supabase
+            .from("products")
             .select("id")
-            .eq("product_id", productId)
-            .eq("version", version)
-            .eq("status", "ACTIVE")
+            .eq("id", productId)
+            .eq("tenant_id", tenantId)
             .single();
 
-        console.log("[BOM API] BOM header result:", { bomHeader, headerError });
-
-        if (headerError || !bomHeader) {
-            // Try to find ANY BOM headers for this product (without RLS)
-            const { data: anyHeaders, error: anyError } = await supabase
-                .from("bom_headers")
-                .select("id, product_id, version, status, tenant_id")
-                .eq("product_id", productId);
-
-            console.log("[BOM API] All BOM headers for product:", { anyHeaders, anyError });
-
+        if (productError || !product) {
+            console.log("[BOM API] Product access denied or not found:", { productId, tenantId });
             return NextResponse.json({
                 ok: true,
                 data: {
@@ -125,7 +115,7 @@ export async function GET(
                 totalCost: totalCost || 0,
                 productId,
                 version,
-                bomHeaderId: bomHeader.id
+                bomHeaderId: bomTree && bomTree.length > 0 ? bomTree[0].bom_header_id : null
             }
         });
 
