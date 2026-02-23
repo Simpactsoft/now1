@@ -43,7 +43,7 @@ export default function SavedViewsMenu({ tenantId, entityType, minimal = false, 
     const loadViews = React.useCallback(async () => {
         setLoading(true);
         const res = await getSavedViews(tenantId, entityType);
-        if (res.data) {
+        if (res.success && res.data) {
             setViews(res.data);
         }
         setLoading(false);
@@ -66,7 +66,7 @@ export default function SavedViewsMenu({ tenantId, entityType, minimal = false, 
             searchTerm
         };
         const res = await saveView(tenantId, viewName, config, entityType || 'people');
-        if (res.error) {
+        if (!res.success) {
             alert(res.error);
         } else {
             setViewName("");

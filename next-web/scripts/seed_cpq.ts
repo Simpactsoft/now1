@@ -36,7 +36,7 @@ async function main() {
     console.log("✅ Using Tenant ID:", tenantId);
 
     // --- 1. MacBook Pro 16" ---
-    let res = await supabase.from('product_templates').insert({
+    let res: any = await supabase.from('product_templates').insert({
         tenant_id: tenantId,
         name: 'MacBook Pro 16-inch',
         description: 'M3 Max chip with 14‑core CPU, 30‑core GPU, 36GB Unified Memory, 1TB SSD',

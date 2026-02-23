@@ -9,13 +9,28 @@ export default async function TenantDetailsPage({ params }: { params: { id: stri
     const { id } = await params;
 
     // Fetch Data
-    const { success, tenant, users, error } = await fetchTenantDetails(id);
+    const response = await fetchTenantDetails(id);
 
-    if (!success || !tenant) {
+    if (!response.success) {
         return (
             <div className="p-8 text-center">
                 <h1 className="text-xl text-destructive mb-2">Error Loading Workspace</h1>
-                <p className="text-muted-foreground mb-4">{error || "Tenant not found"}</p>
+                <p className="text-muted-foreground mb-4">{response.error || "Tenant not found"}</p>
+                <Link href="/dashboard/admin" className="text-primary hover:underline">
+                    &larr; Back to Admin
+                </Link>
+            </div>
+        );
+    }
+
+    const tenant = response.data?.tenant;
+    const users = response.data?.users;
+
+    if (!tenant) {
+        return (
+            <div className="p-8 text-center">
+                <h1 className="text-xl text-destructive mb-2">Error Loading Workspace</h1>
+                <p className="text-muted-foreground mb-4">Tenant not found</p>
                 <Link href="/dashboard/admin" className="text-primary hover:underline">
                     &larr; Back to Admin
                 </Link>

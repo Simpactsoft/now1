@@ -136,13 +136,16 @@ export function validateConfigurationClientSide(
                     }
                     // Group has selection, but if allowed_options specified, validate it's in the list
                     else if (rule.allowedOptions && rule.allowedOptions.length > 0) {
-                        if (!rule.allowedOptions.includes(selectedOption)) {
+                        const selectedArray = Array.isArray(selectedOption) ? selectedOption : [selectedOption];
+                        const invalidSelections = selectedArray.filter(opt => !rule.allowedOptions!.includes(opt));
+
+                        for (const opt of invalidSelections) {
                             errors.push({
                                 ruleId: rule.id,
                                 ruleName: rule.name,
                                 message: errorMessage || `${rule.name}`,
                                 groupId: thenGroupId,
-                                optionId: selectedOption,
+                                optionId: opt,
                                 severity: "error",
                             });
                         }

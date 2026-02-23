@@ -89,8 +89,10 @@ export default function GroupMatrixDialog({ tenantId, onApplyFilter }: GroupMatr
     const loadGroups = async (field: string) => {
         setLoading(true);
         const res = await fetchPeopleGrouped(tenantId, field);
-        if (res.groups) {
-            setGroups(res.groups);
+        if (res.success && res.data?.groups) {
+            setGroups(res.data.groups);
+        } else if (!res.success) {
+            console.error(res.error);
         }
         setLoading(false);
     };

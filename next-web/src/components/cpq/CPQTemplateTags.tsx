@@ -7,9 +7,9 @@ interface CPQTemplate {
     name: string;
     description?: string;
     category?: string;
-    tenant_id: string;
-    created_at: string;
-    updated_at: string;
+    tenantId: string;
+    createdAt: string;
+    updatedAt: string;
 }
 
 interface CPQTemplateTagsProps {
@@ -50,8 +50,8 @@ export default function CPQTemplateTags({
             <div className="flex flex-wrap gap-3">
                 {templates.map((template) => {
                     const isHighlighted = highlightId === template.id;
-                    const formattedDate = template.updated_at
-                        ? new Date(template.updated_at).toLocaleDateString('en-US', {
+                    const formattedDate = template.updatedAt
+                        ? new Date(template.updatedAt).toLocaleDateString('en-US', {
                             month: 'short',
                             day: 'numeric',
                             year: 'numeric'

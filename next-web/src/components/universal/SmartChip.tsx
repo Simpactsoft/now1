@@ -17,7 +17,6 @@ const OPTIONS: Record<string, string[]> = {
     role_name: ['CEO', 'CTO', 'VP Sales', 'Developer', 'Designer', 'Product Manager', 'HR Manager', 'Sales Rep', 'Customer Success', 'Employee'],
     joined_year: ['2023', '2024', '2025', '2026', '2027'],
     language_preference: ['Hebrew', 'English', 'French', 'German', 'Spanish', 'Dutch'],
-    language_preference: ['Hebrew', 'English', 'French', 'German', 'Spanish', 'Dutch'],
     // tags: ['Decision Maker', 'VIP', 'High Priority', 'Referral', 'Investor', 'Local'], // Fetched dynamically or free text
     company_size: ['1-10', '11-50', '51-200', '201-500', '500+'],
     industry: ['Technology', 'Finance', 'Healthcare', 'Retail', 'Real Estate']
@@ -34,7 +33,7 @@ export default function SmartChip({ filter, onUpdate, onRemove, dynamicOptions =
     // Sync from props when opening
     useEffect(() => {
         if (isOpen) {
-            const initial = filter.value ? filter.value.split(',').map(s => s.trim()).filter(Boolean) : [];
+            const initial = filter.value ? filter.value.split(',').map((s: string) => s.trim()).filter(Boolean) : [];
             setSelectedValues(new Set(initial));
             setSearchTerm('');
         }

@@ -6,7 +6,7 @@ import CPQPageWrapper from "@/components/cpq/CPQPageWrapper";
 export default async function CPQPage() {
     const user = await getCurrentUser();
 
-    if (!user) {
+    if (!user || !user.success || !user.data) {
         redirect('/login');
     }
 

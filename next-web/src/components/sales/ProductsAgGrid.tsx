@@ -81,7 +81,7 @@ export default function ProductsAgGrid({
                 headerName: "Product Name",
                 flex: 2,
                 minWidth: 150,
-                filter: true,
+                filter: false,
                 cellRenderer: (params: ICellRendererParams) => {
                     return (
                         <div className="flex flex-col justify-center h-full leading-tight">
@@ -100,14 +100,14 @@ export default function ProductsAgGrid({
                 headerName: "Category",
                 flex: 1,
                 minWidth: 100,
-                filter: true,
+                filter: false,
                 valueFormatter: (params: ValueFormatterParams) => params.value || "-"
             },
             {
                 field: "sku",
                 headerName: "SKU",
                 width: 120,
-                filter: true,
+                filter: false,
                 valueFormatter: (params: ValueFormatterParams) => params.value || "-"
             },
             {
@@ -145,7 +145,7 @@ export default function ProductsAgGrid({
 
     const defaultColDef = useMemo(() => ({
         sortable: true,
-        filter: true,
+        filter: false,
         resizable: true,
     }), []);
 

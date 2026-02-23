@@ -15,9 +15,9 @@ interface CPQTemplate {
     name: string;
     description?: string;
     category?: string;
-    tenant_id: string;
-    created_at: string;
-    updated_at: string;
+    tenantId: string;
+    createdAt: string;
+    updatedAt: string;
 }
 
 interface CPQPageWrapperProps {
@@ -37,7 +37,6 @@ export default function CPQPageWrapper({ tenantId }: CPQPageWrapperProps) {
             headerName: 'Template Name',
             minWidth: 250,
             sortable: true,
-            filter: true,
             cellRenderer: (params: any) => (
                 <div className="flex items-center gap-2 py-2">
                     <Sliders className="w-4 h-4 text-primary" />
@@ -61,7 +60,6 @@ export default function CPQPageWrapper({ tenantId }: CPQPageWrapperProps) {
             headerName: 'Category',
             width: 150,
             sortable: true,
-            filter: true,
             cellRenderer: (params: any) => params.value ? (
                 <span className="px-2 py-1 bg-secondary rounded-full text-xs">
                     {params.value}
@@ -69,7 +67,7 @@ export default function CPQPageWrapper({ tenantId }: CPQPageWrapperProps) {
             ) : null
         },
         {
-            field: 'updated_at',
+            field: 'updatedAt',
             headerName: 'Last Modified',
             width: 180,
             sortable: true,
@@ -139,7 +137,7 @@ export default function CPQPageWrapper({ tenantId }: CPQPageWrapperProps) {
             }
 
             return {
-                data: result.data || [],
+                data: (result.data as unknown as CPQTemplate[]) || [],
                 totalRecords: result.meta?.total || 0,
                 totalPages: result.meta?.page || 0
             };
@@ -156,7 +154,7 @@ export default function CPQPageWrapper({ tenantId }: CPQPageWrapperProps) {
         debounceMs: 500,
         initialPageSize: 50,
         onFetchData,
-        defaultViewMode: 'grid',
+        initialViewMode: 'grid',
     });
 
     // ---- Actions ----
@@ -199,14 +197,13 @@ export default function CPQPageWrapper({ tenantId }: CPQPageWrapperProps) {
             <EntityViewLayout
                 title=""
                 entityType="cpq_templates"
-                tenantId={tenantId}
+                tenantId={tenantId || ""}
                 config={config}
                 columns={columns}
                 onRowClick={handleTemplateClick}
                 onRowDoubleClick={handleTemplateClick}
                 availableViewModes={['tags', 'grid', 'cards']}
                 availableFilters={availableFilters}
-                hideHeader={true}
                 onBulkDelete={handleBulkDelete}
 
                 // Tags View
@@ -250,7 +247,7 @@ export default function CPQPageWrapper({ tenantId }: CPQPageWrapperProps) {
 
                                 <div className="flex items-center justify-between pt-4 border-t border-border">
                                     <span className="text-xs text-muted-foreground">
-                                        {new Date(template.updated_at).toLocaleDateString()}
+                                        {new Date(template.updatedAt).toLocaleDateString()}
                                     </span>
                                     <span className="text-sm text-primary opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
                                         Configure <Settings className="w-4 h-4" />

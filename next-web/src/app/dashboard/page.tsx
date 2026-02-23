@@ -23,8 +23,8 @@ export default async function DashboardPage() {
     let history: string[] = [];
     if (tenantId) {
         const historyRes = await getSearchHistory(tenantId);
-        if (historyRes.success && historyRes.history) {
-            history = historyRes.history;
+        if (historyRes.success && historyRes.data?.history) {
+            history = historyRes.data.history;
         }
     }
 

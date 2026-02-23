@@ -45,7 +45,10 @@ export const translations = {
         cpq: "CPQ Configurator",
         my_configurations: "My Configurations",
         purchase_orders: "Purchase Orders",
-        payments: "Payments"
+        payments: "Payments",
+        pipelines: "Pipelines",
+        leads: "Leads Inbox",
+        tasks: "My Tasks"
     },
     he: {
         dashboard: "לוח בקרה",
@@ -91,6 +94,9 @@ export const translations = {
         cpq: "קונפיגורטור CPQ",
         my_configurations: "הקונפיגורציות שלי",
         purchase_orders: "הזמנות רכש",
-        payments: "תשלומים"
+        payments: "תשלומים",
+        pipelines: "תהליכי מכר",
+        leads: "תיבת אנשי קשר (לידים)",
+        tasks: "המשימות שלי"
     }
 };

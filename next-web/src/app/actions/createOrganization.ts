@@ -11,11 +11,11 @@ export async function createOrganization(params: CreateOrganizationInput): Promi
     // 1. Validate Input
     const result = CreateOrganizationSchema.safeParse(params);
     if (!result.success) {
-        const errorMessage = result.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
+        const errorMessage = result.error.issues.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
         return actionError(errorMessage, "VALIDATION_ERROR");
     }
 
-    const { name, taxId, companySize, industry, email, phone, address, tenantId } = result.data;
+    const { name, taxId, companySize, industry, email, phone, address, tenantId, status } = result.data;
 
     try {
         // 2. Call RPC
@@ -28,7 +28,8 @@ export async function createOrganization(params: CreateOrganizationInput): Promi
             arg_industry: industry || null,
             arg_email: email || null,
             arg_phone: phone || null,
-            arg_address: address || null
+            arg_address: address || null,
+            arg_status: (status && status.toUpperCase() !== 'LEAD') ? status : 'PROSPECT'
         });
 
         if (error) throw error;

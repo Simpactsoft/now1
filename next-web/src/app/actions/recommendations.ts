@@ -91,7 +91,7 @@ export async function getRecommendations(input: {
         return actionSuccess({ recommendations });
     } catch (err: any) {
         if (err instanceof z.ZodError) {
-            const msg = err.errors?.[0]?.message || "Invalid input parameters";
+            const msg = err.issues?.[0]?.message || "Invalid input parameters";
             return actionError("Validation error: " + msg, "VALIDATION_ERROR");
         }
         console.error("[getRecommendations] Error:", err);

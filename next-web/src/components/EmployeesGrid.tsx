@@ -60,10 +60,10 @@ export default function EmployeesGrid({
                 console.log("AG Grid requesting rows:", params.request.startRow, params.request.endRow);
 
                 const result = await fetchGridData({
-                    startRow: params.request.startRow,
-                    endRow: params.request.endRow,
+                    startRow: params.request.startRow ?? 0,
+                    endRow: params.request.endRow ?? 100,
                     sortModel: params.request.sortModel,
-                    filterModel: params.request.filterModel,
+                    filterModel: (params.request.filterModel as Record<string, any>) || {},
                     tenantId,
                 });
 

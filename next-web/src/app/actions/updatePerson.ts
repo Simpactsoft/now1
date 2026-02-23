@@ -16,8 +16,9 @@ const UpdatePersonSchema = z.object({
     lastName: z.string().optional(),
     email: z.string().optional().or(z.literal("")),
     phone: z.string().optional(),
-    customFields: z.record(z.any()).optional(),
-    tags: z.array(z.string()).optional()
+    customFields: z.record(z.string(), z.any()).optional(),
+    tags: z.array(z.string()).optional(),
+    jobTitle: z.string().optional()
 });
 
 export type UpdatePersonInput = z.infer<typeof UpdatePersonSchema>;
@@ -54,7 +55,7 @@ export async function updatePerson(rawInput: any): Promise<ActionResult<void>> {
         return actionError("Validation failed", "VALIDATION_ERROR");
     }
 
-    const { id, tenantId, firstName, lastName, email, phone, tags } = result.data;
+    const { id, tenantId, firstName, lastName, email, phone, tags, jobTitle } = result.data;
     const customFields = (result.data as any).customFields || {};
 
     try {
@@ -107,20 +108,43 @@ export async function updatePerson(rawInput: any): Promise<ActionResult<void>> {
 
         const customFieldsValidation = customFieldsSchema.safeParse(updatedCustomFields);
         if (!customFieldsValidation.success) {
-            return actionError(`Invalid custom_fields: ${customFieldsValidation.error.errors[0].message}`, "VALIDATION_ERROR");
+            return actionError(`Invalid custom_fields: ${customFieldsValidation.error.issues[0].message}`, "VALIDATION_ERROR");
         }
 
         const status = updatedCustomFields.status || cardData.status || 'lead';
 
         // Update Contact Methods
-        let currentContactMethods = cardData.contact_methods || {};
-        if (Array.isArray(currentContactMethods)) {
-            currentContactMethods = {};
+        let contactMethodsArr: any[] = [];
+        if (Array.isArray(cardData.contact_methods)) {
+            contactMethodsArr = [...cardData.contact_methods];
+        } else if (cardData.contact_methods && typeof cardData.contact_methods === 'object') {
+            // Convert legacy object to array
+            if (cardData.contact_methods.email) contactMethodsArr.push({ type: 'email', value: cardData.contact_methods.email });
+            if (cardData.contact_methods.phone) contactMethodsArr.push({ type: 'phone', value: cardData.contact_methods.phone });
+            if (cardData.contact_methods.website) contactMethodsArr.push({ type: 'website', value: cardData.contact_methods.website });
         }
 
-        const newContactMethods = { ...currentContactMethods };
-        if (email !== undefined) newContactMethods.email = email;
-        if (phone !== undefined) newContactMethods.phone = phone;
+        if (email !== undefined) {
+            const emailIdx = contactMethodsArr.findIndex(m => m.type === 'email');
+            if (emailIdx >= 0) {
+                if (email === "") contactMethodsArr.splice(emailIdx, 1);
+                else contactMethodsArr[emailIdx].value = email;
+            } else if (email !== "") {
+                contactMethodsArr.push({ type: 'email', value: email });
+            }
+        }
+
+        if (phone !== undefined) {
+            const phoneIdx = contactMethodsArr.findIndex(m => m.type === 'phone');
+            if (phoneIdx >= 0) {
+                if (phone === "") contactMethodsArr.splice(phoneIdx, 1);
+                else contactMethodsArr[phoneIdx].value = phone;
+            } else if (phone !== "") {
+                contactMethodsArr.push({ type: 'phone', value: phone });
+            }
+        }
+
+        const newContactMethods = contactMethodsArr;
 
 
         const cardUpdatePayload: any = {
@@ -131,8 +155,16 @@ export async function updatePerson(rawInput: any): Promise<ActionResult<void>> {
             updated_at: new Date().toISOString()
         };
 
+        if (firstName !== undefined) cardUpdatePayload.first_name = firstName;
+        if (lastName !== undefined) cardUpdatePayload.last_name = lastName;
+        if (email !== undefined) cardUpdatePayload.email = email === "" ? null : email;
+        if (phone !== undefined) cardUpdatePayload.phone = phone === "" ? null : phone;
+
         if (tags !== undefined) {
             cardUpdatePayload.tags = tags;
+        }
+        if (jobTitle !== undefined) {
+            cardUpdatePayload.job_title = jobTitle;
         }
 
         console.log("updatePerson calling cards update with (Secure):", JSON.stringify(cardUpdatePayload, null, 2));

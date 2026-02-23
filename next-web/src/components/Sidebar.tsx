@@ -24,6 +24,9 @@ import {
     Sliders,
     ClipboardList,
     DollarSign,
+    Kanban,
+    Inbox,
+    CheckSquare,
 } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useLanguage } from '@/context/LanguageContext';
@@ -33,18 +36,21 @@ import { translations } from '@/lib/translations';
 // We'll map keys to icons, but names will come from translation
 const NAV_CONFIG = [
     { key: 'dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { key: 'tasks', href: '/dashboard/tasks', icon: CheckSquare },
     { key: 'contacts', href: '/dashboard/people', icon: UserCircle },
     { key: 'organizations', href: '/dashboard/organizations', icon: Building2 },
     { key: 'products', href: '/dashboard/products', icon: Package },
     { key: 'cpq', href: '/dashboard/cpq', icon: Sliders },
+    { key: 'leads', href: '/dashboard/sales/leads', icon: Inbox },
+    { key: 'pipelines', href: '/dashboard/sales/pipelines', icon: Kanban },
+    { key: 'quotes', href: '/dashboard/sales/quotes', icon: FileText },
+    { key: 'purchase_orders', href: '/dashboard/purchase-orders', icon: ClipboardList },
+    { key: 'payments', href: '/dashboard/payments', icon: DollarSign },
     { key: 'logs', href: '/dashboard/logs', icon: Activity },
     { key: 'team', href: '/dashboard/settings/team', icon: Users },
     { key: 'infrastructure', href: '/dashboard/infra', icon: Database },
     { key: 'system_admin', href: '/dashboard/admin', icon: ShieldCheck },
     { key: 'settings', href: '/dashboard/settings', icon: Settings },
-    { key: 'quotes', href: '/dashboard/sales/quotes', icon: FileText },
-    { key: 'purchase_orders', href: '/dashboard/purchase-orders', icon: ClipboardList },
-    { key: 'payments', href: '/dashboard/payments', icon: DollarSign },
 ] as const;
 
 import TenantSwitcher from "./TenantSwitcher";
@@ -114,7 +120,7 @@ export default function Sidebar({
                 transition-transform duration-300 ease-in-out bg-background/95 lg:bg-background/80
                 ${isOpen ? 'translate-x-0' : 'ltr:-translate-x-full rtl:translate-x-full'}
             `}>
-                <div className="p-6 pb-2">
+                <div className="p-6 pb-2 shrink-0">
                     <div className="flex items-center justify-between mb-4">
                         <h1 className="text-xl font-bold gradient-text tracking-tight flex items-center gap-2">
                             <img src="/icon.png" alt="NOW System" className="w-7 h-7 rounded-md" />
@@ -139,12 +145,12 @@ export default function Sidebar({
 
                 </div>
 
-                <nav className="flex-1 px-4 space-y-1 mt-4">
+                <nav className="flex-1 px-4 space-y-1 mt-4 overflow-y-auto min-h-0 pb-2">
                     {NAV_CONFIG.filter(item => {
-                        // Restricted items
-                        if (['team', 'infrastructure', 'system_admin'].includes(item.key)) {
+                        if (['infrastructure', 'system_admin'].includes(item.key)) {
                             return userProfile?.role === 'distributor';
                         }
+                        // Team is generally accessible so people can manage their own org
                         return true;
                     }).map((item) => {
                         const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
@@ -194,7 +200,7 @@ export default function Sidebar({
                     })}
                 </nav>
 
-                <div className="p-4 mt-auto border-t border-border bg-card/30 space-y-4">
+                <div className="p-4 mt-auto border-t border-border bg-card/30 space-y-4 shrink-0">
                     {/* Version Display */}
                     <div className="flex justify-center mb-2">
                         <span className="text-[10px] text-muted-foreground/50 font-mono">v0.2.3</span>
@@ -245,18 +251,18 @@ function UserProfileDisplay({ initialProfile }: { initialProfile?: UserProfileDa
 
         const fetchProfile = async () => {
             try {
-                // [FIX] Use Server Action to get user via Cookie (more reliable than client SDK)
                 const { getCurrentUser } = await import('@/app/actions/getCurrentUser');
-                const user = await getCurrentUser();
+                const userRes = await getCurrentUser();
 
                 if (!mounted) return;
 
-                if (!user) {
+                if (!userRes.success || !userRes.data) {
                     console.warn('[Sidebar] No user session found via Server Action');
                     setProfile({ name: 'Guest', role: 'Visitor', email: '' });
                     setError(true);
                     return;
                 }
+                const user = userRes.data;
 
                 // Fetch Profile details using client (since we now have a valid ID)
                 // Use maybeSingle() to avoid 406 errors if 0 rows found

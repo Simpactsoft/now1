@@ -18,10 +18,10 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
 
     if (!result.success) {
         return (
-            <div className="flex flex-col h-screen items-center justify-center bg-slate-50 text-slate-800 p-6">
-                <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 text-center max-w-md w-full">
-                    <h1 className="text-2xl font-bold text-slate-900 mb-2">Quote Unavailable</h1>
-                    <p className="text-slate-500">{result.error || "The quote link is invalid, expired, or has been revoked."}</p>
+            <div className="flex flex-col h-screen items-center justify-center bg-muted/30 text-foreground p-6">
+                <div className="bg-card p-8 rounded-2xl shadow-sm border border-border text-center max-w-md w-full">
+                    <h1 className="text-2xl font-bold text-foreground mb-2">Quote Unavailable</h1>
+                    <p className="text-muted-foreground">{result.error || "The quote link is invalid, expired, or has been revoked."}</p>
                 </div>
             </div>
         );
@@ -29,10 +29,10 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
 
     if (!result.data) {
         return (
-            <div className="flex flex-col h-screen items-center justify-center bg-slate-50 text-slate-800 p-6">
-                <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 text-center max-w-md w-full">
-                    <h1 className="text-2xl font-bold text-slate-900 mb-2">Quote Unavailable</h1>
-                    <p className="text-slate-500">The quote data could not be loaded.</p>
+            <div className="flex flex-col h-screen items-center justify-center bg-muted/30 text-foreground p-6">
+                <div className="bg-card p-8 rounded-2xl shadow-sm border border-border text-center max-w-md w-full">
+                    <h1 className="text-2xl font-bold text-foreground mb-2">Quote Unavailable</h1>
+                    <p className="text-muted-foreground">The quote data could not be loaded.</p>
                 </div>
             </div>
         );
@@ -41,7 +41,7 @@ export default async function PublicQuotePage({ params }: { params: Promise<{ to
     const isRtl = result.data.tenant?.rtl_enabled ?? false;
 
     return (
-        <div className="min-h-screen bg-slate-50" dir={isRtl ? "rtl" : "ltr"}>
+        <div className="min-h-screen bg-muted/30" dir={isRtl ? "rtl" : "ltr"}>
             <PublicQuoteViewer quote={result.data} token={token} clientIp={clientIp} />
         </div>
     );

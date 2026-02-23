@@ -24,9 +24,10 @@ interface StatusBadgeProps {
     tenantId: string;
     className?: string;
     options?: StatusOption[];
+    code?: string; // Options API code
 }
 
-export function StatusBadge({ status, tenantId, className, options }: StatusBadgeProps) {
+export function StatusBadge({ status, tenantId, className, options, code = "PERSON_STATUS" }: StatusBadgeProps) {
     const { language } = useLanguage();
     const [option, setOption] = useState<StatusOption | null>(null);
 
@@ -43,20 +44,20 @@ export function StatusBadge({ status, tenantId, className, options }: StatusBadg
         }
 
         // 2. Check cache
-        const cached = STATUS_CACHE[tenantId];
+        const cacheKey = `${tenantId}_${code}`;
+        const cached = STATUS_CACHE[cacheKey];
         if (cached) {
             const found = cached.find(opt => opt.value.toLowerCase().trim() === status.toLowerCase().trim());
             if (found) setOption(found);
             return;
         }
 
-        // Fetch if not in cache (once per tenant per session essentially)
-        // We fetch ALL options for this code (PERSON_STATUS) to be efficient for future badges
-        fetch(`/api/options?code=PERSON_STATUS&tenantId=${tenantId}`)
+        // Fetch if not in cache (once per tenant_code per session essentially)
+        fetch(`/api/options?code=${code}&tenantId=${tenantId}`)
             .then(res => res.json())
             .then(json => {
                 if (json.data) {
-                    STATUS_CACHE[tenantId] = json.data;
+                    STATUS_CACHE[cacheKey] = json.data;
                     const found = json.data.find((opt: any) => opt.value.toLowerCase().trim() === status.toLowerCase().trim());
                     if (found) setOption(found);
                 }

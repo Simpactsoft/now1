@@ -73,7 +73,7 @@ function EntityTreeGridInner<T = any>(props: EntityTreeGridProps<T>) {
     }, [columns]);
 
     // Auto Group Column Definition
-    const defaultAutoGroupColumnDef = useMemo<ColDef>(() => ({
+    const defaultAutoGroupColumnDef = useMemo<any>(() => ({
         headerName: 'Hierarchy',
         minWidth: 300,
         cellRendererParams: {

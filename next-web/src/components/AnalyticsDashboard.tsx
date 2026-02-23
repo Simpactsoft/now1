@@ -24,8 +24,8 @@ export default function AnalyticsDashboard({ tenantId }: AnalyticsDashboardProps
                 fetchOrgAnalytics(tenantId, ""),
             ]);
 
-            if (sumRes.data) setSummary(sumRes.data);
-            if (deptRes.data) setDeptStats(deptRes.data);
+            if (sumRes.success && sumRes.data) setSummary(sumRes.data.data);
+            if (deptRes.success && deptRes.data) setDeptStats(deptRes.data.data);
             setLoading(false);
         };
 

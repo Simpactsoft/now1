@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Mail, Phone, MapPin, Building, Calendar, User, Trash2, Check, Copy } from 'lucide-react';
+import { Mail, Phone, MapPin, Building, Calendar, User, Trash2, Check, Copy, FileText } from 'lucide-react';
 import PersonFormDialog from './PersonFormDialog';
 import EditableField from './universal/EditableField';
 import { updatePerson } from '@/app/actions/updatePerson';
 import { deletePerson } from '@/app/actions/deletePerson';
+import { sendPortalMagicLink } from '@/app/actions/portal-auth-actions';
+import { generatePortalTokenAction } from '@/app/actions/portal-auth';
 import { useRouter } from 'next/navigation';
 import { StatusBadge } from './StatusBadge';
 import { useLanguage } from '@/context/LanguageContext';
@@ -25,6 +27,7 @@ export default function ProfileHeader({ profile, tenantId }: ProfileHeaderProps)
     // Status Options State
     const [statusOptions, setStatusOptions] = useState<any[]>([]);
     const [isStatusOpen, setIsStatusOpen] = useState(false);
+    const [isPortalMenuOpen, setIsPortalMenuOpen] = useState(false);
 
     useEffect(() => {
         // Fetch Status Options
@@ -60,6 +63,37 @@ export default function ProfileHeader({ profile, tenantId }: ProfileHeaderProps)
     const derivedFirstName = profile.first_name || nameParts[0] || "";
     const derivedLastName = profile.last_name || nameParts.slice(1).join(" ") || "";
 
+    const handleSendPortalLink = async () => {
+        setIsPortalMenuOpen(false);
+        if (!profile.email) {
+            toast.error(language === 'he' ? 'אין כתובת אימייל מוגדרת' : 'No email address defined');
+            return;
+        }
+        const loadingToast = toast.loading(language === 'he' ? 'שולח לינק התחברות...' : 'Sending login link...');
+        const res = await sendPortalMagicLink(profile.email);
+        if (res.success) {
+            toast.success(language === 'he' ? 'נשלח בהצלחה!' : 'Link sent perfectly!', { id: loadingToast });
+        } else {
+            toast.error(!res.success ? (res as any).error || "Failed to send link" : "Failed to send link", { id: loadingToast });
+        }
+    };
+
+    const handleCopyPortalLink = async () => {
+        setIsPortalMenuOpen(false);
+        const loadingToast = toast.loading(language === 'he' ? 'מייצר לינק...' : 'Generating link...');
+        try {
+            const res = await generatePortalTokenAction(tenantId, profile.id);
+            if (res.success && res.data) {
+                await navigator.clipboard.writeText(res.data);
+                toast.success(language === 'he' ? 'הלינק הועתק!' : 'Link copied to clipboard!', { id: loadingToast });
+            } else if (!res.success) {
+                toast.error(res.error || "Failed to generate link", { id: loadingToast });
+            }
+        } catch (err) {
+            toast.error("Failed to generate link", { id: loadingToast });
+        }
+    };
+
     const handleUpdate = async (field: string, value: string) => {
         // Construct payload
         const payload: any = {
@@ -87,6 +121,7 @@ export default function ProfileHeader({ profile, tenantId }: ProfileHeaderProps)
             payload.customFields = { status: value };
         } else if (field === 'role') {
             payload.customFields = { role: value };
+            payload.jobTitle = value;
         }
 
         const res = await updatePerson(payload);
@@ -258,6 +293,49 @@ export default function ProfileHeader({ profile, tenantId }: ProfileHeaderProps)
                             tags: profile.tags
                         }}
                     />
+
+                    <button
+                        onClick={() => router.push(`/dashboard/sales/quotes/new?customerId=${profile.id}`)}
+                        className="w-full px-4 py-2 bg-brand-primary text-primary-foreground font-semibold rounded-lg text-sm hover:opacity-90 transition-colors flex items-center justify-center gap-2"
+                    >
+                        <FileText size={16} />
+                        <span>{language === 'he' ? 'הצעת מחיר חדשה' : 'Create Quote'}</span>
+                    </button>
+
+                    <div className="relative">
+                        <button
+                            onClick={() => setIsPortalMenuOpen(!isPortalMenuOpen)}
+                            className="w-full px-4 py-2 bg-indigo-50 text-indigo-600 border border-indigo-200 font-semibold rounded-lg text-sm hover:bg-indigo-100 transition-colors flex items-center justify-center gap-2"
+                        >
+                            <Mail size={16} />
+                            <span>{language === 'he' ? 'חיבור לפורטל' : 'Portal Access'}</span>
+                        </button>
+
+                        {isPortalMenuOpen && (
+                            <>
+                                <div className="fixed inset-0 z-40" onClick={() => setIsPortalMenuOpen(false)} />
+                                <div className="absolute top-12 right-0 w-full min-w-[200px] bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden text-sm">
+                                    {profile.email && (
+                                        <button
+                                            onClick={handleSendPortalLink}
+                                            className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex items-center gap-3 border-b border-slate-100"
+                                        >
+                                            <Mail size={16} className="text-slate-400" />
+                                            {language === 'he' ? 'שלח לינק במייל' : 'Send via Email'}
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={handleCopyPortalLink}
+                                        className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex items-center gap-3"
+                                    >
+                                        <Copy size={16} className="text-slate-400" />
+                                        {language === 'he' ? 'העתק לינק לפורטל' : 'Copy Portal Link'}
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+
                     <button className="px-4 py-2 bg-secondary text-foreground border border-border font-semibold rounded-lg text-sm hover:bg-secondary/80 transition-colors hidden">
                         Log Activity
                     </button>

@@ -18,6 +18,8 @@ export interface QuoteDetail {
     discount_total: number;
     tax_total: number;
     grand_total: number;
+    recurring_total_monthly?: number;
+    recurring_total_yearly?: number;
     total_cost: number;
     margin_pct: number | null;
     notes: string | null;
@@ -40,6 +42,8 @@ export interface QuoteItemDetail {
     unit_cost: number;
     cost_source: string | null;
     configuration_id: string | null;
+    is_recurring?: boolean;
+    billing_frequency?: string | null;
     line_number: number;
 }
 

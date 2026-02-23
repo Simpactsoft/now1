@@ -128,7 +128,7 @@ export async function saveConfiguration(params: {
         // 4. Validate JSONB fields before writing
         const priceBreakdownValidation = priceBreakdownSchema.safeParse(pricing.breakdown);
         if (!priceBreakdownValidation.success) {
-            return { success: false, error: `Invalid price_breakdown: ${priceBreakdownValidation.error.errors[0].message}` };
+            return { success: false, error: `Invalid price_breakdown: ${priceBreakdownValidation.error.issues[0].message}` };
         }
 
         // 4. Prepare configuration data
@@ -835,7 +835,7 @@ export async function cloneConfiguration(sourceConfigurationId: string): Promise
 
         const sourceSnapshotValidation = sourceSnapshotSchema.safeParse(sourceSnapshot);
         if (!sourceSnapshotValidation.success) {
-            return { success: false, error: `Invalid source_snapshot: ${sourceSnapshotValidation.error.errors[0].message}` };
+            return { success: false, error: `Invalid source_snapshot: ${sourceSnapshotValidation.error.issues[0].message}` };
         }
 
         // Create new draft configuration with source reference + snapshot

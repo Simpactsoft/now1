@@ -62,7 +62,7 @@ export default function LogsPage() {
 
         fetchAuditLogs(tenantId)
             .then(res => {
-                if (res.data) setLogs(res.data as AuditLog[]);
+                if (res.success && res.data) setLogs(res.data.data as AuditLog[]);
             })
             .finally(() => setLoading(false));
     }, [tenantId]);

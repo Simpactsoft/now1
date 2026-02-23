@@ -47,11 +47,11 @@ export default function ConfigurationTemplatesTab({
         );
     }
 
-    const getOptionsSummary = (selectedOptions: Record<string, string> | null): string => {
+    const getOptionsSummary = (selectedOptions: Record<string, string | string[]> | null): string => {
         if (!selectedOptions) return "No options";
         const options = Object.entries(selectedOptions);
         if (options.length === 0) return "No options";
-        return options.map(([key, value]) => `${value}`).join(" • ");
+        return options.map(([key, value]) => Array.isArray(value) ? value.join(", ") : `${value}`).join(" • ");
     };
 
     return (

@@ -5,14 +5,18 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useEntityView, EntityViewLayout, ColumnDef } from "@/components/entity-view";
 import OrganizationTags from "@/components/OrganizationTags";
 import EntityCard from "@/components/EntityCard";
+import { PortalAccessModal } from "@/components/PortalAccessModal";
 import { fetchOrganizations } from "@/app/actions/fetchOrganizations";
 import { fetchTotalStats } from "@/app/actions/fetchStats";
+import { sendPortalMagicLink } from "@/app/actions/portal-auth-actions";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { StatusBadge } from "@/components/StatusBadge";
 import { Search, Activity, Factory, Building2, Tags, Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { FetchDataParams, FetchDataResult } from "@/components/entity-view";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface OrganizationViewWrapperProps {
     user: any;
@@ -21,7 +25,21 @@ interface OrganizationViewWrapperProps {
 
 export default function OrganizationViewWrapper({ user, tenantId }: OrganizationViewWrapperProps) {
     const router = useRouter();
+    const { language } = useLanguage();
     const [highlightId, setHighlightId] = useState<string | null>(null);
+
+    // Portal Access Modal State
+    const [portalAccess, setPortalAccess] = useState<{ isOpen: boolean, cardId: string, email: string, name: string } | null>(null);
+
+    const handleSendPortalLink = async (email: string) => {
+        const loadingToast = toast.loading('Sending login link...');
+        const res = await sendPortalMagicLink(email);
+        if (res.success) {
+            toast.success('Link sent perfectly!', { id: loadingToast });
+        } else {
+            toast.error(res.error || "Failed to send link", { id: loadingToast });
+        }
+    };
 
     // Options for SmartChip filters
     const [statusOptions, setStatusOptions] = useState<any[]>([]);
@@ -147,15 +165,13 @@ export default function OrganizationViewWrapper({ user, tenantId }: Organization
             width: 130,
             cellRenderer: (params: any) => {
                 const status = params.value;
+                if (!status) return null;
                 return (
-                    <span className={cn(
-                        "px-2 py-0.5 rounded-full text-[10px] uppercase font-bold border",
-                        status === 'ACTIVE' ? "bg-green-500/10 text-green-600 border-green-500/20" :
-                            status === 'CHURNED' ? "bg-red-500/10 text-red-600 border-red-500/20" :
-                                "bg-secondary text-secondary-foreground border-border"
-                    )}>
-                        {status}
-                    </span>
+                    <StatusBadge
+                        status={status}
+                        tenantId={tenantId}
+                        code="ORGANIZATION_STATUS"
+                    />
                 );
             },
         },
@@ -164,12 +180,36 @@ export default function OrganizationViewWrapper({ user, tenantId }: Organization
             headerName: 'Industry',
             sortable: false,
             width: 150,
+            cellRenderer: (params: any) => {
+                const industry = params.value;
+                if (!industry) return <span className="text-muted-foreground/30">-</span>;
+                return (
+                    <StatusBadge
+                        status={industry}
+                        tenantId={tenantId}
+                        code="ORGANIZATION_INDUSTRY"
+                        className="bg-transparent border-gray-200 text-gray-700"
+                    />
+                );
+            },
         },
         {
             field: 'ret_size',
             headerName: 'Size',
             sortable: false,
             width: 100,
+            cellRenderer: (params: any) => {
+                const size = params.value;
+                if (!size) return <span className="text-muted-foreground/30">-</span>;
+                return (
+                    <StatusBadge
+                        status={size}
+                        tenantId={tenantId}
+                        code="COMPANY_SIZE"
+                        className="bg-transparent border-gray-200 text-gray-700"
+                    />
+                );
+            },
         },
         {
             field: 'ret_updated_at',
@@ -182,7 +222,40 @@ export default function OrganizationViewWrapper({ user, tenantId }: Organization
                 catch { return '-'; }
             },
         },
-    ], []);
+        {
+            field: "actions",
+            headerName: "",
+            width: 80,
+            sortable: false,
+            filter: false,
+            pinned: "right" as const,
+            cellRenderer: (params: any) => {
+                const org = params.data;
+                const email = org.email || org.ret_email;
+                return (
+                    <div className="flex items-center justify-end h-full gap-2 px-2 pb-1" onClick={(e) => e.stopPropagation()}>
+                        {email && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPortalAccess({
+                                        isOpen: true,
+                                        cardId: org.id || org.ret_id,
+                                        email: email,
+                                        name: org.company_name || org.ret_name || 'Unknown'
+                                    });
+                                }}
+                                className="p-1.5 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-md transition-colors"
+                                title={language === 'he' ? 'חיבור לפורטל' : 'Portal Access'}
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4" /><path d="m21 2-9.6 9.6" /><circle cx="7.5" cy="15.5" r="5.5" /></svg>
+                            </button>
+                        )}
+                    </div>
+                );
+            }
+        },
+    ], [language]);
 
     // ---- Available Filters ----
     const availableFilters = useMemo(() => [
@@ -194,56 +267,82 @@ export default function OrganizationViewWrapper({ user, tenantId }: Organization
     ], []);
 
     return (
-        <EntityViewLayout<any>
-            entityType="organizations"
-            tenantId={tenantId}
-            columns={columns}
-            config={config}
-            onRowClick={handleRowClick}
-            availableViewModes={['tags', 'grid', 'cards']}
-            availableFilters={availableFilters}
-            filterOptions={{
-                status: statusOptions,
-                industry: industryOptions,
-                company_size: sizeOptions
-            }}
-            renderTags={(props) => (
-                <OrganizationTags
-                    data={props.data}
-                    loading={props.loading}
-                    hasMore={false}
-                    loadMore={() => { }}
-                    onRowClick={(id) => handleRowClick({ ret_id: id })}
-                    highlightId={highlightId}
-                />
-            )}
-            renderCards={(props) => (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4 pb-24">
-                    {props.data.map((org: any) => (
-                        <EntityCard
-                            key={org.ret_id}
-                            tenantId={tenantId}
-                            entity={{
-                                id: org.ret_id,
-                                displayName: org.ret_name,
-                                type: org.ret_type,
-                                status: org.ret_status,
-                                industry: org.ret_industry,
-                                email: org.ret_email,
-                                phone: org.ret_phone,
-                                website: org.ret_website,
-                                location: [org.ret_city, org.ret_country].filter(Boolean).join(", ")
-                            }}
-                            onEdit={(id) => handleRowClick({ ret_id: id })}
-                        />
-                    ))}
-                    {props.loading && (
-                        Array.from({ length: 4 }).map((_, i) => (
-                            <div key={`skel-${i}`} className="h-48 rounded-xl bg-muted/20 animate-pulse border border-border/50" />
-                        ))
-                    )}
-                </div>
-            )}
-        />
+        <>
+            <EntityViewLayout<any>
+                entityType="organizations"
+                tenantId={tenantId}
+                columns={columns}
+                config={config}
+                onRowClick={handleRowClick}
+                availableViewModes={['tags', 'grid', 'cards']}
+                availableFilters={availableFilters}
+                filterOptions={{
+                    status: statusOptions,
+                    industry: industryOptions,
+                    company_size: sizeOptions
+                }}
+                renderTags={(props) => (
+                    <OrganizationTags
+                        data={props.data}
+                        loading={props.loading}
+                        hasMore={false}
+                        loadMore={() => { }}
+                        onRowClick={(id) => handleRowClick({ ret_id: id })}
+                        highlightId={highlightId}
+                    />
+                )}
+                renderCards={(props) => (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4 pb-24">
+                        {props.data.map((org: any) => (
+                            <EntityCard
+                                key={org.ret_id}
+                                tenantId={tenantId}
+                                entity={{
+                                    id: org.ret_id,
+                                    displayName: org.ret_name,
+                                    type: org.ret_type || 'organization',
+                                    cardType: org.card_type || 'organization',
+                                    status: org.ret_status,
+                                    industry: org.ret_industry,
+                                    email: org.ret_email,
+                                    phone: org.ret_phone,
+                                    website: org.ret_website,
+                                    location: [org.ret_city, org.ret_country].filter(Boolean).join(", "),
+                                    companyName: org.company_name || org.ret_name,
+                                    employeeCount: org.employee_count || org.ret_size ? parseInt(org.ret_size) : undefined,
+                                    annualRevenue: org.annual_revenue
+                                }}
+                                onEdit={(id) => handleRowClick({ ret_id: id })}
+                                onGrantAccess={(id, email) => setPortalAccess({
+                                    isOpen: true,
+                                    cardId: id,
+                                    email: email || '',
+                                    name: org.ret_name
+                                })}
+                                onCreateQuote={(id) => router.push('/dashboard/sales/quotes/new?customerId=' + id)}
+                            />
+                        ))}
+                        {props.loading && (
+                            Array.from({ length: 4 }).map((_, i) => (
+                                <div key={`skel-${i}`} className="h-48 rounded-xl bg-muted/20 animate-pulse border border-border/50" />
+                            ))
+                        )}
+                    </div>
+                )}
+            />
+
+            {
+                portalAccess && (
+                    <PortalAccessModal
+                        isOpen={portalAccess.isOpen}
+                        onClose={() => setPortalAccess(null)}
+                        tenantId={tenantId}
+                        cardId={portalAccess.cardId}
+                        customerEmail={portalAccess.email}
+                        customerName={portalAccess.name}
+                    />
+                )
+            }
+        </>
     );
 }

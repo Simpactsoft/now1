@@ -47,7 +47,7 @@ export const productColumns: ColumnDef<Product>[] = [
         headerName: "Price",
         width: 120,
         headerClass: 'text-right',
-        cellClass: 'text-right',
+        cellClass: 'text-right font-medium',
         valueFormatter: (value) => {
             if (value === undefined || value === null) return '-';
             return new Intl.NumberFormat('he-IL', {
@@ -55,8 +55,7 @@ export const productColumns: ColumnDef<Product>[] = [
                 currency: 'ILS',
                 maximumFractionDigits: 0
             }).format(Number(value));
-        },
-        cellStyle: { fontWeight: 500 }
+        }
     },
     {
         field: "stock_quantity",

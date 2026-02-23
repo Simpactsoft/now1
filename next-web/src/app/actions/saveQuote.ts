@@ -20,6 +20,9 @@ export interface SaveQuoteInput {
     grandTotal: number;
     totalCost: number;
     marginPct: number;
+    notes?: string;
+    recurringTotalMonthly?: number;
+    recurringTotalYearly?: number;
     items: SaveQuoteItemInput[];
 }
 
@@ -34,6 +37,8 @@ export interface SaveQuoteItemInput {
     unitCost: number;
     costSource: string;
     configurationId?: string | null;
+    isRecurring?: boolean;
+    billingFrequency?: string;
 }
 
 export async function saveQuote(rawInput: SaveQuoteInput): Promise<ActionResult<{ quoteId: string, publicToken?: string }>> {

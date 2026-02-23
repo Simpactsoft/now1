@@ -22,7 +22,8 @@ import {
     Loader2,
     Link,
     Copy,
-    Repeat
+    Repeat,
+    Mail
 } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import { Command } from 'cmdk';
@@ -107,7 +108,7 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
 // --- Component ---
 
-export default function QuoteBuilder({ initialTenantId, quoteId }: { initialTenantId?: string; quoteId?: string }) {
+export default function QuoteBuilder({ initialTenantId, quoteId, initialCustomerId }: { initialTenantId?: string; quoteId?: string; initialCustomerId?: string }) {
     // Initialize standard browser client to share session
     const supabase = createBrowserClient(supabaseUrl, supabaseKey);
     // context
@@ -120,7 +121,7 @@ export default function QuoteBuilder({ initialTenantId, quoteId }: { initialTena
     const [products, setProducts] = useState<Product[]>([]);
 
     // selection state
-    const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
+    const [selectedCustomerId, setSelectedCustomerId] = useState<string>(initialCustomerId || '');
     const [selectedPriceListId, setSelectedPriceListId] = useState<string>('');
     const [selectedCategoryPath, setSelectedCategoryPath] = useState<string | null>(null);
 
@@ -197,7 +198,7 @@ export default function QuoteBuilder({ initialTenantId, quoteId }: { initialTena
                             configuration_id: item.configuration_id || undefined,
                             price_source: (item.cost_source as QuoteItem['price_source']) || 'manual',
                             isRecurring: item.is_recurring,
-                            billingFrequency: item.billing_frequency,
+                            billingFrequency: item.billing_frequency as QuoteItem['billingFrequency'],
                         }));
                         setQuoteItems(loadedItems);
                         if (q.public_token) {
@@ -772,6 +773,30 @@ export default function QuoteBuilder({ initialTenantId, quoteId }: { initialTena
                     </div>
 
                     <div className="h-8 w-px bg-slate-300 mx-2"></div>
+
+                    {quoteId && (
+                        <button
+                            onClick={async () => {
+                                if (!quoteId || !selectedCustomerId || !tenantId) return;
+                                try {
+                                    const { sendQuoteEmail } = await import('@/app/actions/email-actions');
+                                    const result = await sendQuoteEmail({ quoteId: quoteId, tenantId: tenantId });
+                                    if (result.success) {
+                                        alert("Email sent to customer successfully.");
+                                    } else {
+                                        alert("Failed to send email: " + result.error);
+                                    }
+                                } catch (e) {
+                                    console.error(e);
+                                    alert("Error initiating email send.");
+                                }
+                            }}
+                            className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg font-medium transition-colors shadow-sm border border-slate-200 mr-2 lg:mr-0"
+                        >
+                            <Mail size={18} />
+                            Send to Customer
+                        </button>
+                    )}
 
                     <button
                         onClick={handleSave}

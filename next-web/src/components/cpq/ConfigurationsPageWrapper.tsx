@@ -10,12 +10,12 @@ import { getConfigurations, deleteConfiguration, duplicateConfiguration } from "
 
 interface CPQConfiguration {
     id: string;
-    template_name?: string;
+    templateName?: string | null;
     status: "draft" | "completed" | "quoted" | "ordered" | "expired";
     quantity: number;
-    total_price: number;
-    updated_at: string;
-    template_id: string;
+    totalPrice: number;
+    updatedAt: string;
+    templateId: string;
 }
 
 interface ConfigurationsPageWrapperProps {
@@ -28,11 +28,10 @@ export default function ConfigurationsPageWrapper({ tenantId }: ConfigurationsPa
     // ---- Column Definitions ----
     const columns: ColumnDef[] = useMemo(() => [
         {
-            field: 'template_name',
+            field: 'templateName',
             headerName: 'Template',
             minWidth: 200,
             sortable: true,
-            filter: true,
             cellRenderer: (params: any) => (
                 <div className="flex items-center gap-2 py-2">
                     <FileText className="w-4 h-4 text-muted-foreground" />
@@ -45,7 +44,6 @@ export default function ConfigurationsPageWrapper({ tenantId }: ConfigurationsPa
             headerName: 'Status',
             width: 130,
             sortable: true,
-            filter: true,
             cellRenderer: (params: any) => {
                 const statusColors = {
                     draft: 'bg-gray-100 text-gray-700',
@@ -73,7 +71,7 @@ export default function ConfigurationsPageWrapper({ tenantId }: ConfigurationsPa
             )
         },
         {
-            field: 'total_price',
+            field: 'totalPrice',
             headerName: 'Total Price',
             width: 130,
             sortable: true,
@@ -82,7 +80,7 @@ export default function ConfigurationsPageWrapper({ tenantId }: ConfigurationsPa
             )
         },
         {
-            field: 'updated_at',
+            field: 'updatedAt',
             headerName: 'Last Updated',
             width: 180,
             sortable: true,
@@ -111,7 +109,7 @@ export default function ConfigurationsPageWrapper({ tenantId }: ConfigurationsPa
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
-                            router.push(`/configurator/${params.data.template_id}?config=${params.value}`);
+                            router.push(`/configurator/${params.data.templateId}?config=${params.value}`);
                         }}
                         className="p-1 text-blue-600 hover:bg-blue-50 rounded"
                         title="Edit"
@@ -160,7 +158,7 @@ export default function ConfigurationsPageWrapper({ tenantId }: ConfigurationsPa
             }
 
             return {
-                data: result.data || [],
+                data: (result.data as unknown as CPQConfiguration[]) || [],
                 totalRecords: result.meta?.total || 0,
                 totalPages: result.meta?.page || 0
             };
@@ -177,11 +175,12 @@ export default function ConfigurationsPageWrapper({ tenantId }: ConfigurationsPa
         debounceMs: 500,
         initialPageSize: 50,
         onFetchData,
+        initialViewMode: 'grid',
     });
 
     // ---- Actions ----
     const handleConfigClick = (configuration: CPQConfiguration) => {
-        router.push(`/configurator/${configuration.template_id}?config=${configuration.id}`);
+        router.push(`/configurator/${configuration.templateId}?config=${configuration.id}`);
     };
 
     const handleDuplicate = async (configId: string) => {
@@ -190,7 +189,7 @@ export default function ConfigurationsPageWrapper({ tenantId }: ConfigurationsPa
             if (result.success) {
                 toast.success('Configuration duplicated successfully');
                 // Refresh the list
-                config.refetch();
+                config.refresh();
             } else {
                 toast.error(result.error || 'Failed to duplicate configuration');
             }
@@ -209,7 +208,7 @@ export default function ConfigurationsPageWrapper({ tenantId }: ConfigurationsPa
             if (result.success) {
                 toast.success('Configuration deleted successfully');
                 // Refresh the list
-                config.refetch();
+                config.refresh();
             } else {
                 toast.error(result.error || 'Failed to delete configuration');
             }
@@ -228,7 +227,7 @@ export default function ConfigurationsPageWrapper({ tenantId }: ConfigurationsPa
         <EntityViewLayout
             title="My Configurations"
             entityType="cpq_configurations"
-            tenantId={tenantId}
+            tenantId={tenantId || ""}
             config={config}
             columns={columns}
             onRowClick={handleConfigClick}
@@ -259,7 +258,7 @@ export default function ConfigurationsPageWrapper({ tenantId }: ConfigurationsPa
                             </div>
 
                             <h3 className="font-semibold text-lg mb-2 group-hover:text-primary transition-colors">
-                                {config.template_name || 'Configuration'}
+                                {config.templateName || 'Configuration'}
                             </h3>
 
                             <div className="space-y-2 mb-4">
@@ -269,13 +268,13 @@ export default function ConfigurationsPageWrapper({ tenantId }: ConfigurationsPa
                                 </div>
                                 <div className="flex justify-between text-sm">
                                     <span className="text-muted-foreground">Total:</span>
-                                    <span className="font-medium">${parseFloat(String(config.total_price || 0)).toFixed(2)}</span>
+                                    <span className="font-medium">${parseFloat(String(config.totalPrice || 0)).toFixed(2)}</span>
                                 </div>
                             </div>
 
                             <div className="flex items-center justify-between pt-4 border-t border-border">
                                 <span className="text-xs text-muted-foreground">
-                                    {new Date(config.updated_at).toLocaleDateString()}
+                                    {new Date(config.updatedAt).toLocaleDateString()}
                                 </span>
                                 <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <button

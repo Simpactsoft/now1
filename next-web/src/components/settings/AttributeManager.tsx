@@ -30,11 +30,11 @@ export default function AttributeManager() {
         setLoading(true);
         // We want to fetch ALL attributes, so we don't pass an entity type filter
         const res = await getTenantAttributes();
-        if (res.data) {
+        if (res.success && res.data) {
             setAttributes(res.data);
             console.log("Attributes loaded:", res.data);
         } else {
-            console.error("Attributes load error:", res.error);
+            console.error("Attributes load error:", !res.success ? res.error : "Unknown");
         }
         setLoading(false);
     };
@@ -42,14 +42,14 @@ export default function AttributeManager() {
     const fetchSetOptions = async (code: string) => {
         const { fetchOptionSetValues } = await import('@/app/actions/attributes');
         const res = await fetchOptionSetValues(code);
-        if (res.data) setCurrentOptions(res.data);
+        if (res.success && res.data) setCurrentOptions(res.data);
     };
 
     const handleAddOption = async () => {
         if (!currentOptionSetCode || !newOptionValue || !newOptionLabel) return;
 
         const res = await addTenantOptionValue(currentOptionSetCode, newOptionValue, newOptionLabel);
-        if (res.error) {
+        if (!res.success) {
             toast.error(res.error);
         } else {
             toast.success("Option added");
@@ -71,7 +71,7 @@ export default function AttributeManager() {
     const fetchOptions = async () => {
         const { fetchOptionSets } = await import('@/app/actions/attributes');
         const res = await fetchOptionSets();
-        if (res.data) setOptionSets(res.data);
+        if (res.success && res.data) setOptionSets(res.data);
     };
 
     const handleSave = async () => {
@@ -97,7 +97,7 @@ export default function AttributeManager() {
         }
 
         const res = await upsertAttribute(payload);
-        if (res.error) toast.error(res.error);
+        if (!res.success) toast.error(res.error);
         else {
             toast.success("Saved");
             setIsOpen(false);
@@ -146,7 +146,7 @@ export default function AttributeManager() {
     const handleDelete = async (id: string) => {
         if (!confirm("Are you sure? This will hide the data, but not delete existing values in JSON.")) return;
         const res = await deleteAttribute(id);
-        if (res.error) toast.error(res.error);
+        if (!res.success) toast.error(res.error);
         else {
             toast.success("Deleted");
             fetchAttrs();
@@ -186,7 +186,7 @@ export default function AttributeManager() {
             values
         });
 
-        if (res.error) {
+        if (!res.success) {
             toast.error(res.error);
         } else {
             toast.success("List created");

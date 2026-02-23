@@ -135,7 +135,7 @@ export function AddOptionGroupDialog({
                         : undefined,
                 sourceType,
                 sourceCategoryId: sourceType === "category" ? sourceCategoryId : null,
-                categoryPriceMode: sourceType === "category" ? "list_price" : undefined,
+                categoryPriceMode: sourceType === "category" ? ("list_price" as const) : undefined,
                 iconUrl: iconUrl.trim() || undefined,
             };
 

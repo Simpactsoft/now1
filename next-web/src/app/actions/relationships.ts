@@ -72,9 +72,13 @@ export async function fetchRelationshipsAction(tenantId: string, entityId: strin
                         ret_role_name: rel?.type.name, // Relationship Type as Role
                         ret_tags: card.tags,
                         ret_last_interaction: card.last_interaction_at,
-                        // Robust Contact Methods extraction (matches fetchDetails logic)
-                        email: card.contact_methods?.email || (typeof card.contact_methods === 'object' ? (card.contact_methods as any).email : ''),
-                        phone: card.contact_methods?.phone || (typeof card.contact_methods === 'object' ? (card.contact_methods as any).phone : ''),
+                        // Robust Contact Methods extraction (supports both array and legacy object)
+                        email: Array.isArray(card.contact_methods)
+                            ? card.contact_methods.find((m: any) => m.type === 'email')?.value || ''
+                            : (card.contact_methods?.email || ''),
+                        phone: Array.isArray(card.contact_methods)
+                            ? card.contact_methods.find((m: any) => m.type === 'phone')?.value || ''
+                            : (card.contact_methods?.phone || ''),
                         // Preserve Relationship Metadata
                         relationshipId: rel?.id,
                         relationshipType: rel?.type,

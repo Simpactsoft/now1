@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Mail, Phone, MapPin, Building, Globe, Trash2, Copy, Pencil } from 'lucide-react';
+import { Mail, Phone, MapPin, Building, Globe, Trash2, Copy, Pencil, FileText } from 'lucide-react';
 import OrganizationFormDialog from './OrganizationFormDialog';
 import EditableField from './universal/EditableField';
 import { updateOrganization } from '@/app/actions/updateOrganization';
+import { sendPortalMagicLink } from '@/app/actions/portal-auth-actions';
+import { generatePortalTokenAction } from '@/app/actions/portal-auth';
 import { useRouter } from 'next/navigation';
 import { StatusBadge } from './StatusBadge';
 import { useLanguage } from '@/context/LanguageContext';
@@ -25,6 +27,7 @@ export default function OrganizationHeader({ profile, tenantId }: OrganizationHe
     // Status Options State
     const [statusOptions, setStatusOptions] = useState<any[]>([]);
     const [isStatusOpen, setIsStatusOpen] = useState(false);
+    const [isPortalMenuOpen, setIsPortalMenuOpen] = useState(false);
 
     useEffect(() => {
         // Fetch Organization Status Options
@@ -37,6 +40,37 @@ export default function OrganizationHeader({ profile, tenantId }: OrganizationHe
     }, [tenantId]);
 
     if (!profile) return null;
+
+    const handleSendPortalLink = async () => {
+        setIsPortalMenuOpen(false);
+        if (!profile.email) {
+            toast.error(language === 'he' ? 'אין כתובת אימייל מוגדרת' : 'No email address defined');
+            return;
+        }
+        const loadingToast = toast.loading(language === 'he' ? 'שולח לינק התחברות...' : 'Sending login link...');
+        const res = await sendPortalMagicLink(profile.email);
+        if (res.success) {
+            toast.success(language === 'he' ? 'נשלח בהצלחה!' : 'Link sent perfectly!', { id: loadingToast });
+        } else {
+            toast.error(res.error || "Failed to send link", { id: loadingToast });
+        }
+    };
+
+    const handleCopyPortalLink = async () => {
+        setIsPortalMenuOpen(false);
+        const loadingToast = toast.loading(language === 'he' ? 'מייצר לינק...' : 'Generating link...');
+        try {
+            const res = await generatePortalTokenAction(tenantId, profile.id);
+            if (res.success && res.data) {
+                await navigator.clipboard.writeText(res.data);
+                toast.success(language === 'he' ? 'הלינק הועתק!' : 'Link copied to clipboard!', { id: loadingToast });
+            } else if (!res.success) {
+                toast.error(res.error || "Failed to generate link", { id: loadingToast });
+            }
+        } catch (err) {
+            toast.error("Failed to generate link", { id: loadingToast });
+        }
+    };
 
     const handleUpdate = async (field: string, value: string) => {
         const payload: any = {
@@ -107,7 +141,7 @@ export default function OrganizationHeader({ profile, tenantId }: OrganizationHe
                             <div className="relative flex items-center self-center shrink-0">
                                 <div onClick={() => setIsStatusOpen(!isStatusOpen)} className="cursor-pointer hover:opacity-80 transition-opacity flex items-center">
                                     {(profile.status || profile.custom_fields?.status) ? (
-                                        <StatusBadge status={profile.status || profile.custom_fields.status} tenantId={tenantId} />
+                                        <StatusBadge status={profile.status || profile.custom_fields.status} tenantId={tenantId} code="ORGANIZATION_STATUS" />
                                     ) : (
                                         <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] uppercase font-bold tracking-widest border border-slate-200 whitespace-nowrap">
                                             Unknown Status
@@ -125,7 +159,7 @@ export default function OrganizationHeader({ profile, tenantId }: OrganizationHe
                                                     onClick={() => { handleUpdate('status', opt.value); setIsStatusOpen(false); }}
                                                     className="text-left px-3 py-2 text-sm hover:bg-muted/50 transition-colors flex items-center gap-2"
                                                 >
-                                                    <StatusBadge status={opt.value} tenantId={tenantId} options={[opt]} className="pointer-events-none" />
+                                                    <StatusBadge status={opt.value} tenantId={tenantId} options={[opt]} code="ORGANIZATION_STATUS" className="pointer-events-none" />
                                                 </button>
                                             ))}
                                         </div>
@@ -134,15 +168,37 @@ export default function OrganizationHeader({ profile, tenantId }: OrganizationHe
                             </div>
                         </div>
 
-                        {/* Industry */}
-                        <div className="text-lg text-muted-foreground font-medium flex items-center gap-2">
-                            <Building size={16} />
-                            <EditableField
-                                value={profile.industry || profile.custom_fields?.industry || ""}
-                                onSave={(val) => handleUpdate('industry', val)}
-                                placeholder="Add Industry"
-                                className="hover:underline decoration-dashed break-words"
-                            />
+                        {/* Industry & Size */}
+                        <div className="flex items-center gap-3">
+                            {/* Industry */}
+                            <div className="text-lg text-muted-foreground font-medium flex items-center gap-2">
+                                <Building size={16} />
+                                {(profile.industry || profile.custom_fields?.industry) ? (
+                                    <StatusBadge
+                                        status={profile.industry || profile.custom_fields.industry}
+                                        tenantId={tenantId}
+                                        code="ORGANIZATION_INDUSTRY"
+                                        className="bg-transparent border-gray-200 text-foreground pointer-events-none px-0 text-lg font-medium tracking-normal rounded-none border-none py-0"
+                                    />
+                                ) : (
+                                    <span className="text-muted-foreground/50 text-sm">No Industry</span>
+                                )}
+                            </div>
+
+                            {/* Size */}
+                            {(profile.company_size || profile.custom_fields?.company_size) && (
+                                <>
+                                    <div className="w-1 h-1 rounded-full bg-border" />
+                                    <div className="text-sm text-muted-foreground flex items-center gap-1.5">
+                                        <StatusBadge
+                                            status={profile.company_size || profile.custom_fields.company_size}
+                                            tenantId={tenantId}
+                                            code="COMPANY_SIZE"
+                                            className="bg-secondary/50 border-border text-muted-foreground pointer-events-none text-xs"
+                                        />
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
 
@@ -231,13 +287,55 @@ export default function OrganizationHeader({ profile, tenantId }: OrganizationHe
                             status: profile.status || profile.custom_fields?.status
                         }}
                         trigger={
-                            <button className="px-4 py-2 bg-white text-black font-semibold rounded-lg text-sm hover:bg-slate-200 transition-colors flex items-center gap-2">
+                            <button className="px-4 py-2 bg-white text-black font-semibold rounded-lg text-sm hover:bg-slate-200 transition-colors flex items-center justify-center gap-2">
                                 <Pencil size={16} />
-                                {language === 'he' ? 'ערוך פרופיל' : 'Edit Profile'}
+                                <span>{language === 'he' ? 'ערוך פרופיל' : 'Edit Profile'}</span>
                             </button>
                         }
                         onSuccess={() => router.refresh()}
                     />
+
+                    <button
+                        onClick={() => router.push(`/dashboard/sales/quotes/new?customerId=${profile.id}`)}
+                        className="w-full px-4 py-2 bg-brand-primary text-primary-foreground font-semibold rounded-lg text-sm hover:opacity-90 transition-colors flex items-center justify-center gap-2"
+                    >
+                        <FileText size={16} />
+                        <span>{language === 'he' ? 'הצעת מחיר חדשה' : 'Create Quote'}</span>
+                    </button>
+
+                    <div className="relative">
+                        <button
+                            onClick={() => setIsPortalMenuOpen(!isPortalMenuOpen)}
+                            className="w-full px-4 py-2 bg-indigo-50 text-indigo-600 border border-indigo-200 font-semibold rounded-lg text-sm hover:bg-indigo-100 transition-colors flex items-center justify-center gap-2"
+                        >
+                            <Mail size={16} />
+                            <span>{language === 'he' ? 'חיבור לפורטל' : 'Portal Access'}</span>
+                        </button>
+
+                        {isPortalMenuOpen && (
+                            <>
+                                <div className="fixed inset-0 z-40" onClick={() => setIsPortalMenuOpen(false)} />
+                                <div className="absolute top-12 right-0 w-full min-w-[200px] bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden text-sm">
+                                    {profile.email && (
+                                        <button
+                                            onClick={handleSendPortalLink}
+                                            className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex items-center gap-3 border-b border-slate-100"
+                                        >
+                                            <Mail size={16} className="text-slate-400" />
+                                            {language === 'he' ? 'שלח לינק במייל' : 'Send via Email'}
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={handleCopyPortalLink}
+                                        className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex items-center gap-3"
+                                    >
+                                        <Copy size={16} className="text-slate-400" />
+                                        {language === 'he' ? 'העתק לינק לפורטל' : 'Copy Portal Link'}
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
 
                     {canDelete && (
                         <button

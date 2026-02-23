@@ -49,13 +49,18 @@ export async function updateSession(request: NextRequest) {
     if (
         !user &&
         !request.nextUrl.pathname.startsWith('/login') &&
+        !request.nextUrl.pathname.startsWith('/portal/login') &&
         !request.nextUrl.pathname.startsWith('/auth') &&
         !request.nextUrl.pathname.startsWith('/quote') &&
         !isServerAction && // Do not redirect Server Actions (let them fail gracefully with JSON)
         !isApi
     ) {
         const url = request.nextUrl.clone()
-        url.pathname = '/login'
+        if (request.nextUrl.pathname.startsWith('/portal')) {
+            url.pathname = '/portal/login'
+        } else {
+            url.pathname = '/login'
+        }
         return NextResponse.redirect(url)
     }
 

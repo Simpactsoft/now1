@@ -11,7 +11,7 @@ export async function createTenant(params: CreateTenantInput): Promise<ActionRes
     // 1. Validate Input
     const result = CreateTenantSchema.safeParse(params);
     if (!result.success) {
-        const errorMessage = result.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
+        const errorMessage = result.error.issues.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
         return actionError(errorMessage, "VALIDATION_ERROR");
     }
 

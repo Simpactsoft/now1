@@ -94,7 +94,7 @@ export async function createRule(
         if (params.allowedOptions !== undefined) {
             const allowedOptionsValidation = allowedOptionsSchema.safeParse(params.allowedOptions);
             if (!allowedOptionsValidation.success) {
-                return { success: false, error: `Invalid allowed_options: ${allowedOptionsValidation.error.errors[0].message}` };
+                return { success: false, error: `Invalid allowed_options: ${allowedOptionsValidation.error.issues[0].message}` };
             }
         }
 
@@ -171,7 +171,7 @@ export async function updateRule(
         if (params.allowedOptions !== undefined) {
             const allowedOptionsValidation = allowedOptionsSchema.safeParse(params.allowedOptions);
             if (!allowedOptionsValidation.success) {
-                return { success: false, error: `Invalid allowed_options: ${allowedOptionsValidation.error.errors[0].message}` };
+                return { success: false, error: `Invalid allowed_options: ${allowedOptionsValidation.error.issues[0].message}` };
             }
             updateData.allowed_options = params.allowedOptions;
         }

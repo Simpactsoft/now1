@@ -63,7 +63,7 @@ export async function createPreset(
 
         const selectedOptionsValidation = selectedOptionsSchema.safeParse(params.selectedOptions);
         if (!selectedOptionsValidation.success) {
-            return { success: false, error: `Invalid selected_options: ${selectedOptionsValidation.error.errors[0].message}` };
+            return { success: false, error: `Invalid selected_options: ${selectedOptionsValidation.error.issues[0].message}` };
         }
 
         // Get next display_order if not specified
@@ -129,7 +129,7 @@ export async function updatePreset(
         if (params.selectedOptions !== undefined) {
             const selectedOptionsValidation = selectedOptionsSchema.safeParse(params.selectedOptions);
             if (!selectedOptionsValidation.success) {
-                return { success: false, error: `Invalid selected_options: ${selectedOptionsValidation.error.errors[0].message}` };
+                return { success: false, error: `Invalid selected_options: ${selectedOptionsValidation.error.issues[0].message}` };
             }
         }
 

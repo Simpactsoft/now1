@@ -48,7 +48,7 @@ async function verify() {
                 const { data: raw } = await supabase.rpc('get_admin_tenant', { arg_tenant_id: firstId });
                 console.log('   Raw result (without .single):', raw);
             } else {
-                console.log('SUCCESS: Fetched single tenant:', single.name);
+                console.log('SUCCESS: Fetched single tenant:', (single as any).name);
             }
         } else {
             console.warn('No tenants found to test single fetch.');

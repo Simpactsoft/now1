@@ -7,12 +7,13 @@ import { getTenantId } from "@/lib/auth/tenant";
 export default async function NewTemplatePage() {
     const user = await getCurrentUser();
 
-    if (!user) {
+    if (!user || !user.success || !user.data) {
         redirect('/login');
     }
 
+    const actualUser = user.data;
     const supabase = await createClient();
-    const tenantId = await getTenantId(user, supabase);
+    const tenantId = await getTenantId(actualUser, supabase);
 
     return (
         <div className="container max-w-2xl mx-auto py-8 px-4">

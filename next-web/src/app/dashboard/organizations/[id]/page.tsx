@@ -5,6 +5,7 @@ import RelationshipManager from "@/components/RelationshipManager";
 import ActionTimeline from "@/components/ActionTimeline";
 import { fetchOrganizationDetails } from "@/app/actions/fetchDetails";
 import BackButton from "@/components/BackButton";
+import { ActivitiesTimeline } from "@/components/ActivitiesTimeline";
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 
@@ -95,6 +96,14 @@ export default async function OrganizationProfilePage({ params }: PageProps) {
                         entityId={id}
                         entityType="organization"
                     />
+
+                    <div className="mb-8">
+                        <ActivitiesTimeline
+                            tenantId={tenantId}
+                            entityId={id}
+                            entityType="card"
+                        />
+                    </div>
 
                     <ActionTimeline events={timeline} />
                 </div>

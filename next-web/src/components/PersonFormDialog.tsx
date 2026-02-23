@@ -85,7 +85,7 @@ export default function PersonFormDialog({ tenantId, initialData, trigger, open,
                     lastName: initialData.lastName || "",
                     email: initialData.email || "",
                     phone: initialData.phone || "",
-                    status: (initialData.status || "").toUpperCase(),
+                    status: initialData.status || "",
                     role: (initialData as any).role || (initialData as any).job_title || "",
                     tags: (initialData as any).tags || []
                 });
@@ -114,7 +114,16 @@ export default function PersonFormDialog({ tenantId, initialData, trigger, open,
             fetch(`/api/options?code=PERSON_STATUS&tenantId=${tenantId}`)
                 .then(res => res.json())
                 .then(json => {
-                    if (json.data) setStatusOptions(json.data);
+                    if (json.data) {
+                        setStatusOptions(json.data);
+                        // Fix casing mismatch between DB and Options
+                        if (initialData?.status) {
+                            const match = json.data.find((o: any) => o.value.toUpperCase() === initialData.status!.toUpperCase());
+                            if (match) {
+                                setFormData(prev => ({ ...prev, status: match.value }));
+                            }
+                        }
+                    }
                     setLoadingStatus(false);
                 })
                 .catch(err => {
@@ -122,7 +131,7 @@ export default function PersonFormDialog({ tenantId, initialData, trigger, open,
                     setLoadingStatus(false);
                 });
         }
-    }, [isOpen, statusOptions.length]);
+    }, [isOpen, statusOptions.length, tenantId, initialData?.status]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -132,7 +141,9 @@ export default function PersonFormDialog({ tenantId, initialData, trigger, open,
         try {
             const customFields: any = {};
             if (formData.status) customFields.status = formData.status;
-            if (formData.role) customFields.role = formData.role;
+            if (formData.role) {
+                customFields.role = formData.role;
+            }
 
             let res;
             if (isEditMode && initialData?.id) {
@@ -145,16 +156,24 @@ export default function PersonFormDialog({ tenantId, initialData, trigger, open,
                     email: formData.email,
                     phone: formData.phone,
                     customFields,
+                    jobTitle: formData.role,
                     tags: formData.tags
                 });
             } else {
                 // Create
+                if (!formData.status) {
+                    setError("Status is required");
+                    setIsLoading(false);
+                    return;
+                }
                 res = await createPerson({
                     firstName: formData.firstName,
                     lastName: formData.lastName,
                     email: formData.email,
                     phone: formData.phone,
                     tenantId,
+                    status: formData.status,
+                    role: formData.role,
                     customFields,
                     tags: formData.tags
                 });
@@ -273,7 +292,7 @@ export default function PersonFormDialog({ tenantId, initialData, trigger, open,
                         <div className="relative">
                             <select
                                 className="w-full bg-secondary/50 border border-input rounded-lg px-3 py-2 text-foreground placeholder:text-muted-foreground focus:border-primary outline-none transition-colors appearance-none"
-                                value={formData.status}
+                                value={statusOptions.length === 0 ? "" : (statusOptions.find((o: any) => o.value?.toUpperCase() === formData.status?.toUpperCase())?.value || formData.status || "")}
                                 onChange={e => setFormData({ ...formData, status: e.target.value })}
                                 disabled={loadingStatus}
                             >

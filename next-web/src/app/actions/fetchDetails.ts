@@ -182,6 +182,13 @@ export async function fetchOrganizationDetails(tenantId: string, orgId: string):
         org.custom_fields = { ...(org.custom_fields || {}), ...rawCustomFields };
     }
 
+    // Merge Status
+    if (directCardResult.data?.status) {
+        org.status = directCardResult.data.status;
+    } else if (!org.status && rawCustomFields?.status) {
+        org.status = rawCustomFields.status;
+    }
+
     // Handle Contact Methods (Array or Object)
     if (Array.isArray(rawContactMethods)) {
         const emailObj = rawContactMethods.find((m: any) => m.type === 'email');

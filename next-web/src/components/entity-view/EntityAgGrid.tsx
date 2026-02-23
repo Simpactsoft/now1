@@ -172,7 +172,7 @@ function EntityAgGridInner<T = any>(props: EntityAgGridProps<T>) {
                 "border border-border rounded-xl overflow-hidden shadow-sm bg-card relative flex-1 min-h-[500px]",
                 hasPagination ? 'rounded-b-none border-b-0' : ''
             )}>
-                <div className="w-full h-full relative">
+                <div className="absolute inset-0">
                     <AgGridReact
                         ref={gridRef}
                         rowData={data}

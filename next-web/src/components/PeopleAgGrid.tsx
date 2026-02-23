@@ -244,7 +244,7 @@ export default function PeopleAgGrid({
 
     const defaultColDef = useMemo(() => ({
         sortable: true,
-        filter: true,
+        filter: false,
         resizable: true,
         suppressMovable: true
     }), []);

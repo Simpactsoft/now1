@@ -42,7 +42,7 @@ export async function updateOrganization(rawInput: any): Promise<ActionResult<vo
 
     if (!result.success) {
         console.error("Validation Failed:", result.error);
-        const firstError = result.error.errors[0];
+        const firstError = result.error.issues[0];
         const errorMessage = firstError ? `${firstError.path.join('.')}: ${firstError.message}` : "Validation failed";
         return actionError(errorMessage, "VALIDATION_ERROR");
     }
@@ -89,23 +89,60 @@ export async function updateOrganization(rawInput: any): Promise<ActionResult<vo
 
         const customFieldsValidation = customFieldsSchema.safeParse(updatedCustomFields);
         if (!customFieldsValidation.success) {
-            return actionError(`Invalid custom_fields: ${customFieldsValidation.error.errors[0].message}`, "VALIDATION_ERROR");
+            return actionError(`Invalid custom_fields: ${customFieldsValidation.error.issues[0].message}`, "VALIDATION_ERROR");
         }
 
         // Ensure Status is Uppercase
         let newStatus = updatedCustomFields.status || cardData.status || 'PROSPECT';
         if (newStatus) newStatus = newStatus.toUpperCase();
 
-        // Update Contact Methods
-        let currentContactMethods = cardData.contact_methods || {};
-        if (Array.isArray(currentContactMethods)) {
-            currentContactMethods = {};
+        // Prevent organizations from being stuck as LEAD due to database defaults
+        if (newStatus === 'LEAD') {
+            newStatus = 'PROSPECT';
         }
 
-        const newContactMethods = { ...currentContactMethods };
-        if (email !== undefined) newContactMethods.email = email;
-        if (phone !== undefined) newContactMethods.phone = phone;
-        if (website !== undefined) newContactMethods.website = website;
+        // Update Contact Methods
+        let contactMethodsArr: any[] = [];
+        if (Array.isArray(cardData.contact_methods)) {
+            contactMethodsArr = [...cardData.contact_methods];
+        } else if (cardData.contact_methods && typeof cardData.contact_methods === 'object') {
+            // Convert legacy object to array
+            if (cardData.contact_methods.email) contactMethodsArr.push({ type: 'email', value: cardData.contact_methods.email });
+            if (cardData.contact_methods.phone) contactMethodsArr.push({ type: 'phone', value: cardData.contact_methods.phone });
+            if (cardData.contact_methods.website) contactMethodsArr.push({ type: 'website', value: cardData.contact_methods.website });
+        }
+
+        if (email !== undefined) {
+            const emailIdx = contactMethodsArr.findIndex(m => m.type === 'email');
+            if (emailIdx >= 0) {
+                if (email === "") contactMethodsArr.splice(emailIdx, 1);
+                else contactMethodsArr[emailIdx].value = email;
+            } else if (email !== "") {
+                contactMethodsArr.push({ type: 'email', value: email });
+            }
+        }
+
+        if (phone !== undefined) {
+            const phoneIdx = contactMethodsArr.findIndex(m => m.type === 'phone');
+            if (phoneIdx >= 0) {
+                if (phone === "") contactMethodsArr.splice(phoneIdx, 1);
+                else contactMethodsArr[phoneIdx].value = phone;
+            } else if (phone !== "") {
+                contactMethodsArr.push({ type: 'phone', value: phone });
+            }
+        }
+
+        if (website !== undefined) {
+            const webIdx = contactMethodsArr.findIndex(m => m.type === 'website');
+            if (webIdx >= 0) {
+                if (website === "") contactMethodsArr.splice(webIdx, 1);
+                else contactMethodsArr[webIdx].value = website;
+            } else if (website !== "") {
+                contactMethodsArr.push({ type: 'website', value: website });
+            }
+        }
+
+        const newContactMethods = contactMethodsArr;
 
         const cardUpdatePayload: any = {
             display_name: displayName !== undefined ? displayName : cardData.display_name,
@@ -114,6 +151,11 @@ export async function updateOrganization(rawInput: any): Promise<ActionResult<vo
             contact_methods: newContactMethods,
             updated_at: new Date().toISOString()
         };
+
+        // If this is an organization (which has company_name), sync display_name to company_name
+        if (displayName !== undefined) {
+            cardUpdatePayload.company_name = displayName;
+        }
 
         if (tags !== undefined) {
             cardUpdatePayload.tags = tags;
@@ -131,9 +173,16 @@ export async function updateOrganization(rawInput: any): Promise<ActionResult<vo
             // .eq('updated_at', lastKnownUpdatedAt) // Relaxed for debugging ease, re-enable if high concurrency needed
             .select();
 
+        console.log(`[updateOrganization] Update result for ${id}:`, {
+            error: updateError,
+            rowCount: updatedRows?.length,
+            updatedData: updatedRows?.[0]
+        });
+
         if (updateError) throw new Error(updateError.message);
 
         if (!updatedRows || updatedRows.length === 0) {
+            console.error(`[updateOrganization] Update failed silently returning 0 rows for ID ${id}`);
             // If we relaxed optimistic locking but still got 0, it means ID/Tenant didn't match or RLS blocked.
             return actionError("Update failed (Record not found or access denied)", "NOT_FOUND");
         }

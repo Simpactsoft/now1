@@ -149,7 +149,7 @@ export default function BomDialog({ productId, productName, isOpen, onClose }: B
                                 entityView.clearFilters();
                                 filters.forEach(filter => entityView.addFilter(filter));
                             },
-                        }}
+                        } as any}
                         availableViewModes={["tags", "grid", "cards", "tree"]}
                         defaultViewMode="grid"
                         renderTags={(props) => (
@@ -238,7 +238,7 @@ export default function BomDialog({ productId, productName, isOpen, onClose }: B
                                             cellRendererParams: {
                                                 suppressCount: false,
                                             }
-                                        }}
+                                        } as any}
                                         className="flex-1"
                                     />
                                 </div>

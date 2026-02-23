@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import EntityPicker from "@/components/universal/EntityPicker";
 import { Plus, X, Link as LinkIcon, Briefcase, LayoutList, LayoutGrid, Tags, User, Pencil } from "lucide-react";
 import { toast } from "sonner";
@@ -14,6 +15,8 @@ import { getDefinitionForType, RELATIONSHIP_SCHEMA, FieldDefinition, getAvailabl
 import SimplePeopleTable from "@/components/SimplePeopleTable";
 import PeopleTags from "@/components/PeopleTags";
 import EntityCard from "@/components/EntityCard";
+import { PortalAccessModal } from "@/components/PortalAccessModal";
+import { sendPortalMagicLink } from "@/app/actions/portal-auth-actions";
 
 interface Relationship {
     id: string; // The relationship ID
@@ -87,6 +90,7 @@ const DynamicField = ({ field, value, onChange }: { field: FieldDefinition, valu
 }
 
 export default function RelationshipManager({ tenantId, entityId, entityType }: RelationshipManagerProps) {
+    const router = useRouter();
     const [relationships, setRelationships] = useState<any[]>([]); // Enriched Data
     const [loading, setLoading] = useState(true);
     const [isAdding, setIsAdding] = useState(false);
@@ -95,6 +99,19 @@ export default function RelationshipManager({ tenantId, entityId, entityType }: 
     const [viewMode, setViewMode] = useState<ViewMode>('list');
 
     const [statusOptions, setStatusOptions] = useState<any[]>([]);
+
+    // Portal Access Modal State
+    const [portalAccess, setPortalAccess] = useState<{ isOpen: boolean, cardId: string, email: string, name: string } | null>(null);
+
+    const handleSendPortalLink = async (email: string) => {
+        const loadingToast = toast.loading('Sending login link...');
+        const res = await sendPortalMagicLink(email);
+        if (res.success) {
+            toast.success('Link sent perfectly!', { id: loadingToast });
+        } else {
+            toast.error(res.error || "Failed to send link", { id: loadingToast });
+        }
+    };
 
     // Configurable Types State
     const [selectedType, setSelectedType] = useState("");
@@ -115,7 +132,7 @@ export default function RelationshipManager({ tenantId, entityId, entityType }: 
     const loadRelationships = async () => {
         setLoading(true);
         const res = await fetchRelationshipsAction(tenantId, entityId);
-        if (res.error) {
+        if (!res.success) {
             console.error(res.error);
             setRelationships([]);
         } else {
@@ -192,7 +209,7 @@ export default function RelationshipManager({ tenantId, entityId, entityType }: 
                 res = await addRelationshipAction(tenantId, entityId, entity.id, selectedType, metaPayload);
             }
 
-            if (res.error) {
+            if (!res.success) {
                 toast.error(res.error);
                 loadRelationships();
             } else {
@@ -216,7 +233,7 @@ export default function RelationshipManager({ tenantId, entityId, entityType }: 
         setRelationships(prev => prev.map(r => r.relationshipId === relId ? { ...r, ret_role_name: newRole } : r));
 
         const res = await updateRelationshipAction(tenantId, relId, newRole);
-        if (res.error) {
+        if (!res.success) {
             toast.error(res.error || "Failed to update role");
             // Revert
             if (oldRel) {
@@ -233,7 +250,7 @@ export default function RelationshipManager({ tenantId, entityId, entityType }: 
         setRelationships(prev => prev.filter(r => r.relationshipId !== relId));
 
         const res = await removeRelationshipAction(tenantId, relId);
-        if (res.error) {
+        if (!res.success) {
             toast.error("Failed to remove relationship");
             setRelationships(oldList); // Revert
         } else {
@@ -430,7 +447,13 @@ export default function RelationshipManager({ tenantId, entityId, entityType }: 
                                         onEdit={() => handleEdit(p)}
                                         onNavigate={() => handlePersonClick(p.ret_id || p.id)}
                                         onDelete={() => handleDeleteRelationship(p.relationshipId)}
-                                    // TODO: Add Unlink action to Card context menu if possible
+                                        onGrantAccess={(id, email) => setPortalAccess({
+                                            isOpen: true,
+                                            cardId: id,
+                                            email: email || '',
+                                            name: p.ret_name
+                                        })}
+                                        onCreateQuote={(id) => router.push('/dashboard/sales/quotes/new?customerId=' + id)}
                                     />
                                 ))}
                             </div>
@@ -452,6 +475,17 @@ export default function RelationshipManager({ tenantId, entityId, entityType }: 
                     </>
                 )}
             </div>
+
+            {portalAccess && (
+                <PortalAccessModal
+                    isOpen={portalAccess.isOpen}
+                    onClose={() => setPortalAccess(null)}
+                    tenantId={tenantId}
+                    cardId={portalAccess.cardId}
+                    customerEmail={portalAccess.email}
+                    customerName={portalAccess.name}
+                />
+            )}
         </div>
     )
 }

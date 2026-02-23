@@ -18,6 +18,8 @@ export const CreatePersonSchema = z.object({
     email: z.string().email("Invalid email").optional().or(z.literal("")),
     phone: z.string().optional(),
     tenantId: z.string().min(1, "Tenant ID is required"),
+    status: z.string().min(1, "Status is required"),
+    role: z.string().optional(),
     customFields: z.record(z.string(), z.any()).optional(), // Flexible JSON for attributes
     tags: z.array(z.string()).optional()
 });
@@ -31,8 +33,11 @@ export const CreateOrganizationSchema = z.object({
     industry: z.string().optional(),
     email: z.string().email("Invalid email").optional().or(z.literal("")),
     phone: z.string().optional(),
+    website: z.string().optional(),
     address: z.string().optional(),
-    tenantId: z.string().min(1, "Tenant ID is required")
+    tenantId: z.string().min(1, "Tenant ID is required"),
+    status: z.string().min(1, "Status is required"),
+    tags: z.array(z.string()).optional()
 });
 
 export type CreateOrganizationInput = z.infer<typeof CreateOrganizationSchema>;

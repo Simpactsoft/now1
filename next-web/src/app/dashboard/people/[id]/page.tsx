@@ -4,6 +4,7 @@ import ProfileHeader from "@/components/ProfileHeader";
 import ActionTimeline from "@/components/ActionTimeline";
 import { fetchPersonDetails } from "@/app/actions/fetchDetails";
 import BackButton from "@/components/BackButton";
+import { ActivitiesTimeline } from "@/components/ActivitiesTimeline";
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link"; // Kept for error state link
 import { getTenantAttributes } from "@/app/actions/attributes";
@@ -108,6 +109,14 @@ export default async function PersonProfilePage({ params }: PageProps) {
                         entityId={id}
                         entityType="person"
                     />
+
+                    <div className="mb-8">
+                        <ActivitiesTimeline
+                            tenantId={tenantId}
+                            entityId={id}
+                            entityType="card"
+                        />
+                    </div>
 
                     <ActionTimeline events={timeline} />
                 </div>

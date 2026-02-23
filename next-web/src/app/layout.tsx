@@ -48,7 +48,16 @@ export default async function RootLayout({
 }>) {
   const cookieStore = await cookies();
   const tenantId = cookieStore.get("tenant_id")?.value;
-  const peopleCount = tenantId ? await getPeopleCount(tenantId) : 0;
+
+  let peopleCount = 0;
+  if (tenantId) {
+    const res = await getPeopleCount(tenantId);
+    if (typeof res === "number") {
+      peopleCount = res;
+    } else if (res && res.success) {
+      peopleCount = res.data;
+    }
+  }
 
   // Fetch tenant RTL setting
   let isRtl = false;
@@ -90,7 +99,6 @@ export default async function RootLayout({
         name: `${data.first_name || ""} ${data.last_name || ""}`.trim() || user.email || "User",
         role: data.role || "User",
         email: user.email || "",
-        status: data.status
       };
     } else {
       console.warn('[RootLayout] Profile query returned no data for user:', user.email);

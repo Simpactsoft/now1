@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Sidebar, { UserProfileData } from "@/components/Sidebar";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 interface DashboardShellProps {
     children: React.ReactNode;
@@ -18,6 +18,7 @@ export default function DashboardShell({
     userProfile
 }: DashboardShellProps) {
     const pathname = usePathname();
+    const router = useRouter();
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isMobile, setIsMobile] = useState(false);
 
@@ -47,26 +48,45 @@ export default function DashboardShell({
 
         // [Auto-Heal] Validate Tenant ID
         const validateTenant = async () => {
-            // Dynamically import to avoid server-side issues in client component if needed, 
+            // Dynamically import to avoid server-side issues in client component if needed,
             // but standard import work for Server Actions.
             const { fetchUserTenants } = await import("@/app/actions/fetchUserTenants");
             const { setTenantAction } = await import("@/app/actions/setTenant");
 
             try {
-                const { tenants } = await fetchUserTenants();
-                if (tenants && tenants.length > 0) {
-                    const validIds = tenants.map((t: any) => t.id);
+                const res = await fetchUserTenants();
+                if (res.success && res.data) {
+                    const tenants = res.data.tenants;
+                    if (tenants && tenants.length > 0) {
+                        const validIds = tenants.map((t: any) => t.id);
 
-                    // If current cookie is missing OR is NOT in the user's valid list
-                    // (e.g. Stale Admin Cookie)
-                    if (!currentTenantId || !validIds.includes(currentTenantId)) {
-                        console.log("[DashboardShell] Fix: Tenant Mismatch detected.", { current: currentTenantId, valid: validIds });
-                        console.log("[DashboardShell] Auto-switching to:", tenants[0].id);
+                        // If current cookie is missing OR is NOT in the user's valid list
+                        // (e.g. Stale Admin Cookie)
+                        if (!currentTenantId || !validIds.includes(currentTenantId)) {
+                            console.log("[DashboardShell] Fix: Tenant Mismatch detected.", { current: currentTenantId, valid: validIds });
+                            console.log("[DashboardShell] Auto-switching to:", tenants[0].id);
 
-                        await setTenantAction(tenants[0].id);
+                            await setTenantAction(tenants[0].id);
 
-                        // Force hard reload to pick up new cookie in Server Components
-                        window.location.reload();
+                            // Force hard reload to pick up new cookie in Server Components
+                            window.location.reload();
+                        }
+                    } else {
+                        // User has no tenants, clear any existing tenant_id cookie
+                        if (currentTenantId) {
+                            console.warn("User has no tenants but a tenant_id cookie is present. Clearing it.");
+                            document.cookie = 'tenant_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+                            router.refresh();
+                        }
+                    }
+                } else if (res.success === false) {
+                    // Handle cases where fetchUserTenants returns success: false
+                    console.error("[DashboardShell] Failed to fetch user tenants:", res.error);
+                    // Optionally, clear tenant_id if there's an error and a tenant_id is set
+                    if (currentTenantId) {
+                        console.warn("Error fetching tenants, clearing existing tenant_id cookie.");
+                        document.cookie = 'tenant_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+                        router.refresh();
                     }
                 }
             } catch (e) {
@@ -111,7 +131,7 @@ export default function DashboardShell({
                 <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 bg-brand-primary/10 rounded-full blur-[120px] pointer-events-none" />
                 <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-96 h-96 bg-brand-secondary/10 rounded-full blur-[120px] pointer-events-none" />
 
-                <div className="relative z-10">
+                <div className="relative z-10 flex flex-col h-full overflow-hidden">
                     {children}
                 </div>
             </main>

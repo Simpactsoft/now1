@@ -105,7 +105,7 @@ export default function ProductSelectorWrapper({
         debounceMs: 500,
         initialPageSize: 50,
         onFetchData,
-        defaultViewMode: 'cards', // Changed from 'tags' to 'cards' since renderCards is implemented
+        initialViewMode: 'cards', // Changed from 'tags' to 'cards' since renderCards is implemented
     });
 
     // ---- Actions ----

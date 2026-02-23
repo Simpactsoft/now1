@@ -4,8 +4,10 @@ import { useState, useEffect } from "react";
 import { fetchUsers, UserProfile } from "@/app/actions/fetchUsers";
 import { inviteUser } from "@/app/actions/inviteUser";
 import { toast } from "sonner";
-import { UserPlus, Mail, Shield, Trash2, Check, X, MoreHorizontal, Building2 } from "lucide-react";
+import { UserPlus, Mail, Shield, Trash2, Check, X, MoreHorizontal, Building2, Key, Loader2 } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { updateTeamMemberPassword } from "@/app/actions/updateTeamMemberPassword";
 
 export default function UserManagement({ tenantId }: { tenantId?: string }) {
     const [users, setUsers] = useState<UserProfile[]>([]);
@@ -17,6 +19,12 @@ export default function UserManagement({ tenantId }: { tenantId?: string }) {
     const [inviteEmail, setInviteEmail] = useState("");
     const [inviteRole, setInviteRole] = useState<'distributor' | 'dealer' | 'agent'>('agent');
     const [inviting, setInviting] = useState(false);
+
+    // Set Password State
+    const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+    const [selectedUserForPassword, setSelectedUserForPassword] = useState<{ id: string, name: string } | null>(null);
+    const [newPassword, setNewPassword] = useState("");
+    const [passwordLoading, setPasswordLoading] = useState(false);
 
     useEffect(() => {
         if (tenantId) loadUsers();
@@ -61,6 +69,27 @@ export default function UserManagement({ tenantId }: { tenantId?: string }) {
         acc[tName].push(user);
         return acc;
     }, {} as Record<string, UserProfile[]>);
+
+    const handleSetPasswordSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedUserForPassword) return;
+
+        setPasswordLoading(true);
+        try {
+            const res = await updateTeamMemberPassword(selectedUserForPassword.id, newPassword);
+            if (res.success) {
+                toast.success(`Password updated for ${selectedUserForPassword.name}`);
+                setPasswordModalOpen(false);
+                setNewPassword("");
+            } else {
+                toast.error(res.error || "Failed to update password");
+            }
+        } catch (e: any) {
+            toast.error(e.message || "An error occurred");
+        } finally {
+            setPasswordLoading(false);
+        }
+    };
 
     if (pageError) {
         return <div className="p-8 text-center text-destructive">{pageError}</div>;
@@ -144,10 +173,28 @@ export default function UserManagement({ tenantId }: { tenantId?: string }) {
                                             </div>
                                         </div>
 
-                                        {/* Actions Menu (Hidden for now, but ready) */}
-                                        <button className="absolute top-3 right-3 p-1.5 rounded-md hover:bg-secondary opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
-                                        </button>
+                                        <DropdownMenu.Root>
+                                            <DropdownMenu.Trigger asChild>
+                                                <button className="absolute top-3 right-3 p-1.5 rounded-md hover:bg-secondary opacity-0 group-hover:opacity-100 transition-opacity outline-none">
+                                                    <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
+                                                </button>
+                                            </DropdownMenu.Trigger>
+                                            <DropdownMenu.Portal>
+                                                <DropdownMenu.Content align="end" className="w-48 bg-popover border border-border rounded-lg shadow-lg py-1 z-50 animate-in fade-in zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:zoom-out-95">
+                                                    <DropdownMenu.Item
+                                                        onSelect={() => {
+                                                            setSelectedUserForPassword({ id: user.id, name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email });
+                                                            setNewPassword("");
+                                                            setPasswordModalOpen(true);
+                                                        }}
+                                                        className="flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-secondary hover:text-foreground cursor-default outline-none select-none transition-colors"
+                                                    >
+                                                        <Key size={14} className="text-muted-foreground" />
+                                                        Set Password
+                                                    </DropdownMenu.Item>
+                                                </DropdownMenu.Content>
+                                            </DropdownMenu.Portal>
+                                        </DropdownMenu.Root>
                                     </div>
                                 ))}
                             </div>
@@ -235,6 +282,59 @@ export default function UserManagement({ tenantId }: { tenantId?: string }) {
                                 )}
                             </button>
                         </div>
+
+                        <Dialog.Close className="absolute top-4 right-4 p-2 rounded-full hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-colors">
+                            <X size={16} />
+                        </Dialog.Close>
+                    </Dialog.Content>
+                </Dialog.Portal>
+            </Dialog.Root>
+
+            {/* Set Password Dialog */}
+            <Dialog.Root open={passwordModalOpen} onOpenChange={setPasswordModalOpen}>
+                <Dialog.Portal>
+                    <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 animate-in fade-in" />
+                    <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm bg-background p-0 rounded-2xl shadow-2xl z-50 border border-border animate-in zoom-in-95 duration-200 overflow-hidden">
+                        <div className="p-6 border-b border-border bg-muted/30 flex items-center gap-3">
+                            <Key className="w-5 h-5 text-indigo-500" />
+                            <Dialog.Title className="text-lg font-bold">Set Password</Dialog.Title>
+                        </div>
+
+                        <form onSubmit={handleSetPasswordSubmit} className="p-6 space-y-4">
+                            <p className="text-sm text-muted-foreground">
+                                Override the login password for <span className="font-semibold text-foreground">{selectedUserForPassword?.name}</span>.
+                            </p>
+                            <div className="space-y-2">
+                                <label className="text-sm font-semibold">New Password</label>
+                                <input
+                                    type="text"
+                                    required
+                                    minLength={6}
+                                    value={newPassword}
+                                    onChange={e => setNewPassword(e.target.value)}
+                                    className="w-full px-3 py-2 border border-input rounded-lg bg-background focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                                    placeholder="Enter at least 6 characters..."
+                                />
+                            </div>
+
+                            <div className="pt-4 flex justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setPasswordModalOpen(false)}
+                                    className="px-4 py-2 text-sm font-medium hover:bg-secondary rounded-lg transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={passwordLoading || newPassword.length < 6}
+                                    className="px-5 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold shadow-sm hover:translate-y-[-1px] active:translate-y-[1px] transition-all disabled:opacity-50 disabled:pointer-events-none flex items-center gap-2"
+                                >
+                                    {passwordLoading ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+                                    Save Password
+                                </button>
+                            </div>
+                        </form>
 
                         <Dialog.Close className="absolute top-4 right-4 p-2 rounded-full hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-colors">
                             <X size={16} />

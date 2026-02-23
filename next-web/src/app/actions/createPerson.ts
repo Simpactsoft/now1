@@ -11,7 +11,7 @@ export async function createPerson(params: CreatePersonInput): Promise<ActionRes
     const supabase = await createClient();
 
     // 1. Validate Input (Manual Validation to bypass Zod crash)
-    const { firstName, lastName, email, phone, tenantId, customFields, tags } = params as any;
+    const { firstName, lastName, email, phone, tenantId, customFields, tags, status } = params as any;
     console.log("createPerson: Received inputs:", { firstName, lastName, email, phone, tenantId, customFields, tags });
 
     const errors: string[] = [];
@@ -28,7 +28,7 @@ export async function createPerson(params: CreatePersonInput): Promise<ActionRes
     if (customFields !== undefined && customFields !== null) {
         const customFieldsValidation = customFieldsSchema.safeParse(customFields);
         if (!customFieldsValidation.success) {
-            return actionError(`Invalid custom_fields: ${customFieldsValidation.error.errors[0].message}`, "VALIDATION_ERROR");
+            return actionError(`Invalid custom_fields: ${customFieldsValidation.error.issues[0].message}`, "VALIDATION_ERROR");
         }
     }
 
@@ -47,7 +47,8 @@ export async function createPerson(params: CreatePersonInput): Promise<ActionRes
             arg_phone: phone || null,
             arg_custom_fields: customFields || {},
             arg_tags: tags || [],
-            arg_organization_id: null
+            arg_organization_id: null,
+            arg_status: status || (customFields?.status) || 'LEAD'
         });
 
         console.log("createPerson: RPC Arguments:", {
@@ -56,7 +57,8 @@ export async function createPerson(params: CreatePersonInput): Promise<ActionRes
             arg_last_name: lastName,
             arg_email: email || null,
             arg_phone: phone || null,
-            arg_organization_id: null
+            arg_organization_id: null,
+            arg_status: status || (customFields?.status) || 'LEAD'
         });
 
         if (!error) {
@@ -76,7 +78,8 @@ export async function createPerson(params: CreatePersonInput): Promise<ActionRes
                     arg_first_name: firstName,
                     arg_last_name: lastName,
                     arg_email: email || null,
-                    arg_phone: phone || null
+                    arg_phone: phone || null,
+                    arg_status: status || (customFields?.status) || 'LEAD'
                 });
 
                 if (fallbackError) {

@@ -23,6 +23,7 @@ interface SimplePeopleTableProps {
     statusOptions: any[];
     onUpdateRole?: (relId: string, newRole: string) => void;
     onDeleteRelationship?: (relId: string) => void;
+    onEditRelationship?: (relId: string) => void;
 }
 
 export default function SimplePeopleTable({
@@ -196,17 +197,23 @@ export default function SimplePeopleTable({
                                     {onUpdateRole ? (
                                         <div className={`relative group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-secondary/50 hover:bg-secondary border border-transparent hover:border-border/50 transition-all cursor-pointer max-w-full`}>
                                             <span className={`truncate text-sm font-medium w-full ${language === 'he' ? 'text-right' : 'text-left'}`}>
-                                                {(language === 'he' ? {
-                                                    'Employee': 'עובד',
-                                                    'Manager': 'מנהל',
-                                                    'Partner': 'שותף',
-                                                    'Supplier': 'ספק',
-                                                    'Investor': 'משקיע',
-                                                    'Board Member': 'חבר דירקטוריון'
-                                                }[person.ret_role_name] || person.ret_role_name : person.ret_role_name) || <span className="text-muted-foreground/50 italic">{language === 'he' ? 'בחר תפקיד...' : 'Add role...'}</span>}
+                                                {person.ret_role_name ? (
+                                                    language === 'he' ? (
+                                                        ({
+                                                            'Employee': 'עובד',
+                                                            'Manager': 'מנהל',
+                                                            'Partner': 'שותף',
+                                                            'Supplier': 'ספק',
+                                                            'Investor': 'משקיע',
+                                                            'Board Member': 'חבר דירקטוריון'
+                                                        } as Record<string, string>)[person.ret_role_name as string] || person.ret_role_name
+                                                    ) : person.ret_role_name
+                                                ) : (
+                                                    <span className="text-muted-foreground/50 italic">
+                                                        {language === 'he' ? 'בחר תפקיד...' : 'Add role...'}
+                                                    </span>
+                                                )}
                                             </span>
-
-                                            {/* Chevron Removed to match Status Badge design */}
 
                                             {/* Invisible Overlay Select */}
                                             <select
@@ -263,58 +270,60 @@ export default function SimplePeopleTable({
                                     }
                                 </td>
 
-                                {onDeleteRelationship && (
-                                    <td className="px-6 py-4 text-center">
-                                        <div className="relative">
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    // Toggle logic would require state, simplified for now:
-                                                    // We'll use a simple CSS-based hover menu or just keep the buttons but style them as a menu?
-                                                    // Better: Keep the buttons but acknowledge the user's "3 dots" request.
-                                                    // ACTUALLY: Let's implement the 3-dots popover using the same logic as EntityCard if possible, 
-                                                    // BUT managing state for every row in a table is heavy.
-                                                    // ALTERNATIVE: Use a simple "Action" column with the 3 dots icon that behaves as a trigger
-                                                    // Since we don't have Radix, we'll stick to the visible buttons for now but maybe style them better?
-                                                    // The user specifically ASKED for the 3 dots.
-                                                    // Let's Add a "More" button that shows the options on hover/click.
-                                                }}
-                                                className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted transition-colors group-hover/row:opacity-100"
-                                            >
-                                                {/* <MoreHorizontal className="w-4 h-4" /> */}
-                                                {/* Reverting to visible buttons as implementing a full dropdown per row without Radix is error-prone */}
-                                            </button>
-
-                                            {/* Standard Buttons (Always Visible) */}
-                                            <div className="flex items-center justify-end gap-1">
-                                                {onEditRelationship && (
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            onEditRelationship(person.relationshipId);
-                                                        }}
-                                                        className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full transition-colors"
-                                                        title="Edit Relationship"
-                                                    >
-                                                        <Pencil className="w-4 h-4" />
-                                                    </button>
-                                                )}
+                                {
+                                    onDeleteRelationship && (
+                                        <td className="px-6 py-4 text-center">
+                                            <div className="relative">
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        if (confirm('Are you sure you want to remove this relationship?')) {
-                                                            onDeleteRelationship(person.relationshipId);
-                                                        }
+                                                        // Toggle logic would require state, simplified for now:
+                                                        // We'll use a simple CSS-based hover menu or just keep the buttons but style them as a menu?
+                                                        // Better: Keep the buttons but acknowledge the user's "3 dots" request.
+                                                        // ACTUALLY: Let's implement the 3-dots popover using the same logic as EntityCard if possible, 
+                                                        // BUT managing state for every row in a table is heavy.
+                                                        // ALTERNATIVE: Use a simple "Action" column with the 3 dots icon that behaves as a trigger
+                                                        // Since we don't have Radix, we'll stick to the visible buttons for now but maybe style them better?
+                                                        // The user specifically ASKED for the 3 dots.
+                                                        // Let's Add a "More" button that shows the options on hover/click.
                                                     }}
-                                                    className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full transition-colors"
-                                                    title="Unlink"
+                                                    className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted transition-colors group-hover/row:opacity-100"
                                                 >
-                                                    <Trash2 className="w-4 h-4" />
+                                                    {/* <MoreHorizontal className="w-4 h-4" /> */}
+                                                    {/* Reverting to visible buttons as implementing a full dropdown per row without Radix is error-prone */}
                                                 </button>
+
+                                                {/* Standard Buttons (Always Visible) */}
+                                                <div className="flex items-center justify-end gap-1">
+                                                    {onEditRelationship && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                onEditRelationship(person.relationshipId);
+                                                            }}
+                                                            className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full transition-colors"
+                                                            title="Edit Relationship"
+                                                        >
+                                                            <Pencil className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            if (confirm('Are you sure you want to remove this relationship?')) {
+                                                                onDeleteRelationship(person.relationshipId);
+                                                            }
+                                                        }}
+                                                        className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full transition-colors"
+                                                        title="Unlink"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
                                             </div>
-                                        </div>
-                                    </td>
-                                )}
+                                        </td>
+                                    )
+                                }
                             </tr>
                         );
                     })}
@@ -342,6 +351,6 @@ export default function SimplePeopleTable({
                     )}
                 </tbody>
             </table>
-        </div>
+        </div >
     );
 }

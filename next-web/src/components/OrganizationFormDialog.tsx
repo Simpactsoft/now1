@@ -73,27 +73,44 @@ export default function OrganizationFormDialog({ tenantId, initialData, trigger,
     // Options State
     const [statusOptions, setStatusOptions] = useState<any[]>([]);
     const [loadingStatus, setLoadingStatus] = useState(false);
+    const [industryOptions, setIndustryOptions] = useState<any[]>([]);
+    const [loadingIndustry, setLoadingIndustry] = useState(false);
+    const [sizeOptions, setSizeOptions] = useState<any[]>([]);
+    const [loadingSize, setLoadingSize] = useState(false);
 
     useEffect(() => {
         setMounted(true);
     }, []);
 
-    // Fetch Status Options
+    // Fetch Options
     useEffect(() => {
-        if (isOpen && statusOptions.length === 0) {
-            setLoadingStatus(true);
-            fetch(`/api/options?code=ORGANIZATION_STATUS&tenantId=${tenantId}`)
-                .then(res => res.json())
-                .then(json => {
-                    if (json.data) setStatusOptions(json.data);
-                    setLoadingStatus(false);
-                })
-                .catch(err => {
-                    console.error("Failed to fetch status options", err);
-                    setLoadingStatus(false);
-                });
-        }
-    }, [isOpen, statusOptions.length, tenantId]);
+        if (!isOpen || !tenantId) return;
+
+        const fetchOpt = async (code: string, setter: (v: any[]) => void, loader: (v: boolean) => void, initialVal?: string, formField?: string) => {
+            loader(true);
+            try {
+                const res = await fetch(`/api/options?code=${code}&tenantId=${tenantId}`);
+                const json = await res.json();
+                if (json.data) {
+                    setter(json.data);
+                    if (initialVal && formField) {
+                        const match = json.data.find((o: any) => o.value.toUpperCase() === initialVal.toUpperCase());
+                        if (match) {
+                            setFormData(prev => ({ ...prev, [formField]: match.value }));
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error(`Failed to fetch ${code} options`, err);
+            } finally {
+                loader(false);
+            }
+        };
+
+        if (statusOptions.length === 0) fetchOpt('ORGANIZATION_STATUS', setStatusOptions, setLoadingStatus, initialData?.status, 'status');
+        if (industryOptions.length === 0) fetchOpt('ORGANIZATION_INDUSTRY', setIndustryOptions, setLoadingIndustry, initialData?.industry, 'industry');
+        if (sizeOptions.length === 0) fetchOpt('COMPANY_SIZE', setSizeOptions, setLoadingSize, initialData?.companySize, 'companySize');
+    }, [isOpen, statusOptions.length, industryOptions.length, sizeOptions.length, tenantId, initialData]);
 
     useEffect(() => {
         if (isOpen) {
@@ -105,7 +122,7 @@ export default function OrganizationFormDialog({ tenantId, initialData, trigger,
                     email: initialData.email || "",
                     industry: initialData.industry || "",
                     companySize: initialData.companySize || "",
-                    status: (initialData.status || "").toUpperCase(),
+                    status: initialData.status || "",
                     tags: initialData.tags || []
                 });
             } else {
@@ -131,6 +148,8 @@ export default function OrganizationFormDialog({ tenantId, initialData, trigger,
         try {
             const customFields: any = {};
             if (formData.status) customFields.status = formData.status;
+            if (formData.industry) customFields.industry = formData.industry;
+            if (formData.companySize) customFields.company_size = formData.companySize;
 
             // TODO: Ensure backend supports 'tags' for organization if not already
             // Assuming the actions support `customFields` and `tags` conceptually similar to persons
@@ -140,15 +159,12 @@ export default function OrganizationFormDialog({ tenantId, initialData, trigger,
                 res = await updateOrganization({
                     id: initialData.id,
                     tenantId,
-                    name: formData.name,
-                    industry: formData.industry,
-                    companySize: formData.companySize,
+                    displayName: formData.name,
                     phone: formData.phone,
                     email: formData.email,
                     website: formData.website,
                     customFields,
-                    tags: formData.tags,
-                    address: ""
+                    tags: formData.tags
                 });
             } else {
                 res = await createOrganization({
@@ -158,10 +174,8 @@ export default function OrganizationFormDialog({ tenantId, initialData, trigger,
                     companySize: formData.companySize,
                     phone: formData.phone,
                     email: formData.email,
-                    website: formData.website,
-                    customFields,
-                    tags: formData.tags,
-                    address: ""
+                    address: "",
+                    status: formData.status || 'prospect'
                 });
             }
 
@@ -211,23 +225,47 @@ export default function OrganizationFormDialog({ tenantId, initialData, trigger,
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                             <label className="text-xs font-medium text-muted-foreground">{language === 'he' ? 'תעשייה' : 'Industry'} (Optional)</label>
-                            <input
-                                type="text"
-                                className="w-full bg-secondary/50 border border-input rounded-lg px-3 py-2 text-foreground placeholder:text-muted-foreground focus:border-primary outline-none transition-colors"
-                                placeholder="e.g. Technology"
-                                value={formData.industry}
-                                onChange={e => setFormData({ ...formData, industry: e.target.value })}
-                            />
+                            <div className="relative">
+                                <select
+                                    className="w-full bg-secondary/50 border border-input rounded-lg px-3 py-2 text-foreground placeholder:text-muted-foreground focus:border-primary outline-none transition-colors appearance-none"
+                                    value={industryOptions.find((o: any) => o.value?.toUpperCase() === formData.industry?.toUpperCase())?.value || formData.industry || ""}
+                                    onChange={e => setFormData({ ...formData, industry: e.target.value })}
+                                    disabled={loadingIndustry}
+                                >
+                                    <option value="">{language === 'he' ? 'בחר תעשייה...' : 'Select Industry...'}</option>
+                                    {industryOptions.map((opt: any) => {
+                                        const label = opt.payload?.label_i18n?.[language] || opt.label || opt.value;
+                                        return (
+                                            <option key={opt.value} value={opt.value}>
+                                                {label}
+                                            </option>
+                                        );
+                                    })}
+                                </select>
+                                {loadingIndustry && <div className="absolute right-3 top-2.5"><Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /></div>}
+                            </div>
                         </div>
                         <div className="space-y-1.5">
                             <label className="text-xs font-medium text-muted-foreground">{language === 'he' ? 'גודל חברה' : 'Company Size'} (Optional)</label>
-                            <input
-                                type="text"
-                                className="w-full bg-secondary/50 border border-input rounded-lg px-3 py-2 text-foreground placeholder:text-muted-foreground focus:border-primary outline-none transition-colors"
-                                placeholder="e.g. 50-100"
-                                value={formData.companySize}
-                                onChange={e => setFormData({ ...formData, companySize: e.target.value })}
-                            />
+                            <div className="relative">
+                                <select
+                                    className="w-full bg-secondary/50 border border-input rounded-lg px-3 py-2 text-foreground placeholder:text-muted-foreground focus:border-primary outline-none transition-colors appearance-none"
+                                    value={sizeOptions.find((o: any) => o.value?.toUpperCase() === formData.companySize?.toUpperCase())?.value || formData.companySize || ""}
+                                    onChange={e => setFormData({ ...formData, companySize: e.target.value })}
+                                    disabled={loadingSize}
+                                >
+                                    <option value="">{language === 'he' ? 'בחר גודל...' : 'Select Size...'}</option>
+                                    {sizeOptions.map((opt: any) => {
+                                        const label = opt.payload?.label_i18n?.[language] || opt.label || opt.value;
+                                        return (
+                                            <option key={opt.value} value={opt.value}>
+                                                {label}
+                                            </option>
+                                        );
+                                    })}
+                                </select>
+                                {loadingSize && <div className="absolute right-3 top-2.5"><Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /></div>}
+                            </div>
                         </div>
                     </div>
 
@@ -257,7 +295,7 @@ export default function OrganizationFormDialog({ tenantId, initialData, trigger,
                     <div className="space-y-1.5">
                         <label className="text-xs font-medium text-muted-foreground">{language === 'he' ? 'אתר אינטרנט' : 'Website'} (Optional)</label>
                         <input
-                            type="url"
+                            type="text"
                             className="w-full bg-secondary/50 border border-input rounded-lg px-3 py-2 text-foreground placeholder:text-muted-foreground focus:border-primary outline-none transition-colors"
                             placeholder="https://example.com"
                             value={formData.website}
@@ -271,7 +309,7 @@ export default function OrganizationFormDialog({ tenantId, initialData, trigger,
                         <div className="relative">
                             <select
                                 className="w-full bg-secondary/50 border border-input rounded-lg px-3 py-2 text-foreground placeholder:text-muted-foreground focus:border-primary outline-none transition-colors appearance-none"
-                                value={formData.status}
+                                value={statusOptions.length === 0 ? "" : (statusOptions.find((o: any) => o.value?.toUpperCase() === formData.status?.toUpperCase())?.value || formData.status || "")}
                                 onChange={e => setFormData({ ...formData, status: e.target.value })}
                                 disabled={loadingStatus}
                             >

@@ -65,7 +65,7 @@ export default function EntityAgGrid({
     // Default Column Definitions
     const defaultColDef = useMemo(() => ({
         sortable: true,
-        filter: true,
+        filter: false,
         resizable: true,
         suppressMovable: true,
     }), []);
@@ -75,7 +75,7 @@ export default function EntityAgGrid({
 
     return (
         <div className={cn("w-full h-full border border-border rounded-xl overflow-hidden shadow-sm bg-card relative", className)}>
-            <div className="h-full w-full relative">
+            <div className="absolute inset-0">
                 <AgGridReact
                     ref={gridRef}
                     rowData={rowData}
