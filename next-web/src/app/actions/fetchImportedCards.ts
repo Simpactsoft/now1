@@ -1,10 +1,8 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
-import { createClient as createAdminClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { ActionResult, actionSuccess, actionError } from '@/lib/action-result';
 
 export interface ImportedCard {
     id: string;
@@ -16,15 +14,15 @@ export interface ImportedCard {
     created_at: string;
 }
 
-export async function fetchImportedCards(jobId: string): Promise<{ success: boolean; data?: ImportedCard[]; error?: string }> {
-    if (!jobId) return { success: false, error: 'Job ID is required' };
+export async function fetchImportedCards(jobId: string): Promise<ActionResult<ImportedCard[]>> {
+    if (!jobId) return actionError('Job ID is required', 'VALIDATION_ERROR');
 
     try {
         const supabaseAuth = await createClient();
         const { data: authData } = await supabaseAuth.auth.getUser();
-        if (!authData.user) return { success: false, error: 'Unauthorized' };
+        if (!authData.user) return actionError('Unauthorized', 'AUTH_ERROR');
 
-        const supabase = createAdminClient(supabaseUrl, supabaseServiceKey);
+        const supabase = createAdminClient();
 
         const { data: profile } = await supabase
             .from('profiles')
@@ -32,7 +30,7 @@ export async function fetchImportedCards(jobId: string): Promise<{ success: bool
             .eq('id', authData.user.id)
             .single();
 
-        if (!profile?.tenant_id) return { success: false, error: 'Tenant not found' };
+        if (!profile?.tenant_id) return actionError('Tenant not found', 'AUTH_ERROR');
 
         // Query cards that were created by this import job
         const { data, error } = await supabase
@@ -43,10 +41,10 @@ export async function fetchImportedCards(jobId: string): Promise<{ success: bool
             .order('created_at', { ascending: true })
             .limit(500);
 
-        if (error) return { success: false, error: error.message };
+        if (error) return actionError(error.message, 'DB_ERROR');
 
-        return { success: true, data: data || [] };
+        return actionSuccess(data || []);
     } catch (e: any) {
-        return { success: false, error: e.message };
+        return actionError(e.message, 'INTERNAL_ERROR');
     }
 }

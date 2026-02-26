@@ -1,20 +1,22 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
-import { createClient as createAdminClient } from '@supabase/supabase-js';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { ActionResult, actionSuccess, actionError } from '@/lib/action-result';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+interface RollbackResult {
+    deleted: number;
+}
 
-export async function rollbackImport(jobId: string): Promise<{ success: boolean; deleted: number; error?: string }> {
-    if (!jobId) return { success: false, deleted: 0, error: 'Job ID is required' };
+export async function rollbackImport(jobId: string): Promise<ActionResult<RollbackResult>> {
+    if (!jobId) return actionError('Job ID is required', 'VALIDATION_ERROR');
 
     try {
         const supabaseAuth = await createClient();
         const { data: authData } = await supabaseAuth.auth.getUser();
-        if (!authData.user) return { success: false, deleted: 0, error: 'Unauthorized' };
+        if (!authData.user) return actionError('Unauthorized', 'AUTH_ERROR');
 
-        const supabase = createAdminClient(supabaseUrl, supabaseServiceKey);
+        const supabase = createAdminClient();
 
         const { data: profile } = await supabase
             .from('profiles')
@@ -22,7 +24,7 @@ export async function rollbackImport(jobId: string): Promise<{ success: boolean;
             .eq('id', authData.user.id)
             .single();
 
-        if (!profile?.tenant_id) return { success: false, deleted: 0, error: 'Tenant not found' };
+        if (!profile?.tenant_id) return actionError('Tenant not found', 'AUTH_ERROR');
 
         const tenantId = profile.tenant_id;
 
@@ -34,8 +36,8 @@ export async function rollbackImport(jobId: string): Promise<{ success: boolean;
             .eq('tenant_id', tenantId)
             .single();
 
-        if (jobError || !job) return { success: false, deleted: 0, error: 'Import job not found' };
-        if (job.status === 'rolled_back') return { success: false, deleted: 0, error: 'Import was already rolled back' };
+        if (jobError || !job) return actionError('Import job not found', 'NOT_FOUND');
+        if (job.status === 'rolled_back') return actionError('Import was already rolled back', 'VALIDATION_ERROR');
 
         // Delete all cards created by this import job
         const { data: deletedCards, error: deleteError } = await supabase
@@ -47,7 +49,7 @@ export async function rollbackImport(jobId: string): Promise<{ success: boolean;
 
         if (deleteError) {
             console.error('[Rollback] Delete error:', deleteError);
-            return { success: false, deleted: 0, error: deleteError.message };
+            return actionError(deleteError.message, 'DB_ERROR');
         }
 
         const deletedCount = deletedCards?.length || 0;
@@ -61,9 +63,9 @@ export async function rollbackImport(jobId: string): Promise<{ success: boolean;
 
         console.log(`[Rollback] Job ${jobId}: deleted ${deletedCount} cards, status -> rolled_back`);
 
-        return { success: true, deleted: deletedCount };
+        return actionSuccess({ deleted: deletedCount });
     } catch (e: any) {
         console.error('[Rollback] Exception:', e);
-        return { success: false, deleted: 0, error: e.message };
+        return actionError(e.message, 'INTERNAL_ERROR');
     }
 }

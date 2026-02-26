@@ -1,10 +1,8 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
-import { createClient as createAdminClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { ActionResult, actionSuccess, actionError } from '@/lib/action-result';
 
 export interface ImportJob {
     id: string;
@@ -21,13 +19,13 @@ export interface ImportJob {
     completed_at: string | null;
 }
 
-export async function fetchImportHistory(): Promise<{ success: boolean; data?: ImportJob[]; error?: string }> {
+export async function fetchImportHistory(): Promise<ActionResult<ImportJob[]>> {
     try {
         const supabaseAuth = await createClient();
         const { data: authData } = await supabaseAuth.auth.getUser();
-        if (!authData.user) return { success: false, error: 'Unauthorized' };
+        if (!authData.user) return actionError('Unauthorized', 'AUTH_ERROR');
 
-        const supabase = createAdminClient(supabaseUrl, supabaseServiceKey);
+        const supabase = createAdminClient();
 
         const { data: profile } = await supabase
             .from('profiles')
@@ -35,7 +33,7 @@ export async function fetchImportHistory(): Promise<{ success: boolean; data?: I
             .eq('id', authData.user.id)
             .single();
 
-        if (!profile?.tenant_id) return { success: false, error: 'Tenant not found' };
+        if (!profile?.tenant_id) return actionError('Tenant not found', 'AUTH_ERROR');
 
         const { data, error } = await supabase
             .from('import_jobs')
@@ -44,10 +42,10 @@ export async function fetchImportHistory(): Promise<{ success: boolean; data?: I
             .order('created_at', { ascending: false })
             .limit(50);
 
-        if (error) return { success: false, error: error.message };
+        if (error) return actionError(error.message, 'DB_ERROR');
 
-        return { success: true, data: data || [] };
+        return actionSuccess(data || []);
     } catch (e: any) {
-        return { success: false, error: e.message };
+        return actionError(e.message, 'INTERNAL_ERROR');
     }
 }

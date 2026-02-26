@@ -1,43 +1,34 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
-import { createClient as createAdminClient } from '@supabase/supabase-js';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { ActionResult, actionSuccess, actionError } from '@/lib/action-result';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+interface BulkDeleteResult {
+    deleted: number;
+}
 
 /**
  * Bulk deletes cards by IDs, with tenant security check.
  */
-export async function bulkDeleteCards(ids: string[]): Promise<{ success: boolean; deleted: number; error?: string }> {
-    if (!ids || ids.length === 0) {
-        return { success: false, deleted: 0, error: 'No IDs provided' };
-    }
-
-    if (ids.length > 200) {
-        return { success: false, deleted: 0, error: 'Maximum 200 items can be deleted at once' };
-    }
+export async function bulkDeleteCards(ids: string[]): Promise<ActionResult<BulkDeleteResult>> {
+    if (!ids || ids.length === 0) return actionError('No IDs provided', 'VALIDATION_ERROR');
+    if (ids.length > 200) return actionError('Maximum 200 items can be deleted at once', 'VALIDATION_ERROR');
 
     try {
-        // Auth check
         const supabaseAuth = await createClient();
         const { data: authData } = await supabaseAuth.auth.getUser();
-        if (!authData.user) {
-            return { success: false, deleted: 0, error: 'Unauthorized' };
-        }
+        if (!authData.user) return actionError('Unauthorized', 'AUTH_ERROR');
 
-        const supabase = createAdminClient(supabaseUrl, supabaseServiceKey);
+        const supabase = createAdminClient();
 
-        // Get tenant
         const { data: profile } = await supabase
             .from('profiles')
             .select('tenant_id')
             .eq('id', authData.user.id)
             .single();
 
-        if (!profile?.tenant_id) {
-            return { success: false, deleted: 0, error: 'Tenant not found' };
-        }
+        if (!profile?.tenant_id) return actionError('Tenant not found', 'AUTH_ERROR');
 
         const tenantId = profile.tenant_id;
 
@@ -51,15 +42,15 @@ export async function bulkDeleteCards(ids: string[]): Promise<{ success: boolean
 
         if (error) {
             console.error('[BulkDelete] Error:', error);
-            return { success: false, deleted: 0, error: error.message };
+            return actionError(error.message, 'DB_ERROR');
         }
 
         const deletedCount = data?.length || 0;
         console.log(`[BulkDelete] Deleted ${deletedCount} cards for tenant ${tenantId}`);
 
-        return { success: true, deleted: deletedCount };
+        return actionSuccess({ deleted: deletedCount });
     } catch (e: any) {
         console.error('[BulkDelete] Exception:', e);
-        return { success: false, deleted: 0, error: e.message || 'Unknown error' };
+        return actionError(e.message, 'INTERNAL_ERROR');
     }
 }

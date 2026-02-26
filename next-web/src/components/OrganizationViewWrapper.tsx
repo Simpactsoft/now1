@@ -272,7 +272,7 @@ export default function OrganizationViewWrapper({ user, tenantId }: Organization
     const handleBulkDelete = useCallback(async (ids: string[]) => {
         const res = await bulkDeleteCards(ids);
         if (res.success) {
-            toast.success(`${res.deleted} ארגונים נמחקו בהצלחה`);
+            toast.success(`${res.data.deleted} ארגונים נמחקו בהצלחה`);
         } else {
             toast.error(res.error || 'שגיאה במחיקה');
         }

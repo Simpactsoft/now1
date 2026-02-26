@@ -190,7 +190,7 @@ export default function PeopleViewWrapper({ tenantId }: PeopleViewWrapperProps) 
     const handleBulkDelete = useCallback(async (ids: string[]) => {
         const res = await bulkDeleteCards(ids);
         if (res.success) {
-            toast.success(`${res.deleted} רשומות נמחקו בהצלחה`);
+            toast.success(`${res.data.deleted} רשומות נמחקו בהצלחה`);
         } else {
             toast.error(res.error || 'שגיאה במחיקה');
         }

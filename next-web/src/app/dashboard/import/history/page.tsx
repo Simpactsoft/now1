@@ -57,7 +57,7 @@ function JobRow({ job, onRollback }: { job: ImportJob; onRollback: (id: string) 
         if (cards.length > 0) return; // already loaded
         setLoadingCards(true);
         const res = await fetchImportedCards(job.id);
-        if (res.success && res.data) {
+        if (res.success) {
             setCards(res.data);
         } else {
             toast.error(res.error || 'שגיאה בטעינת כרטיסים');
@@ -79,7 +79,7 @@ function JobRow({ job, onRollback }: { job: ImportJob; onRollback: (id: string) 
         setIsRollingBack(true);
         const res = await rollbackImport(job.id);
         if (res.success) {
-            toast.success(`הייבוא בוטל — ${res.deleted} כרטיסים נמחקו`);
+            toast.success(`הייבוא בוטל — ${res.data.deleted} כרטיסים נמחקו`);
             onRollback(job.id);
         } else {
             toast.error(res.error || 'שגיאה בביטול הייבוא');
@@ -233,7 +233,7 @@ export default function ImportHistoryPage() {
     const loadJobs = async () => {
         setLoading(true);
         const res = await fetchImportHistory();
-        if (res.success && res.data) {
+        if (res.success) {
             setJobs(res.data);
         } else {
             toast.error(res.error || 'שגיאה בטעינת היסטוריה');
