@@ -8,8 +8,15 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 export function ResultsStep() {
-    const { results, jobId, jobStatus, reset } = useImportStore();
+    const { importType, results, jobId, jobStatus, reset } = useImportStore();
     const router = useRouter();
+
+    const entityLabels: Record<string, { name: string; route: string }> = {
+        people: { name: 'אנשי קשר', route: '/dashboard/people' },
+        organizations: { name: 'ארגונים', route: '/dashboard/organizations' },
+        relationships: { name: 'קשרים', route: '/dashboard/people' },
+    };
+    const entity = entityLabels[importType] || entityLabels.people;
 
     if (jobStatus === 'failed') {
         return (
@@ -53,7 +60,7 @@ export function ResultsStep() {
                 <h2 className="text-2xl font-bold tracking-tight">סיכום תהליך הייבוא</h2>
                 <p className="text-muted-foreground text-center max-w-md mx-auto">
                     {isPerfect ?
-                        "כל הרשומות עובדו בהצלחה וללא שגיאות. אנשי הקשר זמינים כעת במערכת." :
+                        `כל הרשומות עובדו בהצלחה וללא שגיאות. ה${entity.name} זמינים כעת במערכת.` :
                         "תהליך הייבוא הסתיים, אך היו מספר שגיאות או כפילויות שיש לתת עליהן את הדעת."}
                 </p>
             </div>
@@ -107,8 +114,8 @@ export function ResultsStep() {
                     <History className="w-4 h-4 mr-2" />
                     היסטוריית ייבואים
                 </Button>
-                <Button onClick={() => router.push('/dashboard/people')}>
-                    סיום ומעבר לאנשי קשר
+                <Button onClick={() => router.push(entity.route)}>
+                    סיום ומעבר ל{entity.name}
                 </Button>
             </div>
         </div>

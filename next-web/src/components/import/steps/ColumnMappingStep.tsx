@@ -1,7 +1,7 @@
 // src/components/import/steps/ColumnMappingStep.tsx
 import { useEffect, useMemo, useState } from 'react';
 import { useImportStore } from '@/stores/importStore';
-import { PERSON_IMPORT_FIELDS, autoMapColumns, FIELD_ALIASES } from '@/lib/importAliases';
+import { autoMapColumns, getFieldsForType } from '@/lib/importAliases';
 import { Button } from '@/components/ui/button';
 import {
     Select,
@@ -15,17 +15,22 @@ import { AlertCircle, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export function ColumnMappingStep() {
-    const { fileHeaders, columnMapping, setMapping, nextStep, prevStep } = useImportStore();
+    const { importType, fileHeaders, columnMapping, setMapping, nextStep, prevStep } = useImportStore();
     const [initialMappingDone, setInitialMappingDone] = useState(false);
+
+    const { fields: importFields, aliases: fieldAliases } = useMemo(
+        () => getFieldsForType(importType),
+        [importType]
+    );
 
     // Auto-map on first load
     useEffect(() => {
         if (!initialMappingDone && fileHeaders.length > 0 && Object.keys(columnMapping).length === 0) {
-            const autoMapped = autoMapColumns(fileHeaders, FIELD_ALIASES);
+            const autoMapped = autoMapColumns(fileHeaders, fieldAliases);
             setMapping(autoMapped);
             setInitialMappingDone(true);
         }
-    }, [fileHeaders, columnMapping, setMapping, initialMappingDone]);
+    }, [fileHeaders, columnMapping, setMapping, initialMappingDone, fieldAliases]);
 
     const handleMapChange = (header: string, field: string | null) => {
         setMapping({
@@ -38,28 +43,30 @@ export function ColumnMappingStep() {
     const { missingRequired, hasDuplicates, noEmailInfo } = useMemo(() => {
         const mappedFields = Object.values(columnMapping).filter(Boolean) as string[];
 
-        const requiredFields = PERSON_IMPORT_FIELDS.filter(f => f.required).map(f => f.value);
+        const requiredFields = importFields.filter(f => f.required).map(f => f.value).filter(Boolean) as string[];
         const missing = requiredFields.filter(req => !mappedFields.includes(req));
 
         const duplicates = mappedFields.filter((item, index) => mappedFields.indexOf(item) !== index);
 
-        const noEmailInfo = !mappedFields.includes('email');
+        const noEmailInfo = importType === 'people' && !mappedFields.includes('email');
 
         return {
             missingRequired: missing,
             hasDuplicates: duplicates.length > 0,
             noEmailInfo
         };
-    }, [columnMapping]);
+    }, [columnMapping, importFields, importType]);
 
     const isValid = missingRequired.length === 0 && !hasDuplicates;
+
+    const entityLabel = importType === 'organizations' ? 'ארגונים' : importType === 'relationships' ? 'קשרים' : 'אנשי קשר';
 
     return (
         <div className="flex flex-col space-y-6">
             <div>
-                <h2 className="text-2xl font-bold tracking-tight">מיפוי עמודות</h2>
+                <h2 className="text-2xl font-bold tracking-tight">מיפוי עמודות — {entityLabel}</h2>
                 <p className="text-muted-foreground mt-2">
-                    התאם את העמודות מקובץ ה-Excel לשדות במערכת ה-CRM.
+                    התאם את העמודות מקובץ ה-Excel לשדות במערכת.
                 </p>
             </div>
 
@@ -68,8 +75,8 @@ export function ColumnMappingStep() {
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle>שדות חובה חסרים</AlertTitle>
                     <AlertDescription>
-                        חובה למפות את השדות הבאים כדי להמשיך:
-                        {missingRequired.map(f => PERSON_IMPORT_FIELDS.find(pf => pf.value === f)?.label).join(', ')}
+                        חובה למפות את השדות הבאים כדי להמשיך:{' '}
+                        {missingRequired.map(f => importFields.find(pf => pf.value === f)?.label).join(', ')}
                     </AlertDescription>
                 </Alert>
             )}
@@ -106,8 +113,6 @@ export function ColumnMappingStep() {
                     <TableBody>
                         {fileHeaders.map((header, idx) => {
                             const currentValue = columnMapping[header] || 'null';
-                            const sysField = PERSON_IMPORT_FIELDS.find(f => f.value === currentValue);
-
                             return (
                                 <TableRow key={`${header}-${idx}`}>
                                     <TableCell className="font-medium">{header}</TableCell>
@@ -120,7 +125,7 @@ export function ColumnMappingStep() {
                                                 <SelectValue placeholder="בחר שדה..." />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                {PERSON_IMPORT_FIELDS.map((field) => (
+                                                {importFields.map((field) => (
                                                     <SelectItem
                                                         key={field.value || 'null'}
                                                         value={field.value || 'null'}

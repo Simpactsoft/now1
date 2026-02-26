@@ -22,6 +22,12 @@ export const orgImportSchema = z.object({
     website: z.string().url('Invalid URL format').optional().or(z.literal('')),
 });
 
+export const relationshipImportSchema = z.object({
+    person_email: z.string().email('Valid person email is required'),
+    company_name: z.string().min(1, 'Company name is required').max(200).trim(),
+    relationship_type: z.enum(['employee', 'investor', 'partner', 'advisor', 'customer', 'vendor']).default('employee'),
+});
+
 // --- Normalization & Sanitization --- //
 
 /**

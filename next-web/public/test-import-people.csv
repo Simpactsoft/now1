@@ -1,0 +1,31 @@
+first_name,last_name,email,phone,status,tags
+יוסי,כהן,yossi.cohen@technovate.co.il,050-1234567,customer,CEO;VIP
+מירב,לוי,merav.levy@technovate.co.il,052-9876543,customer,CFO;פיננסי
+אלון,שפירא,alon.shapira@technovate.co.il,054-1112233,customer,CTO;R&D
+דנה,אברהם,dana.a@technovate.co.il,053-4455667,lead,מפתחת Full Stack
+רועי,ברק,roi.barak@technovate.co.il,050-7788990,customer,מפתח Backend;בכיר
+נעמה,גולדברג,naama.g@technovate.co.il,058-1122334,lead,מעצבת UX/UI
+עידו,פרידמן,ido.f@technovate.co.il,054-5566778,lead,DevOps Engineer
+שירה,ביטון,shira.b@technovate.co.il,052-8899001,lead,QA Lead
+תומר,מזרחי,tomer.m@technovate.co.il,050-3344556,customer,מנהל מוצר
+יעל,רוזנברג,yael.r@technovate.co.il,053-6677889,lead,HR Manager
+דוד,ישראלי,david.israeli@solaris.co.il,04-9991234,customer,מנכ״ל;VIP
+חנה,פישר,hana.fisher@solaris.co.il,04-9995678,customer,סמנכ״ל תפעול
+משה,אלוני,moshe.aloni@solaris.co.il,04-9993456,lead,מהנדס חשמל
+רחל,ברגמן,rachel.bergman@solaris.co.il,04-9997890,lead,מנהלת לוגיסטיקה
+אריאל,וולף,ariel.wolf@solaris.co.il,04-9992345,customer,ראש צוות התקנות
+נגה,תמיר,noga.tamir@solaris.co.il,050-1010101,lead,מנהלת שיווק;דיגיטל
+שי,מרקוביץ,shai.m@solaris.co.il,052-2020202,lead,מנהל כספים
+עדי,זיו,adi.ziv@solaris.co.il,054-3030303,customer,מנהלת מכירות;B2B
+אורן,לנדאו,oren.landau@solaris.co.il,053-4040404,lead,מפתח תוכנה;IoT
+יונתן,שגב,yonatan.segev@solaris.co.il,058-5050505,lead,מהנדס מכונות
+גיל,אורון,gil.oron@nexgen.io,054-2222111,prospect,מנכ״ל;AI
+ליאור,כספי,lior.caspi@nexgen.io,050-3333222,lead,VP R&D;Machine Learning
+מיכל,אדלר,michal.adler@nexgen.io,052-4444333,prospect,Data Scientist
+טל,עוז,tal.oz@bluewave.co.il,058-5555444,customer,מנהל פרויקטים
+נועם,דהן,noam.dahan@bluewave.co.il,054-6666555,lead,יועץ אסטרטגי
+רינת,חיים,rinat.haim@bluewave.co.il,050-7777666,prospect,אנליסטית דאטה
+אבי,גרינברג,avi.greenberg@capitalflow.co.il,03-5551234,customer,שותף מנהל;VIP
+רונית,שטרן,ronit.stern@capitalflow.co.il,03-5554567,customer,שותפה;פיננסי
+עמית,בן-דוד,amit.bd@globalvest.com,09-8881234,customer,Managing Partner;VIP
+סיגל,קרן,sigal.keren@globalvest.com,09-8885678,lead,מנהלת תיקים

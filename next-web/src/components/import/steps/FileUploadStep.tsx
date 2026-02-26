@@ -1,14 +1,20 @@
 // src/components/import/steps/FileUploadStep.tsx
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { UploadCloud, File, AlertCircle } from 'lucide-react';
+import { UploadCloud, File, AlertCircle, Users, Building2, Link2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useImportStore } from '@/stores/importStore';
+import { useImportStore, ImportType } from '@/stores/importStore';
 import { parseImportFile } from '@/lib/importParser';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
+const IMPORT_TYPES: { value: ImportType; label: string; description: string; icon: typeof Users }[] = [
+    { value: 'people', label: 'אנשי קשר', description: 'שם, אימייל, טלפון, תפקיד', icon: Users },
+    { value: 'organizations', label: 'ארגונים', description: 'שם חברה, תעשייה, גודל', icon: Building2 },
+    { value: 'relationships', label: 'קשרים', description: 'אימייל ← ארגון, סוג קשר', icon: Link2 },
+];
+
 export function FileUploadStep() {
-    const { setFile, nextStep } = useImportStore();
+    const { importType, setImportType, setFile, nextStep } = useImportStore();
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -52,13 +58,48 @@ export function FileUploadStep() {
         multiple: false
     });
 
+    const currentType = IMPORT_TYPES.find(t => t.value === importType) || IMPORT_TYPES[0];
+
     return (
         <div className="flex flex-col space-y-6">
             <div className="text-center">
-                <h2 className="text-2xl font-bold tracking-tight">העלאת קובץ אנשי קשר</h2>
+                <h2 className="text-2xl font-bold tracking-tight">אשף ייבוא נתונים</h2>
                 <p className="text-muted-foreground mt-2">
-                    העלה קובץ Excel או CSV עד 10MB בפורמט התואם לייבוא אנשי קשר.
+                    בחר את סוג הנתונים לייבוא והעלה קובץ Excel או CSV.
                 </p>
+            </div>
+
+            {/* Entity Type Selector */}
+            <div className="grid grid-cols-3 gap-3">
+                {IMPORT_TYPES.map(type => {
+                    const Icon = type.icon;
+                    const isSelected = importType === type.value;
+                    return (
+                        <button
+                            key={type.value}
+                            onClick={() => setImportType(type.value)}
+                            className={`
+                                flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all cursor-pointer
+                                ${isSelected
+                                    ? 'border-primary bg-primary/5 shadow-sm'
+                                    : 'border-border hover:border-muted-foreground/30 hover:bg-muted/30'
+                                }
+                            `}
+                        >
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isSelected ? 'bg-primary/15' : 'bg-muted'}`}>
+                                <Icon className={`w-5 h-5 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
+                            </div>
+                            <div className="text-center">
+                                <div className={`text-sm font-semibold ${isSelected ? 'text-primary' : 'text-foreground'}`}>
+                                    {type.label}
+                                </div>
+                                <div className="text-xs text-muted-foreground mt-0.5">
+                                    {type.description}
+                                </div>
+                            </div>
+                        </button>
+                    );
+                })}
             </div>
 
             {error && (
@@ -89,7 +130,7 @@ export function FileUploadStep() {
                     </div>
                     <div>
                         <p className="text-lg font-medium">
-                            {isDragActive ? 'שחרר את הקובץ כאן' : 'לחץ או גרור קובץ לכאן'}
+                            {isDragActive ? 'שחרר את הקובץ כאן' : `העלה קובץ ${currentType.label}`}
                         </p>
                         <p className="text-sm text-muted-foreground mt-1">
                             תומך ב-XLSX, XLS, CSV ו-TSV.

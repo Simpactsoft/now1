@@ -1,0 +1,7 @@
+name,email,phone,industry,company_size,website,tax_id
+Technovate Solutions,info@technovate.co.il,03-7771234,Technology,50-200,https://technovate.co.il,515678901
+Solaris Energy,info@solaris.co.il,04-9990000,Energy,200-500,https://solaris.co.il,512345678
+NexGen AI,hello@nexgen.io,03-9991111,Artificial Intelligence,10-50,https://nexgen.io,517890123
+BlueWave Consulting,office@bluewave.co.il,09-7772222,Consulting,10-50,https://bluewave.co.il,514567890
+CapitalFlow Ventures,invest@capitalflow.co.il,03-5550000,Venture Capital,1-10,https://capitalflow.co.il,516789012
+GlobalVest Fund,info@globalvest.com,09-8880000,Investment Fund,1-10,https://globalvest.com,519012345

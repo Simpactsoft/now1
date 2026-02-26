@@ -4,6 +4,7 @@ import { toast } from "sonner";
 export interface ImportStartRequest {
     rows: Array<Record<string, string>>;
     mapping: Record<string, string | null>;
+    import_type?: 'people' | 'organizations' | 'relationships';
     settings: {
         duplicate_policy: 'skip' | 'update' | 'manual';
         default_status: string;

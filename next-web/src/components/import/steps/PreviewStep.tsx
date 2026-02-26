@@ -11,6 +11,7 @@ import { startImport } from '@/lib/importApi';
 
 export function PreviewStep() {
     const {
+        importType,
         rawRows,
         columnMapping,
         fileHeaders,
@@ -42,40 +43,41 @@ export function PreviewStep() {
         });
     }, [rawRows, columnMapping, fileHeaders]);
 
-    // Validation logic
+    // Validation logic — dynamic per import type
     useEffect(() => {
         const results: ValidationResult[] = mappedData.map((row, index) => {
             const errors: { field: string; message: string }[] = [];
             const warnings: { field: string; message: string }[] = [];
 
-            // Required fields
-            if (!row.first_name?.trim()) {
-                errors.push({ field: 'first_name', message: 'שם פרטי הוא שדה חובה' });
-            }
-            if (!row.last_name?.trim()) {
-                errors.push({ field: 'last_name', message: 'שם משפחה הוא שדה חובה' });
-            }
-
-            // Email format
-            if (row.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email.trim())) {
-                errors.push({ field: 'email', message: 'כתובת אימייל לא תקינה' });
-            }
-
-            // Scientific notation (Excel corruption)
-            if (row.phone && /^-?\d+\.?\d*[eE][+\-]?\d+$/.test(String(row.phone))) {
-                warnings.push({
-                    field: 'phone',
-                    message: 'ערך נראה כמו כתיב מדעי — ייתכן שהושחת ע"י Excel'
-                });
-            }
-
-            // Status validation
-            const validStatuses = ['lead', 'customer', 'prospect', 'inactive'];
-            if (row.status && !validStatuses.includes(row.status.toLowerCase().trim())) {
-                warnings.push({
-                    field: 'status',
-                    message: `סטטוס לא מוכר: "${row.status}". ייקבע כ-"lead"`
-                });
+            if (importType === 'people') {
+                if (!row.first_name?.trim()) errors.push({ field: 'first_name', message: 'שם פרטי הוא שדה חובה' });
+                if (!row.last_name?.trim()) errors.push({ field: 'last_name', message: 'שם משפחה הוא שדה חובה' });
+                if (row.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email.trim())) {
+                    errors.push({ field: 'email', message: 'כתובת אימייל לא תקינה' });
+                }
+                if (row.phone && /^-?\d+\.?\d*[eE][+\-]?\d+$/.test(String(row.phone))) {
+                    warnings.push({ field: 'phone', message: 'ערך נראה כמו כתיב מדעי — ייתכן שהושחת ע"י Excel' });
+                }
+                const validStatuses = ['lead', 'customer', 'prospect', 'inactive'];
+                if (row.status && !validStatuses.includes(row.status.toLowerCase().trim())) {
+                    warnings.push({ field: 'status', message: `סטטוס לא מוכר: "${row.status}". ייקבע כ-"lead"` });
+                }
+            } else if (importType === 'organizations') {
+                if (!row.name?.trim()) errors.push({ field: 'name', message: 'שם ארגון הוא שדה חובה' });
+                if (row.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email.trim())) {
+                    errors.push({ field: 'email', message: 'כתובת אימייל לא תקינה' });
+                }
+                if (row.website && !/^https?:\/\/.+/.test(row.website.trim())) {
+                    warnings.push({ field: 'website', message: 'כתובת אתר לא תקינה (חסר http/https)' });
+                }
+            } else if (importType === 'relationships') {
+                if (!row.person_email?.trim()) errors.push({ field: 'person_email', message: 'אימייל איש קשר הוא שדה חובה' });
+                if (!row.company_name?.trim()) errors.push({ field: 'company_name', message: 'שם ארגון הוא שדה חובה' });
+                if (!row.relationship_type?.trim()) errors.push({ field: 'relationship_type', message: 'סוג קשר הוא שדה חובה' });
+                const validTypes = ['employee', 'investor', 'partner', 'advisor', 'customer', 'vendor'];
+                if (row.relationship_type && !validTypes.includes(row.relationship_type.toLowerCase().trim())) {
+                    errors.push({ field: 'relationship_type', message: `סוג קשר לא מוכר: "${row.relationship_type}"` });
+                }
             }
 
             return {
@@ -87,7 +89,7 @@ export function PreviewStep() {
         });
 
         setValidationResults(results);
-    }, [mappedData, setValidationResults]);
+    }, [mappedData, setValidationResults, importType]);
 
     const errorCount = validationResults.filter(r => !r.valid).length;
     const warningCount = validationResults.filter(r => r.warnings.length > 0).length;
@@ -106,6 +108,7 @@ export function PreviewStep() {
             const res = await startImport({
                 rows: mappedData,
                 mapping: columnMapping,
+                import_type: importType,
                 settings: {
                     duplicate_policy: duplicatePolicy,
                     default_status: 'lead'
@@ -213,29 +216,31 @@ export function PreviewStep() {
                 </Table>
             </div>
 
-            <div className="space-y-4 border rounded-md p-6 bg-card">
-                <h3 className="font-medium text-lg border-b pb-2 mb-4">ניהול כפילויות</h3>
-                <RadioGroup
-                    value={duplicatePolicy}
-                    onValueChange={(val: any) => setDuplicatePolicy(val)}
-                >
-                    <div className="flex items-center space-x-2 space-x-reverse mb-3">
-                        <RadioGroupItem value="manual" id="r1" />
-                        <Label htmlFor="r1" className="cursor-pointer">
-                            <span className="font-medium">הצג לי לבדיקה ידנית </span>
-                            <span className="text-muted-foreground text-sm">(מומלץ)</span>
-                        </Label>
-                    </div>
-                    <div className="flex items-center space-x-2 space-x-reverse mb-3">
-                        <RadioGroupItem value="update" id="r2" />
-                        <Label htmlFor="r2" className="cursor-pointer">עדכן רשומות קיימות במידע חדש</Label>
-                    </div>
-                    <div className="flex items-center space-x-2 space-x-reverse">
-                        <RadioGroupItem value="skip" id="r3" />
-                        <Label htmlFor="r3" className="cursor-pointer">דלג על רשומות כפולות (אל תייבא)</Label>
-                    </div>
-                </RadioGroup>
-            </div>
+            {importType !== 'relationships' && (
+                <div className="space-y-4 border rounded-md p-6 bg-card">
+                    <h3 className="font-medium text-lg border-b pb-2 mb-4">ניהול כפילויות</h3>
+                    <RadioGroup
+                        value={duplicatePolicy}
+                        onValueChange={(val: any) => setDuplicatePolicy(val)}
+                    >
+                        <div className="flex items-center space-x-2 space-x-reverse mb-3">
+                            <RadioGroupItem value="manual" id="r1" />
+                            <Label htmlFor="r1" className="cursor-pointer">
+                                <span className="font-medium">הצג לי לבדיקה ידנית </span>
+                                <span className="text-muted-foreground text-sm">(מומלץ)</span>
+                            </Label>
+                        </div>
+                        <div className="flex items-center space-x-2 space-x-reverse mb-3">
+                            <RadioGroupItem value="update" id="r2" />
+                            <Label htmlFor="r2" className="cursor-pointer">עדכן רשומות קיימות במידע חדש</Label>
+                        </div>
+                        <div className="flex items-center space-x-2 space-x-reverse">
+                            <RadioGroupItem value="skip" id="r3" />
+                            <Label htmlFor="r3" className="cursor-pointer">דלג על רשומות כפולות (אל תייבא)</Label>
+                        </div>
+                    </RadioGroup>
+                </div>
+            )}
 
             {submitError && (
                 <Alert variant="destructive">

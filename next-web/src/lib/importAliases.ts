@@ -85,3 +85,81 @@ export const PERSON_IMPORT_FIELDS = [
     { value: 'notes', label: 'הערות', required: false },
     { value: null, label: 'לא לייבא', required: false },
 ] as const;
+
+export const ORG_FIELD_ALIASES: Record<string, string[]> = {
+    name: [
+        'name', 'company name', 'company_name', 'organization', 'org name',
+        'שם', 'שם חברה', 'שם ארגון', 'ארגון',
+    ],
+    email: [
+        'email', 'e-mail', 'company email', 'org email',
+        'דוא"ל', 'אימייל', 'מייל',
+    ],
+    phone: [
+        'phone', 'phone number', 'tel', 'telephone', 'office phone',
+        'טלפון', 'טלפון חברה', 'טלפון משרד',
+    ],
+    industry: [
+        'industry', 'sector', 'field',
+        'תעשייה', 'ענף', 'תחום',
+    ],
+    company_size: [
+        'company size', 'company_size', 'size', 'employees', 'num employees',
+        'גודל חברה', 'גודל', 'מספר עובדים',
+    ],
+    tax_id: [
+        'tax id', 'tax_id', 'vat', 'registration', 'company id', 'ח.פ.',
+        'מספר עוסק', 'ח.פ', 'עוסק מורשה',
+    ],
+    website: [
+        'website', 'url', 'web', 'homepage',
+        'אתר', 'אתר אינטרנט', 'כתובת אתר',
+    ],
+};
+
+export const ORG_IMPORT_FIELDS = [
+    { value: 'name', label: 'שם ארגון', required: true },
+    { value: 'email', label: 'אימייל', required: false },
+    { value: 'phone', label: 'טלפון', required: false },
+    { value: 'industry', label: 'תעשייה', required: false },
+    { value: 'company_size', label: 'גודל חברה', required: false },
+    { value: 'tax_id', label: 'ח.פ. / מספר עוסק', required: false },
+    { value: 'website', label: 'אתר אינטרנט', required: false },
+    { value: null, label: 'לא לייבא', required: false },
+] as const;
+
+export const RELATIONSHIP_FIELD_ALIASES: Record<string, string[]> = {
+    person_email: [
+        'person email', 'person_email', 'email', 'contact email',
+        'אימייל איש קשר', 'מייל איש קשר',
+    ],
+    company_name: [
+        'company name', 'company_name', 'organization', 'org name', 'company',
+        'שם חברה', 'ארגון', 'שם ארגון',
+    ],
+    relationship_type: [
+        'relationship type', 'relationship_type', 'type', 'relation', 'role',
+        'סוג קשר', 'סוג', 'יחס',
+    ],
+};
+
+export const RELATIONSHIP_IMPORT_FIELDS = [
+    { value: 'person_email', label: 'אימייל איש קשר', required: true },
+    { value: 'company_name', label: 'שם ארגון', required: true },
+    { value: 'relationship_type', label: 'סוג קשר', required: true },
+    { value: null, label: 'לא לייבא', required: false },
+] as const;
+
+// Helper to get correct config per import type
+export type ImportType = 'people' | 'organizations' | 'relationships';
+
+export function getFieldsForType(type: ImportType) {
+    switch (type) {
+        case 'organizations':
+            return { fields: ORG_IMPORT_FIELDS, aliases: ORG_FIELD_ALIASES };
+        case 'relationships':
+            return { fields: RELATIONSHIP_IMPORT_FIELDS, aliases: RELATIONSHIP_FIELD_ALIASES };
+        default:
+            return { fields: PERSON_IMPORT_FIELDS, aliases: FIELD_ALIASES };
+    }
+}

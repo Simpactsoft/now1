@@ -15,7 +15,12 @@ interface ImportResults {
     errors: number;
 }
 
+export type ImportType = 'people' | 'organizations' | 'relationships';
+
 interface ImportState {
+    // Entity type
+    importType: ImportType;
+
     // Step 1: File
     file: File | null;
     fileName: string;
@@ -39,6 +44,7 @@ interface ImportState {
     currentStep: 1 | 2 | 3 | 4;
 
     // Actions
+    setImportType: (type: ImportType) => void;
     setFile: (file: File, headers: string[], rows: string[][], rowCount: number) => void;
     setMapping: (mapping: Record<string, string | null>) => void;
     setValidationResults: (results: ValidationResult[]) => void;
@@ -53,6 +59,7 @@ interface ImportState {
 }
 
 const initialState = {
+    importType: 'people' as ImportType,
     file: null,
     fileName: '',
     fileHeaders: [],
@@ -69,6 +76,8 @@ const initialState = {
 
 export const useImportStore = create<ImportState>((set) => ({
     ...initialState,
+
+    setImportType: (importType) => set({ importType }),
 
     setFile: (file, fileHeaders, rawRows, rowCount) =>
         set({ file, fileName: file.name, fileHeaders, rawRows, rowCount }),
