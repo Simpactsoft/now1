@@ -42,7 +42,7 @@ export default function ProductRelationshipsClient({ tenantId, productId, produc
     const loadRelationships = async () => {
         setLoading(true);
         const res = await fetchProductRelationships(tenantId, productId);
-        if (res.success && res.data) {
+        if (res.success) {
             setRelationships(res.data);
         } else {
             toast.error(res.error || "Failed to load product relationships");
@@ -61,9 +61,8 @@ export default function ProductRelationshipsClient({ tenantId, productId, produc
 
         setSearching(true);
         const res = await searchProducts(tenantId, query);
-        if (Array.isArray(res)) {
-            // Filter out the current product from search results
-            setSearchResults(res.filter(p => p.id !== productId).slice(0, 5));
+        if (res.success && Array.isArray(res.data)) {
+            setSearchResults(res.data.filter((p: any) => p.id !== productId).slice(0, 5));
         }
         setSearching(false);
     };

@@ -4,16 +4,16 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyAuthWithTenant } from "./_shared/auth";
 import { isAuthError } from "./_shared/auth-utils";
+import { ActionResult, actionSuccess, actionError, actionOk } from "@/lib/action-result";
 
-export async function fetchProductRelationships(tenantId: string, sourceProductId: string) {
-    if (!tenantId || !sourceProductId) return { error: "Missing required parameters" };
+export async function fetchProductRelationships(tenantId: string, sourceProductId: string): Promise<ActionResult<any[]>> {
+    if (!tenantId || !sourceProductId) return actionError("Missing required parameters", "VALIDATION_ERROR");
 
     const auth = await verifyAuthWithTenant(tenantId);
-    if (isAuthError(auth)) return { error: "Unauthorized" };
+    if (isAuthError(auth)) return actionError(auth.error, "AUTH_ERROR");
 
     const adminClient = createAdminClient();
 
-    // We join on `products` to get details of the target products
     const { data, error } = await adminClient
         .from("product_relationships")
         .select(`
@@ -26,10 +26,10 @@ export async function fetchProductRelationships(tenantId: string, sourceProductI
 
     if (error) {
         console.error("fetchProductRelationships error:", error);
-        return { error: "Failed to fetch relationships" };
+        return actionError("Failed to fetch relationships", "DB_ERROR");
     }
 
-    return { success: true, data };
+    return actionSuccess(data || []);
 }
 
 const UpsertRelationshipSchema = z.object({
@@ -40,23 +40,21 @@ const UpsertRelationshipSchema = z.object({
     confidenceScore: z.number().min(0).max(100).default(100)
 });
 
-export async function upsertProductRelationship(payload: z.infer<typeof UpsertRelationshipSchema>) {
+export async function upsertProductRelationship(payload: z.infer<typeof UpsertRelationshipSchema>): Promise<ActionResult<any>> {
     const parsed = UpsertRelationshipSchema.safeParse(payload);
-    if (!parsed.success) return { error: "Invalid input" };
+    if (!parsed.success) return actionError("Invalid input", "VALIDATION_ERROR");
 
     const { tenantId, sourceProductId, targetProductId, relationshipType, confidenceScore } = parsed.data;
 
-    // Prevent linking to itself
     if (sourceProductId === targetProductId) {
-        return { error: "A product cannot be related to itself." };
+        return actionError("A product cannot be related to itself.", "VALIDATION_ERROR");
     }
 
     const auth = await verifyAuthWithTenant(tenantId);
-    if (isAuthError(auth)) return { error: "Unauthorized" };
+    if (isAuthError(auth)) return actionError(auth.error, "AUTH_ERROR");
 
     const adminClient = createAdminClient();
 
-    // We use ON CONFLICT DO UPDATE since there is a UNIQUE constraint on (tenant, source, target, type)
     const { data, error } = await adminClient
         .from("product_relationships")
         .upsert({
@@ -75,17 +73,17 @@ export async function upsertProductRelationship(payload: z.infer<typeof UpsertRe
 
     if (error) {
         console.error("upsertProductRelationship error:", error);
-        return { error: error.message };
+        return actionError(error.message, "DB_ERROR");
     }
 
-    return { success: true, data };
+    return actionSuccess(data);
 }
 
-export async function removeProductRelationship(tenantId: string, relationshipId: string) {
-    if (!tenantId || !relationshipId) return { error: "Missing required parameters" };
+export async function removeProductRelationship(tenantId: string, relationshipId: string): Promise<ActionResult<void>> {
+    if (!tenantId || !relationshipId) return actionError("Missing required parameters", "VALIDATION_ERROR");
 
     const auth = await verifyAuthWithTenant(tenantId);
-    if (isAuthError(auth)) return { error: "Unauthorized" };
+    if (isAuthError(auth)) return actionError(auth.error, "AUTH_ERROR");
 
     const adminClient = createAdminClient();
     const { error } = await adminClient
@@ -96,17 +94,17 @@ export async function removeProductRelationship(tenantId: string, relationshipId
 
     if (error) {
         console.error("removeProductRelationship error:", error);
-        return { error: error.message };
+        return actionError(error.message, "DB_ERROR");
     }
 
-    return { success: true };
+    return actionOk();
 }
 
-export async function searchProducts(tenantId: string, query: string) {
-    if (!tenantId || !query || query.length < 2) return [];
+export async function searchProducts(tenantId: string, query: string): Promise<ActionResult<any[]>> {
+    if (!tenantId || !query || query.length < 2) return actionSuccess([]);
 
     const auth = await verifyAuthWithTenant(tenantId);
-    if (isAuthError(auth)) return [];
+    if (isAuthError(auth)) return actionError(auth.error, "AUTH_ERROR");
 
     const adminClient = createAdminClient();
     const { data } = await adminClient
@@ -116,5 +114,5 @@ export async function searchProducts(tenantId: string, query: string) {
         .or(`name.ilike.%${query}%,sku.ilike.%${query}%`)
         .limit(5);
 
-    return data || [];
+    return actionSuccess(data || []);
 }

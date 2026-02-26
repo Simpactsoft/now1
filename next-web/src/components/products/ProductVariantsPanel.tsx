@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "sonner";
 
 import React, { useState, useEffect, useCallback } from "react";
 import { Plus, Trash2, Loader2, Palette, Box, Tag, Layers } from "lucide-react";
@@ -77,7 +78,7 @@ export default function ProductVariantsPanel({
         // Filter attributes that have values
         const withValues = attributes.filter(a => a.values.length > 0);
         if (withValues.length === 0) {
-            alert('No attribute values defined. Add values to your attributes first.');
+            toast.warning('No attribute values defined. Add values to your attributes first.');
             return;
         }
 
@@ -114,7 +115,7 @@ export default function ProductVariantsPanel({
         });
 
         if (newCombinations.length === 0) {
-            alert('All combinations already exist.');
+            toast.info('All combinations already exist.');
             return;
         }
 
@@ -144,7 +145,7 @@ export default function ProductVariantsPanel({
             if (result.success) created++;
         }
 
-        alert(`Created ${created} of ${newCombinations.length} variants.`);
+        toast.success(`Created ${created} of ${newCombinations.length} variants.`);
         setGenerating(false);
         fetchData();
     };

@@ -19,10 +19,36 @@ export async function fetchOrganizations(params: {
 
     const supabase = await createClient();
 
-    // Helper for multi-select
-    const parseMultiSelect = (val: string | undefined) => {
-        if (!val) return undefined;
-        return val.split(',').map(s => s.trim()).filter(Boolean);
+    // Helper to extract filter values (supports single object or array of objects)
+    const extractFilterValues = (entry: any): string[] | string | null => {
+        if (!entry) return null;
+        if (Array.isArray(entry)) {
+            // Multiple conditions/chips for same field
+            return entry.map(e => e.filter || e);
+        }
+        // Single condition
+        return entry.filter || entry;
+    };
+
+    // Helper to parse potential multi-select values (comma separated strings)
+    // AND now supports array from multiple chips
+    const parseMultiSelect = (entry: any) => {
+        const raw = extractFilterValues(entry);
+        if (!raw) return undefined;
+
+        // If it's already an array (from multiple chips), we might have "A,B" and "C" mixed
+        // Let's normalize to a single flat array of strings
+        const list = Array.isArray(raw) ? raw : [raw];
+
+        let combined: string[] = [];
+        list.forEach(val => {
+            if (val && typeof val === 'string' && val.includes(',')) {
+                combined.push(...val.split(',').map(s => s.trim()));
+            } else if (val) {
+                combined.push(val);
+            }
+        });
+        return combined.length > 0 ? combined : undefined;
     };
 
     const arg_filters: any = {

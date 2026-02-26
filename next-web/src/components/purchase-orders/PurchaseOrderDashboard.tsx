@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "sonner";
 
 import React, { useState, useEffect, useCallback } from "react";
 import {
@@ -144,10 +145,10 @@ function VendorTab({ tenantId }: { tenantId: string }) {
     const handleSave = async (data: Record<string, unknown>) => {
         if (editingVendor) {
             const result = await updateVendor(tenantId, editingVendor.id, data);
-            if (!result.success) { alert(result.error); return; }
+            if (!result.success) { toast.error(result.error); return; }
         } else {
             const result = await createVendor(tenantId, data as Parameters<typeof createVendor>[1]);
-            if (!result.success) { alert(result.error); return; }
+            if (!result.success) { toast.error(result.error); return; }
         }
         setShowDialog(false);
         setEditingVendor(null);
@@ -372,7 +373,7 @@ function POTab({ tenantId }: { tenantId: string }) {
         if (!confirm("Submit this PO for approval?")) return;
         setProcessingId(poId);
         const result = await submitPurchaseOrder(tenantId, poId);
-        if (result.success) fetchOrders(); else alert(result.error);
+        if (result.success) fetchOrders(); else toast.error(result.error);
         setProcessingId(null);
     };
 
@@ -380,7 +381,7 @@ function POTab({ tenantId }: { tenantId: string }) {
         if (!confirm("Approve this PO?")) return;
         setProcessingId(poId);
         const result = await approvePurchaseOrder(tenantId, poId);
-        if (result.success) fetchOrders(); else alert(result.error);
+        if (result.success) fetchOrders(); else toast.error(result.error);
         setProcessingId(null);
     };
 
@@ -395,9 +396,9 @@ function POTab({ tenantId }: { tenantId: string }) {
                 itemId: i.id,
                 receivedQty: i.quantity - i.received_quantity,
             }));
-        if (items.length === 0) { alert("All items already received"); setProcessingId(null); return; }
+        if (items.length === 0) { toast.warning("All items already received"); setProcessingId(null); return; }
         const result = await receivePurchaseOrder(tenantId, poId, items);
-        if (result.success) fetchOrders(); else alert(result.error);
+        if (result.success) fetchOrders(); else toast.error(result.error);
         setProcessingId(null);
     };
 
@@ -405,7 +406,7 @@ function POTab({ tenantId }: { tenantId: string }) {
         if (!confirm("Cancel this PO?")) return;
         setProcessingId(poId);
         const result = await cancelPurchaseOrder(tenantId, poId);
-        if (result.success) fetchOrders(); else alert(result.error);
+        if (result.success) fetchOrders(); else toast.error(result.error);
         setProcessingId(null);
     };
 
@@ -643,8 +644,8 @@ function CreatePODialog({
     const fmt = (n: number) => `₪ ${n.toLocaleString("he-IL", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
     const handleCreate = async () => {
-        if (!vendorId) { alert("Please select a vendor"); return; }
-        if (items.some((i) => !i.description.trim())) { alert("All items need a description"); return; }
+        if (!vendorId) { toast.warning("Please select a vendor"); return; }
+        if (items.some((i) => !i.description.trim())) { toast.warning("All items need a description"); return; }
         setSaving(true);
         const result = await createPurchaseOrder(
             tenantId,
@@ -664,7 +665,7 @@ function CreatePODialog({
         if (result.success) {
             onCreated();
         } else {
-            alert(result.error);
+            toast.error(result.error);
         }
         setSaving(false);
     };

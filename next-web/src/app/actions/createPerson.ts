@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { CreatePersonSchema, CreatePersonInput } from "@/lib/schemas";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
@@ -95,13 +96,8 @@ export async function createPerson(params: CreatePersonInput): Promise<ActionRes
                 if (Object.keys(updates).length > 0) {
                     console.log("createPerson: Manually updating fields for", fallbackData.id, updates);
 
-                    // Initialize Admin Client on demand
-                    const { createClient: createAdminClient } = require('@supabase/supabase-js');
-                    const supabaseAdmin = createAdminClient(
-                        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                        process.env.SUPABASE_SERVICE_ROLE_KEY!,
-                        { auth: { persistSession: false } }
-                    );
+                    // Use the existing admin client utility
+                    const supabaseAdmin = createAdminClient();
 
                     const { error: updateError } = await supabaseAdmin.from('cards').update(updates).eq('id', fallbackData.id);
 

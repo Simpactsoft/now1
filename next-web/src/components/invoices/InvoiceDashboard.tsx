@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "sonner";
 
 import React, { useState, useEffect, useCallback } from "react";
 import {
@@ -94,9 +95,9 @@ export default function InvoiceDashboard({ tenantId }: { tenantId: string }) {
             fetchInvoices();
         } else {
             if (result.error?.includes("Missing GL account") || result.error?.includes("Required account type")) {
-                alert("Cannot issue invoice: required accounting accounts are not set up. Go to Accounting → Chart of Accounts to seed accounts.");
+                toast.error("Cannot issue invoice: required accounting accounts are not set up. Go to Accounting → Chart of Accounts to seed accounts.");
             } else {
-                alert(`Failed: ${result.error}`);
+                toast.error(`Failed: ${result.error}`);
             }
         }
         setProcessingId(null);
@@ -110,7 +111,7 @@ export default function InvoiceDashboard({ tenantId }: { tenantId: string }) {
         if (result.success) {
             fetchInvoices();
         } else {
-            alert(`Failed: ${result.error}`);
+            toast.error(`Failed: ${result.error}`);
         }
         setProcessingId(null);
     };
@@ -121,7 +122,7 @@ export default function InvoiceDashboard({ tenantId }: { tenantId: string }) {
         if (result.success) {
             fetchInvoices();
         } else {
-            alert(`Failed: ${result.error}`);
+            toast.error(`Failed: ${result.error}`);
         }
         setProcessingId(null);
     };

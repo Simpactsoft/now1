@@ -2,11 +2,9 @@
 
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 import { verifyAuthWithTenant } from "./_shared/auth";
 import { isAuthError } from "./_shared/auth-utils";
-import { cookies } from "next/headers";
-import { getTenantId } from "@/lib/auth/tenant";
+import { ActionResult, actionSuccess, actionError } from "@/lib/action-result";
 
 const FetchActivitiesSchema = z.object({
   tenantId: z.string().min(1),
@@ -20,56 +18,45 @@ export async function fetchActivities(
   entityId: string,
   entityType: "card" | "opportunity" | "lead",
   limit: number = 20
-) {
+): Promise<ActionResult<any[]>> {
   const parsed = FetchActivitiesSchema.safeParse({ tenantId, entityId, entityType, limit });
   if (!parsed.success) {
-    return { error: "Invalid input" };
+    return actionError("Invalid input", "VALIDATION_ERROR");
   }
 
   const auth = await verifyAuthWithTenant(parsed.data.tenantId);
-  if (isAuthError(auth)) {
-    return { error: "Unauthorized for this tenant" };
-  }
+  if (isAuthError(auth)) return actionError(auth.error, "AUTH_ERROR");
 
   const adminClient = createAdminClient();
 
-  // We fetch via activities directly to simplify filtering
   const { data, error } = await adminClient
     .from("activities")
-    .select(`
-      *,
-      activity_links!inner (
-        card_id,
-        opportunity_id,
-        lead_id
-      )
-    `)
+    .select(`*`)
     .eq("tenant_id", parsed.data.tenantId)
-    .eq(`activity_links.${parsed.data.entityType}_id`, parsed.data.entityId)
+    .eq("entity_type", parsed.data.entityType)
+    .eq("entity_id", parsed.data.entityId)
+    .order("created_at", { ascending: false })
     .limit(parsed.data.limit);
 
   if (error) {
     console.error("fetchActivities error:", error);
-    return { error: "Failed to fetch activities" };
+    return actionError("Failed to fetch activities", "DB_ERROR");
   }
 
-  const activitiesData = data || [];
-  activitiesData.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-  return { success: true, data: activitiesData };
+  return actionSuccess(data || []);
 }
 
 const CreateActivitySchema = z.object({
-  tenantId: z.string().optional(),
+  tenantId: z.string().min(1),
   entityId: z.string().optional(),
   entityType: z.enum(["card", "opportunity", "lead"]).optional(),
   activityType: z.enum(["call", "email", "meeting", "note", "task", "sms", "whatsapp", "system"]),
   title: z.string().optional(),
   description: z.string().optional(),
-  subject: z.string().optional(), // fallback for backwards compatibility
-  body: z.string().optional(), // fallback for backwards compatibility
+  subject: z.string().optional(),
+  body: z.string().optional(),
   isTask: z.boolean().optional().default(false),
-  dueAt: z.string().optional(), // ISO string
+  dueAt: z.string().optional(),
   priority: z.enum(["low", "normal", "high", "urgent"]).optional().default("normal"),
   participants: z.array(z.object({
     id: z.string(),
@@ -79,32 +66,16 @@ const CreateActivitySchema = z.object({
   })).optional(),
 });
 
-export async function createActivity(data: z.infer<typeof CreateActivitySchema>) {
+export async function createActivity(data: z.infer<typeof CreateActivitySchema>): Promise<ActionResult<{ activityId: string }>> {
   const parsed = CreateActivitySchema.safeParse(data);
   if (!parsed.success) {
-    return { error: `Invalid input: ${(parsed.error as any).errors[0].message}` };
+    return actionError(`Invalid input: ${parsed.error.issues[0].message}`, "VALIDATION_ERROR");
   }
 
-  let { tenantId, entityId, entityType, activityType, title, description, subject, body, isTask, dueAt, priority, participants } = parsed.data;
-
-  // If the frontend passed an empty string or didn't pass it, retrieve it securely from the session
-  if (!tenantId) {
-    const cookieStore = await cookies();
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { error: "Not authenticated" };
-
-    const rawTenantId = cookieStore.get("tenant_id")?.value;
-    const tId = rawTenantId?.replace(/['"]+/g, '') || await getTenantId(user, supabase);
-
-    if (!tId) return { error: "Missing tenant context" };
-    tenantId = tId;
-  }
+  const { tenantId, entityId, entityType, activityType, title, description, subject, body, dueAt, priority, participants } = parsed.data;
 
   const auth = await verifyAuthWithTenant(tenantId);
-  if (isAuthError(auth)) {
-    return { error: "Unauthorized for this tenant" };
-  }
+  if (isAuthError(auth)) return actionError(auth.error, "AUTH_ERROR");
   const userId = auth.userId;
 
   // Determine assignee
@@ -118,46 +89,33 @@ export async function createActivity(data: z.infer<typeof CreateActivitySchema>)
 
   const adminClient = createAdminClient();
 
-  // Insert the activity
+  const payload: Record<string, unknown> = {
+    tenant_id: tenantId,
+    type: activityType === 'task' ? 'task' : (activityType === 'meeting' ? 'meeting' : 'email'),
+    title: title || subject || "New Activity",
+    description: description || body,
+    due_date: dueAt || null,
+    priority: priority || "normal",
+    created_by: userId,
+    assigned_to: assignee,
+  };
+
+  // Attach polymorphic link if provided
+  if (entityId && entityType && ['card', 'opportunity', 'lead'].includes(entityType)) {
+    payload.entity_type = entityType;
+    payload.entity_id = entityId;
+  }
+
   const { data: newActivity, error: activityError } = await adminClient
     .from("activities")
-    .insert({
-      tenant_id: tenantId,
-      activity_type: activityType === 'task' ? 'task' : (activityType === 'meeting' ? 'meeting' : 'email'),
-      subject: title || subject || "New Activity",
-      body: description || body,
-      due_at: dueAt || null,
-      is_task: isTask,
-      priority: priority || "normal",
-      created_by: userId,
-      assigned_to: assignee,
-    })
+    .insert(payload)
     .select("id")
     .single();
 
   if (activityError || !newActivity) {
     console.error("Failed to create activity", activityError);
-    return { error: "Failed to create activity: " + activityError?.message };
+    return actionError("Failed to create activity: " + activityError?.message, "DB_ERROR");
   }
 
-  // Insert link if any
-  if (entityId && entityType) {
-    if (['card', 'opportunity', 'lead'].includes(entityType)) {
-      const payload: any = {
-        tenant_id: tenantId,
-        activity_id: newActivity.id,
-        link_type: 'related'
-      };
-
-      // Match the exact columns in activity_links (`card_id`, `opportunity_id`, `lead_id`)
-      payload[`${entityType}_id`] = entityId;
-
-      const { error: linkError } = await adminClient.from("activity_links").insert(payload);
-      if (linkError) {
-        console.error("Failed to link activity", linkError);
-      }
-    }
-  }
-
-  return { success: true, activityId: newActivity.id };
+  return actionSuccess({ activityId: newActivity.id });
 }

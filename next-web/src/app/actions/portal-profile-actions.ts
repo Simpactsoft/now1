@@ -175,109 +175,50 @@ export async function getPortalProfile(): Promise<ActionResult<any>> {
             });
         }
 
-        // 2. Try modern parties table using raw pg connection to bypass PostgREST cache issues
+        // 2. Try modern parties table via adminClient
         try {
-            const dbUrl = process.env.DATABASE_URL || process.env.DIRECT_URL;
-            if (dbUrl && dbUrl.startsWith('postgres')) {
-                const { Client } = require('pg');
-                const client = new Client({
-                    connectionString: dbUrl,
-                    ssl: { rejectUnauthorized: false }
+            const { data: parties, error: partyQueryError } = await adminClient
+                .from('parties')
+                .select(`
+                    id, display_name, avatar_url, contact_methods, custom_fields, type,
+                    people (first_name, last_name, gender)
+                `)
+                .contains('contact_methods', [{ value: userEmail }])
+                .limit(1);
+
+            if (!partyQueryError && parties && parties.length > 0) {
+                const p = parties[0];
+                const pp = Array.isArray(p.people) ? p.people[0] : p.people;
+
+                let firstName = pp?.first_name || '';
+                let lastName = pp?.last_name || '';
+                let displayName = p.display_name;
+
+                if (displayName) {
+                    const parts = displayName.trim().split(' ');
+                    firstName = parts[0] || '';
+                    lastName = parts.slice(1).join(' ') || '';
+                } else {
+                    displayName = `${firstName} ${lastName}`.trim();
+                }
+
+                const phoneMethod = Array.isArray(p.contact_methods) ? p.contact_methods.find((m: any) => m.type === 'phone') : null;
+                const customFields = typeof p.custom_fields === 'object' && p.custom_fields !== null ? p.custom_fields : {};
+
+                return actionSuccess({
+                    id: p.id,
+                    email: userEmail,
+                    first_name: firstName,
+                    last_name: lastName,
+                    display_name: displayName,
+                    avatar_url: p.avatar_url,
+                    phone: phoneMethod ? phoneMethod.value : null,
+                    status: (customFields as any).status || null,
+                    source: 'parties'
                 });
-
-                await client.connect();
-
-                try {
-                    const res = await client.query(`
-                        SELECT p.id, p.display_name, p.avatar_url, p.contact_methods, p.custom_fields,
-                               pp.first_name, pp.last_name, pp.gender
-                        FROM parties p
-                        LEFT JOIN people pp ON pp.party_id = p.id
-                        WHERE p.contact_methods @> $1::jsonb
-                        LIMIT 1
-                    `, [JSON.stringify([{ value: userEmail }])]);
-
-                    if (res.rows.length > 0) {
-                        const p = res.rows[0];
-
-                        let firstName = p.first_name || '';
-                        let lastName = p.last_name || '';
-                        let displayName = p.display_name;
-
-                        if (displayName) {
-                            const parts = displayName.trim().split(' ');
-                            firstName = parts[0] || '';
-                            lastName = parts.slice(1).join(' ') || '';
-                        } else {
-                            displayName = `${firstName} ${lastName}`.trim();
-                        }
-
-                        const contactMethods = typeof p.contact_methods === 'string' ? JSON.parse(p.contact_methods) : p.contact_methods;
-                        const phoneMethod = Array.isArray(contactMethods) ? contactMethods.find((m: any) => m.type === 'phone') : null;
-
-                        let customFields = p.custom_fields;
-                        if (typeof customFields === 'string') customFields = JSON.parse(customFields);
-                        if (!customFields || typeof customFields !== 'object') customFields = {};
-
-                        return actionSuccess({
-                            id: p.id,
-                            email: userEmail,
-                            first_name: firstName,
-                            last_name: lastName,
-                            display_name: displayName,
-                            avatar_url: p.avatar_url,
-                            phone: phoneMethod ? phoneMethod.value : null,
-                            status: customFields.status || null,
-                            source: 'parties'
-                        });
-                    }
-                } finally {
-                    await client.end();
-                }
-            } else {
-                const { data: parties, error: partyQueryError } = await adminClient
-                    .from('parties')
-                    .select(`
-                        id, display_name, avatar_url, contact_methods, custom_fields, type,
-                        people (first_name, last_name, gender)
-                    `)
-                    .contains('contact_methods', [{ value: userEmail }])
-                    .limit(1);
-
-                if (!partyQueryError && parties && parties.length > 0) {
-                    const p = parties[0];
-                    const pp = Array.isArray(p.people) ? p.people[0] : p.people;
-
-                    let firstName = pp?.first_name || '';
-                    let lastName = pp?.last_name || '';
-                    let displayName = p.display_name;
-
-                    if (displayName) {
-                        const parts = displayName.trim().split(' ');
-                        firstName = parts[0] || '';
-                        lastName = parts.slice(1).join(' ') || '';
-                    } else {
-                        displayName = `${firstName} ${lastName}`.trim();
-                    }
-
-                    const phoneMethod = Array.isArray(p.contact_methods) ? p.contact_methods.find((m: any) => m.type === 'phone') : null;
-                    const customFields = typeof p.custom_fields === 'object' && p.custom_fields !== null ? p.custom_fields : {};
-
-                    return actionSuccess({
-                        id: p.id,
-                        email: userEmail,
-                        first_name: firstName,
-                        last_name: lastName,
-                        display_name: displayName,
-                        avatar_url: p.avatar_url,
-                        phone: phoneMethod ? phoneMethod.value : null,
-                        status: (customFields as any).status || null,
-                        source: 'parties'
-                    });
-                }
             }
         } catch (partyErr) {
-            console.warn("[getPortalProfile] Could not query parties table. Schema cache might be stale and pg fallback failed.", partyErr);
+            console.warn("[getPortalProfile] Could not query parties table.", partyErr);
         }
 
         console.warn("[getPortalProfile] User authorized but no CRM profile found. Returning auto-fallback.");
@@ -425,128 +366,60 @@ export async function updatePortalProfile(
             return actionSuccess(undefined);
         }
 
-        // 2. Try modern parties table using raw pg connection to bypass PostgREST cache issues
+        // 2. Try modern parties table via adminClient
         try {
-            const dbUrl = process.env.DATABASE_URL || process.env.DIRECT_URL;
-            if (dbUrl && dbUrl.startsWith('postgres')) {
-                const { Client } = require('pg');
-                const client = new Client({
-                    connectionString: dbUrl,
-                    ssl: { rejectUnauthorized: false }
-                });
+            const { data: parties, error: partyQueryError } = await adminClient
+                .from('parties')
+                .select('id, custom_fields, contact_methods')
+                .contains('contact_methods', [{ value: userEmail }])
+                .limit(1);
 
-                await client.connect();
-                try {
-                    // Find the party id
-                    const res = await client.query(`
-                        SELECT id, custom_fields FROM parties 
-                        WHERE contact_methods @> $1::jsonb LIMIT 1
-                    `, [JSON.stringify([{ value: userEmail }])]);
+            if (!partyQueryError && parties && parties.length > 0) {
+                const pId = parties[0].id;
+                const customFields = typeof parties[0].custom_fields === 'object' && parties[0].custom_fields !== null ? parties[0].custom_fields : {};
 
-                    if (res.rows.length > 0) {
-                        const pId = res.rows[0].id;
-                        let customFields = res.rows[0].custom_fields;
-                        if (typeof customFields === 'string') customFields = JSON.parse(customFields);
-                        if (!customFields || typeof customFields !== 'object') customFields = {};
+                // Find existing contact methods or initialize
+                const party = parties[0] as any;
+                let contactMethods = party.contact_methods || [];
+                if (typeof contactMethods === 'string') contactMethods = JSON.parse(contactMethods as any);
+                if (!Array.isArray(contactMethods)) contactMethods = [];
 
-                        const newCustomFields = { ...customFields, job_title: data.job_title, department: data.department, role: data.job_title };
-
-                        // Find existing contact methods or initialize
-                        let contactMethods = res.rows[0].contact_methods || [];
-                        if (typeof contactMethods === 'string') contactMethods = JSON.parse(contactMethods);
-                        if (!Array.isArray(contactMethods)) contactMethods = [];
-
-                        // Update phone method
-                        const phoneIndex = contactMethods.findIndex((m: any) => m.type === 'phone');
-                        if (phoneIndex >= 0) {
-                            contactMethods[phoneIndex].value = data.phone;
-                        } else if (data.phone) {
-                            contactMethods.push({ type: 'phone', value: data.phone });
-                        }
-
-                        // Update email method
-                        const emailIndex = contactMethods.findIndex((m: any) => m.type === 'email');
-                        if (emailIndex >= 0) {
-                            contactMethods[emailIndex].value = data.email;
-                        } else if (data.email) {
-                            contactMethods.push({ type: 'email', value: data.email, is_primary: true });
-                        }
-
-                        // Begin transaction-like sequence (though not strictly necessary to be atomic here)
-                        await client.query(`
-                            UPDATE parties 
-                            SET display_name = $1, custom_fields = $2::jsonb, contact_methods = $3::jsonb
-                            WHERE id = $4
-                        `, [newDisplayName, JSON.stringify(newCustomFields), JSON.stringify(contactMethods), pId]);
-
-                        await client.query(`
-                            UPDATE people 
-                            SET first_name = $1, last_name = $2 
-                            WHERE party_id = $3
-                        `, [data.first_name, data.last_name, pId]);
-
-                        await client.query(`
-                            UPDATE party_memberships
-                            SET role_name = $1
-                            WHERE person_id = $2
-                        `, [data.job_title, pId]).catch(() => {/* ignore if table missing */ });
-
-                        revalidatePath('/portal/profile');
-                        return actionSuccess(undefined);
-                    }
-                } finally {
-                    await client.end();
+                // Update phone method
+                const phoneIndex = contactMethods.findIndex((m: any) => m.type === 'phone');
+                if (phoneIndex >= 0) {
+                    contactMethods[phoneIndex].value = data.phone;
+                } else if (data.phone) {
+                    contactMethods.push({ type: 'phone', value: data.phone });
                 }
-            } else {
-                // Fallback to standard admin client if no pg connection string
-                const { data: parties, error: partyQueryError } = await adminClient.from('parties').select('id, custom_fields').contains('contact_methods', [{ value: userEmail }]).limit(1);
-                if (!partyQueryError && parties && parties.length > 0) {
-                    const pId = parties[0].id;
-                    const customFields = typeof parties[0].custom_fields === 'object' && parties[0].custom_fields !== null ? parties[0].custom_fields : {};
 
-                    // Find existing contact methods or initialize
-                    const party = parties[0] as any;
-                    let contactMethods = party.contact_methods || [];
-                    if (typeof contactMethods === 'string') contactMethods = JSON.parse(contactMethods as any);
-                    if (!Array.isArray(contactMethods)) contactMethods = [];
-
-                    // Update phone method
-                    const phoneIndex = contactMethods.findIndex((m: any) => m.type === 'phone');
-                    if (phoneIndex >= 0) {
-                        contactMethods[phoneIndex].value = data.phone;
-                    } else if (data.phone) {
-                        contactMethods.push({ type: 'phone', value: data.phone });
-                    }
-
-                    // Update email method
-                    const emailIndex = contactMethods.findIndex((m: any) => m.type === 'email');
-                    if (emailIndex >= 0) {
-                        contactMethods[emailIndex].value = data.email;
-                    } else if (data.email) {
-                        contactMethods.push({ type: 'email', value: data.email, is_primary: true });
-                    }
-
-                    await adminClient.from('parties').update({
-                        display_name: newDisplayName,
-                        custom_fields: { ...customFields, job_title: data.job_title, department: data.department, role: data.job_title },
-                        contact_methods: contactMethods
-                    }).eq('id', pId);
-
-                    await adminClient.from('people').update({
-                        first_name: data.first_name,
-                        last_name: data.last_name
-                    }).eq('party_id', pId);
-
-                    await adminClient.from('party_memberships').update({
-                        role_name: data.job_title
-                    }).eq('person_id', pId);
-
-                    revalidatePath('/portal/profile');
-                    return actionSuccess(undefined);
+                // Update email method
+                const emailIndex = contactMethods.findIndex((m: any) => m.type === 'email');
+                if (emailIndex >= 0) {
+                    contactMethods[emailIndex].value = data.email;
+                } else if (data.email) {
+                    contactMethods.push({ type: 'email', value: data.email, is_primary: true });
                 }
+
+                await adminClient.from('parties').update({
+                    display_name: newDisplayName,
+                    custom_fields: { ...customFields, job_title: data.job_title, department: data.department, role: data.job_title },
+                    contact_methods: contactMethods
+                }).eq('id', pId);
+
+                await adminClient.from('people').update({
+                    first_name: data.first_name,
+                    last_name: data.last_name
+                }).eq('party_id', pId);
+
+                await adminClient.from('party_memberships').update({
+                    role_name: data.job_title
+                }).eq('person_id', pId);
+
+                revalidatePath('/portal/profile');
+                return actionSuccess(undefined);
             }
         } catch (partyErr) {
-            console.warn("[updatePortalProfile] Could not update parties table. Schema cache might be stale and pg fallback failed.", partyErr);
+            console.warn("[updatePortalProfile] Could not update parties table.", partyErr);
         }
 
         // 3. AUTO-FALLBACK: If auth user exists but no CRM record, return error instead of faking success

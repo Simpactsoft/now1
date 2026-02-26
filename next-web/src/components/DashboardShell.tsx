@@ -24,12 +24,12 @@ export default function DashboardShell({
 
     // Bypass DashboardShell entirely for login or public quote pages
     const isPublicRoute = pathname?.startsWith('/login') || pathname?.startsWith('/quote');
-    if (isPublicRoute) {
-        return <>{children}</>;
-    }
 
     // Initial check for screen size & Auto-Heal Tenant
     useEffect(() => {
+        // Don't run on public routes
+        if (isPublicRoute) return;
+
         const checkMobile = () => {
             const mobile = window.innerWidth < 1024; // lg breakpoint
             setIsMobile(mobile);
@@ -48,8 +48,6 @@ export default function DashboardShell({
 
         // [Auto-Heal] Validate Tenant ID
         const validateTenant = async () => {
-            // Dynamically import to avoid server-side issues in client component if needed,
-            // but standard import work for Server Actions.
             const { fetchUserTenants } = await import("@/app/actions/fetchUserTenants");
             const { setTenantAction } = await import("@/app/actions/setTenant");
 
@@ -60,19 +58,14 @@ export default function DashboardShell({
                     if (tenants && tenants.length > 0) {
                         const validIds = tenants.map((t: any) => t.id);
 
-                        // If current cookie is missing OR is NOT in the user's valid list
-                        // (e.g. Stale Admin Cookie)
                         if (!currentTenantId || !validIds.includes(currentTenantId)) {
                             console.log("[DashboardShell] Fix: Tenant Mismatch detected.", { current: currentTenantId, valid: validIds });
                             console.log("[DashboardShell] Auto-switching to:", tenants[0].id);
 
                             await setTenantAction(tenants[0].id);
-
-                            // Force hard reload to pick up new cookie in Server Components
                             window.location.reload();
                         }
                     } else {
-                        // User has no tenants, clear any existing tenant_id cookie
                         if (currentTenantId) {
                             console.warn("User has no tenants but a tenant_id cookie is present. Clearing it.");
                             document.cookie = 'tenant_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
@@ -80,9 +73,7 @@ export default function DashboardShell({
                         }
                     }
                 } else if (res.success === false) {
-                    // Handle cases where fetchUserTenants returns success: false
                     console.error("[DashboardShell] Failed to fetch user tenants:", res.error);
-                    // Optionally, clear tenant_id if there's an error and a tenant_id is set
                     if (currentTenantId) {
                         console.warn("Error fetching tenants, clearing existing tenant_id cookie.");
                         document.cookie = 'tenant_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
@@ -94,13 +85,15 @@ export default function DashboardShell({
             }
         };
 
-        // Short delay to allow hydration
         setTimeout(validateTenant, 1000);
 
         return () => window.removeEventListener("resize", handleResize);
-    }, [currentTenantId]);
+    }, [currentTenantId, isPublicRoute]);
 
     const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+
+    // Public routes: render children only, no shell
+    if (isPublicRoute) return <>{children}</>;
 
     return (
         <div className="flex min-h-screen bg-background text-foreground transition-colors duration-300">

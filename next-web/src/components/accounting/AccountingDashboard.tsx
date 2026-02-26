@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "sonner";
 
 import React, { useState, useEffect, useCallback } from "react";
 import {
@@ -227,7 +228,7 @@ function JournalTab({ tenantId }: { tenantId: string }) {
         if (result.success) {
             fetchEntries();
         } else {
-            alert(`Failed to post: ${result.error}`);
+            toast.error(`Failed to post: ${result.error}`);
         }
         setProcessingId(null);
     };
@@ -239,7 +240,7 @@ function JournalTab({ tenantId }: { tenantId: string }) {
         if (result.success) {
             fetchEntries();
         } else {
-            alert(`Failed to void: ${result.error}`);
+            toast.error(`Failed to void: ${result.error}`);
         }
         setProcessingId(null);
     };

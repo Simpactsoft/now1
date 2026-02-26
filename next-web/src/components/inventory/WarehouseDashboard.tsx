@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "sonner";
 
 import React, { useState, useEffect, useCallback } from "react";
 import {
@@ -130,7 +131,7 @@ function WarehousesTab({ tenantId }: { tenantId: string }) {
         if (result.success) {
             fetchWarehouses();
         } else {
-            alert(`Failed: ${result.error}`);
+            toast.error(`Failed: ${result.error}`);
         }
     };
 
@@ -287,7 +288,7 @@ function WarehouseFormModal({ tenantId, onClose, onSuccess }: { tenantId: string
             onSuccess();
             onClose();
         } else {
-            alert(`Failed: ${result.error}`);
+            toast.error(`Failed: ${result.error}`);
         }
         setSaving(false);
     };
@@ -369,7 +370,7 @@ function TransfersTab({ tenantId }: { tenantId: string }) {
         if (result.success) {
             fetchTransfers();
         } else {
-            alert(`Failed: ${result.error}`);
+            toast.error(`Failed: ${result.error}`);
         }
         setProcessingId(null);
     };

@@ -149,6 +149,7 @@ export interface EntityViewConfig<T = any> {
 
     // Actions — Refresh
     refresh: (reset?: boolean) => void | Promise<void>;
+    navigateTo: (path: string) => void;
 }
 
 // ==================== Render Props (Generic) ====================

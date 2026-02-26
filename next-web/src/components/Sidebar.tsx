@@ -27,6 +27,7 @@ import {
     Kanban,
     Inbox,
     CheckSquare,
+    Link as LinkIcon,
 } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useLanguage } from '@/context/LanguageContext';
@@ -38,7 +39,9 @@ const NAV_CONFIG = [
     { key: 'dashboard', href: '/dashboard', icon: LayoutDashboard },
     { key: 'tasks', href: '/dashboard/tasks', icon: CheckSquare },
     { key: 'contacts', href: '/dashboard/people', icon: UserCircle },
+    { key: 'import_data', href: '/dashboard/import', icon: Database },
     { key: 'organizations', href: '/dashboard/organizations', icon: Building2 },
+    { key: 'relationships', href: '/dashboard/relationships', icon: LinkIcon },
     { key: 'products', href: '/dashboard/products', icon: Package },
     { key: 'cpq', href: '/dashboard/cpq', icon: Sliders },
     { key: 'leads', href: '/dashboard/sales/leads', icon: Inbox },

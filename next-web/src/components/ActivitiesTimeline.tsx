@@ -52,7 +52,7 @@ export function ActivitiesTimeline({ tenantId, entityId, entityType }: Activitie
             }
 
             const res = await fetchActivities(tenantId, entityId, entityType);
-            if (res.success && res.data) {
+            if (res.success) {
                 setActivities(res.data as Activity[]);
             } else {
                 setError(res.error || "Failed to load activities");

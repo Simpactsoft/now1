@@ -1,17 +1,13 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { ActionResult, actionSuccess, actionError } from "@/lib/action-result";
 
 export async function toggleUserStatus(userId: string, currentStatus: string, tenantId: string): Promise<ActionResult<{ newStatus: string }>> {
     try {
-        const { createClient: createAdminClient } = require('@supabase/supabase-js');
-        const supabaseAdmin = createAdminClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!,
-            { auth: { persistSession: false } }
-        );
+        const supabaseAdmin = createAdminClient();
 
         const newStatus = currentStatus === 'active' ? 'suspended' : 'active';
 

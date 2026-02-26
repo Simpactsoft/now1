@@ -12,7 +12,7 @@ import { createClient } from "@/lib/supabase/client";
 import { getDefinitionForType, RELATIONSHIP_SCHEMA, FieldDefinition, getAvailableRoles, RelationshipMetadata } from "@/lib/relationshipSchema";
 
 // Reusable Components
-import SimplePeopleTable from "@/components/SimplePeopleTable";
+import RelationshipsGrid from "@/components/relationships/RelationshipsGrid";
 import PeopleTags from "@/components/PeopleTags";
 import EntityCard from "@/components/EntityCard";
 import { PortalAccessModal } from "@/components/PortalAccessModal";
@@ -419,21 +419,17 @@ export default function RelationshipManager({ tenantId, entityId, entityType }: 
                 ) : (
                     <>
                         {viewMode === 'list' && (
-                            <SimplePeopleTable
-                                people={relationships}
-                                loading={false}
-                                hasMore={false}
-                                loadMore={() => { }}
-                                onPersonClick={handlePersonClick}
-                                highlightId={null}
+                            <RelationshipsGrid
                                 tenantId={tenantId}
-                                statusOptions={statusOptions}
+                                relationships={relationships}
+                                loading={loading}
                                 onUpdateRole={handleUpdateRole}
                                 onDeleteRelationship={handleDeleteRelationship}
                                 onEditRelationship={(relId) => {
-                                    const rel = relationships.find(r => r.relationshipId === relId);
+                                    const rel = relationships.find(r => (r.relationshipId || r.id) === relId);
                                     if (rel) handleEdit(rel);
                                 }}
+                                onPersonClick={handlePersonClick}
                             />
                         )}
 

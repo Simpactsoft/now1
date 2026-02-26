@@ -1,0 +1,9 @@
+DROP TABLE IF EXISTS "activities" CASCADE;
+DROP TABLE IF EXISTS "activity_links" CASCADE;
+DROP TABLE IF EXISTS "activity_participants" CASCADE;
+DROP TABLE IF EXISTS "activity_participants_v2" CASCADE;
+DROP TABLE IF EXISTS "activity_status_history" CASCADE;
+DROP TABLE IF EXISTS "activity_status_definitions" CASCADE;
+DROP TABLE IF EXISTS "commission_ledger" CASCADE;
+DROP TABLE IF EXISTS "commission_rules" CASCADE;
+DROP TABLE IF EXISTS "commission_plans" CASCADE;

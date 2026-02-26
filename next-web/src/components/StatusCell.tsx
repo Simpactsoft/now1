@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "sonner";
 
 import { useState, useEffect, useTransition } from "react";
 import { StatusBadge } from "./StatusBadge";
@@ -62,7 +63,7 @@ export function StatusCell({ status, personId, tenantId, statusOptions }: Status
             const res = await updatePerson(payload);
             if (!res.success) {
                 console.error("Failed to update status", res.error);
-                alert("Failed to update status");
+                toast.error("Failed to update status");
                 setCurrentStatus(status); // Revert
             }
         });

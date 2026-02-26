@@ -4,6 +4,7 @@ export const translations = {
     en: {
         dashboard: "Dashboard",
         contacts: "Contacts (CRM)",
+        import_data: "Import Data",
         people: "People",
         employees: "Employees",
         logs: "System Logs",
@@ -51,11 +52,13 @@ export const translations = {
         tasks: "My Tasks",
         teams_admin: "Teams & Users",
         commissions_admin: "Commission Plans",
-        commissions_ledger: "My Commissions"
+        commissions_ledger: "My Commissions",
+        relationships: "Relationships"
     },
     he: {
         dashboard: "לוח בקרה",
         contacts: "אנשי קשר (CRM)",
+        import_data: "ייבוא נתונים",
         people: "אנשים",
         employees: "עובדים",
         logs: "יומני מערכת",
@@ -103,6 +106,7 @@ export const translations = {
         tasks: "המשימות שלי",
         teams_admin: "צוותים ומשתמשים",
         commissions_admin: "תוכניות עמלה",
-        commissions_ledger: "העמלות שלי"
+        commissions_ledger: "העמלות שלי",
+        relationships: "קשרים"
     }
 };

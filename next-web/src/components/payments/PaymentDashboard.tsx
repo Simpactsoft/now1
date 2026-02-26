@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "sonner";
 
 import React, { useState, useEffect, useCallback } from "react";
 import {
@@ -160,9 +161,9 @@ function PaymentTab({
             fetchPayments();
         } else {
             if (result.error?.includes("Missing GL account")) {
-                alert("Cannot post payment: required accounting accounts are not set up. Go to Accounting → Chart of Accounts to seed accounts.");
+                toast.error("Cannot post payment: required accounting accounts are not set up. Go to Accounting → Chart of Accounts to seed accounts.");
             } else {
-                alert(result.error);
+                toast.error(result.error);
             }
         }
         setProcessingId(null);
@@ -172,7 +173,7 @@ function PaymentTab({
         if (!confirm("Void this payment? This will create a reversing journal entry.")) return;
         setProcessingId(id);
         const result = await voidPayment(tenantId, id);
-        if (result.success) fetchPayments(); else alert(result.error);
+        if (result.success) fetchPayments(); else toast.error(result.error);
         setProcessingId(null);
     };
 
@@ -408,8 +409,8 @@ function CreatePaymentDialog({
     const fmt = (n: number) => `₪ ${n.toLocaleString("he-IL", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
     const handleCreate = async () => {
-        if (!entityId) { alert("Please select a " + entityType); return; }
-        if (amount <= 0) { alert("Amount must be positive"); return; }
+        if (!entityId) { toast.warning("Please select a " + entityType); return; }
+        if (amount <= 0) { toast.warning("Amount must be positive"); return; }
         setSaving(true);
 
         // Create payment
@@ -424,7 +425,7 @@ function CreatePaymentDialog({
             notes: notes || null,
         });
 
-        if (!result.success) { alert(result.error); setSaving(false); return; }
+        if (!result.success) { toast.error(result.error); setSaving(false); return; }
 
         // Add allocations
         for (const [docId, allocAmount] of Object.entries(allocations)) {

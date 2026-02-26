@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "sonner";
 
 import { useState, useTransition, useEffect, useRef } from "react";
 import { updatePerson } from "@/app/actions/updatePerson";
@@ -40,7 +41,7 @@ export function RoleCell({ role, personId, tenantId }: RoleCellProps) {
                 console.error("Failed to update role", res.error);
                 // Revert on failure
                 setValue(role || "");
-                alert("Failed to update role");
+                toast.error("Failed to update role");
             }
             setIsEditing(false);
         });

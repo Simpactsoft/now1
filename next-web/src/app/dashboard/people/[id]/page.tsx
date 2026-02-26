@@ -105,18 +105,20 @@ export default async function PersonProfilePage({ params }: PageProps) {
 
                 {/* Right Column: Timeline & Relationships */}
                 <div className="lg:col-span-2 space-y-8">
-                    {/* Relationships Section */}
-                    <RelationshipManager
-                        tenantId={tenantId}
-                        entityId={id}
-                        entityType="person"
-                    />
-
                     <Tabs defaultValue="stream" className="w-full">
-                        <TabsList className="w-full grid grid-cols-2 mb-6">
+                        <TabsList className="w-full grid grid-cols-3 mb-6">
                             <TabsTrigger value="stream" className="text-base font-medium">זרם פעילויות (חדש)</TabsTrigger>
+                            <TabsTrigger value="relationships" className="text-base font-medium">קשרים</TabsTrigger>
                             <TabsTrigger value="quotes" className="text-base font-medium">הצעות מחיר</TabsTrigger>
                         </TabsList>
+
+                        <TabsContent value="relationships" className="mt-0 focus-visible:outline-none focus-visible:ring-0">
+                            <RelationshipManager
+                                tenantId={tenantId}
+                                entityId={id}
+                                entityType="person"
+                            />
+                        </TabsContent>
 
                         <TabsContent value="stream" className="mt-0 focus-visible:outline-none focus-visible:ring-0 space-y-8">
                             <ActionTimeline events={timeline} />

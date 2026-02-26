@@ -2,6 +2,8 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { actionError, actionSuccess, ActionResult } from "@/lib/action-result";
+import { verifyAuthWithTenant } from "./_shared/auth";
+import { isAuthError } from "./_shared/auth-utils";
 import { z } from "zod";
 
 const getRecommendationsSchema = z.object({
@@ -30,6 +32,11 @@ export async function getRecommendations(input: {
 }): Promise<ActionResult<{ recommendations: RecommendationItem[] }>> {
     try {
         const validated = getRecommendationsSchema.parse(input);
+
+        // Auth: verify the caller belongs to this tenant
+        const auth = await verifyAuthWithTenant(validated.tenantId);
+        if (isAuthError(auth)) return actionError(auth.error, "AUTH_ERROR");
+
         const adminClient = createAdminClient();
 
         // Query the relationships table where the source product is in the cart

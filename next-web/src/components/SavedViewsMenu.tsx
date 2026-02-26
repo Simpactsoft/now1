@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "sonner";
 
 import * as React from "react";
 import { Bookmark, Save, Trash2, Edit2, Check, X, MoreHorizontal, Plus, ListFilter } from "lucide-react";
@@ -67,7 +68,7 @@ export default function SavedViewsMenu({ tenantId, entityType, minimal = false, 
         };
         const res = await saveView(tenantId, viewName, config, entityType || 'people');
         if (!res.success) {
-            alert(res.error);
+            toast.error(res.error);
         } else {
             setViewName("");
             loadViews();

@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "sonner";
 
 import { useState, useTransition, useEffect, useRef } from "react";
 import { updatePerson } from "@/app/actions/updatePerson";
@@ -56,7 +57,7 @@ export function NameCell({ firstName, lastName, personId, tenantId }: NameCellPr
             if (!res.success) {
                 console.error("Failed to update name", res.error);
                 setValue([firstName, lastName].filter(Boolean).join(" ")); // Revert
-                alert("Failed to update name: " + res.error);
+                toast.error("Failed to update name: " + res.error);
             }
             setIsEditing(false);
         });

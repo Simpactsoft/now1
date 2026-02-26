@@ -1,5 +1,6 @@
 'use client';
 
+import { toast } from "sonner";
 import React, { useState, useEffect, useMemo } from 'react';
 import {
     ChevronRight,
@@ -589,7 +590,7 @@ export default function QuoteBuilder({ initialTenantId, quoteId, initialCustomer
     // 5. Save Logic
     const handleSave = async (): Promise<string | null> => {
         if (!tenantId || !selectedCustomerId) {
-            alert('Missing Tenant or Customer');
+            toast.error('Missing Tenant or Customer');
             return null;
         }
 
@@ -634,7 +635,7 @@ export default function QuoteBuilder({ initialTenantId, quoteId, initialCustomer
             }
 
             console.log('[QuoteBuilder] Quote saved via server action:', result.data.quoteId, quoteNumber);
-            alert('Quote Saved Successfully!');
+            toast.success('Quote Saved Successfully!');
             if (result.data.publicToken) {
                 setGeneratedQuoteToken(result.data.publicToken);
             }
@@ -643,7 +644,7 @@ export default function QuoteBuilder({ initialTenantId, quoteId, initialCustomer
 
         } catch (e: any) {
             console.error('[QuoteBuilder] Save error:', e);
-            alert('Failed to save quote: ' + e.message);
+            toast.error('Failed to save quote: ' + e.message);
             return null;
         } finally {
             setLoading(false);
@@ -796,13 +797,13 @@ export default function QuoteBuilder({ initialTenantId, quoteId, initialCustomer
                                     const { sendQuoteEmail } = await import('@/app/actions/email-actions');
                                     const result = await sendQuoteEmail({ quoteId: quoteId, tenantId: tenantId });
                                     if (result.success) {
-                                        alert("Email sent to customer successfully.");
+                                        toast.success("Email sent to customer successfully.");
                                     } else {
-                                        alert("Failed to send email: " + result.error);
+                                        toast.error("Failed to send email: " + result.error);
                                     }
                                 } catch (e) {
                                     console.error(e);
-                                    alert("Error initiating email send.");
+                                    toast.error("Error initiating email send.");
                                 }
                             }}
                             className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg font-medium transition-colors shadow-sm border border-slate-200 mr-2 lg:mr-0"
@@ -1112,13 +1113,13 @@ export default function QuoteBuilder({ initialTenantId, quoteId, initialCustomer
                                         if (savedQuoteId) {
                                             const result = await validateQuoteMargin(savedQuoteId);
                                             if (result.success) {
-                                                alert('Quote submitted for margin approval.');
+                                                toast.success('Quote submitted for margin approval.');
                                             } else {
-                                                alert(`Approval submission failed: ${result.error}`);
+                                                toast.error(`Approval submission failed: ${result.error}`);
                                             }
                                         }
                                     } catch (err) {
-                                        alert('Failed to submit for approval');
+                                        toast.error('Failed to submit for approval');
                                     }
                                     setSubmittingForApproval(false);
                                 }}
@@ -1149,9 +1150,9 @@ export default function QuoteBuilder({ initialTenantId, quoteId, initialCustomer
                                     if (savedQuoteId && tenantId) {
                                         const result = await createInvoiceFromQuote(tenantId, savedQuoteId);
                                         if (result.success) {
-                                            alert('Invoice created successfully. Go to Invoices to issue it.');
+                                            toast.success('Invoice created successfully. Go to Invoices to issue it.');
                                         } else {
-                                            alert(`Failed to create invoice: ${result.error}`);
+                                            toast.error(`Failed to create invoice: ${result.error}`);
                                         }
                                     }
                                 }}
@@ -1169,7 +1170,7 @@ export default function QuoteBuilder({ initialTenantId, quoteId, initialCustomer
                                     const baseUrl = window.location.origin;
                                     const url = `${baseUrl}/quote/${generatedQuoteToken}`;
                                     navigator.clipboard.writeText(url);
-                                    alert('Public Quote Link copied to clipboard!');
+                                    toast.success('Public Quote Link copied to clipboard!');
                                 }}
                                 className="w-full mt-2 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition-colors"
                             >
