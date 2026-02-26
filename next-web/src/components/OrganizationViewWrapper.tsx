@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { FetchDataParams, FetchDataResult } from "@/components/entity-view";
 import { useLanguage } from "@/context/LanguageContext";
+import Link from "next/link";
 
 interface OrganizationViewWrapperProps {
     user: any;
@@ -127,10 +128,10 @@ export default function OrganizationViewWrapper({ user, tenantId }: Organization
 
     const handleRowClick = useCallback((item: any) => {
         const id = item.ret_id || item.id;
-        setHighlightId(id);
+        console.log('[NAV] Org handleRowClick:', id);
         sessionStorage.setItem('lastClickedOrgId', id);
-        router.push(`/dashboard/organizations/${id}`);
-    }, [router]);
+        config.navigateTo(`/dashboard/organizations/${id}`);
+    }, [config.navigateTo]);
 
     // ---- Column Definitions ----
     const columns = useMemo<ColumnDef<any>[]>(() => [
@@ -144,17 +145,18 @@ export default function OrganizationViewWrapper({ user, tenantId }: Organization
             cellRenderer: (params: any) => {
                 const data = params.data;
                 if (!data) return null;
+                const id = data.id || data.ret_id;
                 return (
-                    <div className="flex items-center gap-3 py-1">
+                    <Link href={`/dashboard/organizations/${id}`} onClick={(e) => e.stopPropagation()} className="flex items-center gap-3 py-1 group w-full cursor-pointer hover:bg-slate-50/50 rounded-md transition-colors">
                         {data.ret_avatar_url ? (
-                            <img src={data.ret_avatar_url} alt="" className="w-8 h-8 rounded-md object-cover border" />
+                            <img src={data.ret_avatar_url} alt="" className="w-8 h-8 rounded-md object-cover border shrink-0" />
                         ) : (
-                            <div className="w-8 h-8 bg-secondary rounded-md flex items-center justify-center text-muted-foreground">
+                            <div className="w-8 h-8 bg-secondary rounded-md flex items-center justify-center text-muted-foreground shrink-0">
                                 <Building2 className="w-4 h-4" />
                             </div>
                         )}
-                        <span className="font-medium text-foreground">{data.ret_name}</span>
-                    </div>
+                        <span className="font-medium text-foreground group-hover:underline group-hover:text-blue-600 truncate">{data.ret_name}</span>
+                    </Link>
                 );
             },
         },
@@ -273,7 +275,6 @@ export default function OrganizationViewWrapper({ user, tenantId }: Organization
                 tenantId={tenantId}
                 columns={columns}
                 config={config}
-                onRowClick={handleRowClick}
                 availableViewModes={['tags', 'grid', 'cards']}
                 availableFilters={availableFilters}
                 filterOptions={{

@@ -102,17 +102,15 @@ export default function PeopleViewWrapper({ tenantId }: PeopleViewWrapperProps) 
     // ---- Actions ----
     const handlePersonClick = (item: any) => {
         const id = item.id || item.ret_id;
-        const type = item.type || item.ret_type; // 'person' or 'organization'
-        setHighlightId(id);
+        const type = item.type || item.ret_type;
+        console.log('[NAV] People handlePersonClick:', id, type);
 
-        // Preserve history
         sessionStorage.setItem('lastClickedPersonId', id);
 
-        if (type === 'organization') {
-            router.push(`/dashboard/organizations/${id}`);
-        } else {
-            router.push(`/dashboard/people/${id}`);
-        }
+        const target = type === 'organization'
+            ? `/dashboard/organizations/${id}`
+            : `/dashboard/people/${id}`;
+        config.navigateTo(target);
     };
 
     const handleExport = async () => {
@@ -196,7 +194,6 @@ export default function PeopleViewWrapper({ tenantId }: PeopleViewWrapperProps) 
                 tenantId={tenantId}
                 config={config}
                 columns={gridColumns}
-                onRowClick={handlePersonClick}
                 enableExport={canExport}
                 onExport={handleExport}
                 availableViewModes={['tags', 'grid', 'cards']}

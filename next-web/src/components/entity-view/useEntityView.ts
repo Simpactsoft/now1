@@ -186,11 +186,21 @@ export function useEntityView<T = any>(options: UseEntityViewOptions<T>): Entity
     }, []);
 
     // ==================== URL Sync (effect) ====================
-    // Use a ref to track the last URL we wrote, avoiding the
-    // searchParams → replace → searchParams infinite loop.
+    // Use a ref to track the last URL we wrote, avoiding loops.
     const lastPushedUrl = useRef<string>('');
+    // Navigation guard: when true, URL sync will skip to prevent
+    // interfering with a pending router.push navigation.
+    const isNavigatingRef = useRef(false);
 
     useEffect(() => {
+        // [DISABLE URL SYNC]: URL synchronization was causing navigation issues.
+        // - router.replace() caused infinite re-render loops in Server Components.
+        // - window.history.replaceState() broke Next.js internal router state, causing router.push() to fail silently.
+        // Disabling this allows core navigation to work correctly.
+        /*
+        // Skip URL sync if a navigation is in progress
+        if (isNavigatingRef.current) return;
+
         const params = new URLSearchParams();
 
         if (viewState.viewMode !== 'tags') params.set('view', viewState.viewMode);
@@ -207,9 +217,25 @@ export function useEntityView<T = any>(options: UseEntityViewOptions<T>): Entity
         const newUrl = params.toString();
         if (newUrl !== lastPushedUrl.current) {
             lastPushedUrl.current = newUrl;
-            router.replace(`${pathname}?${newUrl}`, { scroll: false });
+            // Use history.replaceState instead of router.replace to update
+            // the URL without triggering Next.js server-side re-rendering.
+            // router.replace causes RSC re-fetch → component re-mount → infinite loop.
+            const fullUrl = `${pathname}${newUrl ? '?' + newUrl : ''}`;
+            window.history.replaceState(window.history.state, '', fullUrl);
         }
-    }, [viewState.viewMode, viewState.layout, viewState.searchTerm, viewState.filters, pathname, router]);
+        */
+    }, [viewState.viewMode, viewState.layout, viewState.searchTerm, viewState.filters, pathname]);
+
+    // Safe navigation function: forcefully bypass Next.js soft transitions
+    const navigateTo = useCallback((path: string) => {
+        console.log('[NAV] Scheduling absolute hard navigation to:', path);
+
+        // Escape the current event handler tick
+        setTimeout(() => {
+            console.log('[NAV] Executing window.location.href from next tick');
+            window.location.href = path;
+        }, 10);
+    }, []);
 
     // ==================== Server-Side Data Fetching ====================
     // Use a ref to hold totalRecords/totalPages so updating them does NOT
@@ -531,5 +557,8 @@ export function useEntityView<T = any>(options: UseEntityViewOptions<T>): Entity
 
         // Actions — Refresh
         refresh,
+
+        // Actions — Navigation
+        navigateTo,
     };
 }
