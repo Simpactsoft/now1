@@ -1,7 +1,7 @@
 // src/components/import/steps/ResultsStep.tsx
 import { useImportStore } from '@/stores/importStore';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, AlertCircle, RefreshCw, Download, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, AlertCircle, RefreshCw, Download, AlertTriangle, History } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { downloadErrorReport } from '@/lib/importApi';
 import Link from 'next/link';
@@ -102,6 +102,10 @@ export function ResultsStep() {
                 <Button variant="outline" onClick={reset}>
                     <RefreshCw className="w-4 h-4 mr-2" />
                     ייבא קובץ נוסף
+                </Button>
+                <Button variant="outline" onClick={() => router.push('/dashboard/import/history')}>
+                    <History className="w-4 h-4 mr-2" />
+                    היסטוריית ייבואים
                 </Button>
                 <Button onClick={() => router.push('/dashboard/people')}>
                     סיום ומעבר לאנשי קשר

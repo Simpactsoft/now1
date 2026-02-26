@@ -7,6 +7,7 @@ import OrganizationTags from "@/components/OrganizationTags";
 import EntityCard from "@/components/EntityCard";
 import { PortalAccessModal } from "@/components/PortalAccessModal";
 import { fetchOrganizations } from "@/app/actions/fetchOrganizations";
+import { bulkDeleteCards } from "@/app/actions/bulkDeleteCards";
 import { fetchTotalStats } from "@/app/actions/fetchStats";
 import { sendPortalMagicLink } from "@/app/actions/portal-auth-actions";
 import { toast } from "sonner";
@@ -268,6 +269,15 @@ export default function OrganizationViewWrapper({ user, tenantId }: Organization
         { id: 'tags', label: 'Tags', icon: Tags },
     ], []);
 
+    const handleBulkDelete = useCallback(async (ids: string[]) => {
+        const res = await bulkDeleteCards(ids);
+        if (res.success) {
+            toast.success(`${res.deleted} ארגונים נמחקו בהצלחה`);
+        } else {
+            toast.error(res.error || 'שגיאה במחיקה');
+        }
+    }, []);
+
     return (
         <>
             <EntityViewLayout<any>
@@ -275,6 +285,7 @@ export default function OrganizationViewWrapper({ user, tenantId }: Organization
                 tenantId={tenantId}
                 columns={columns}
                 config={config}
+                onBulkDelete={handleBulkDelete}
                 availableViewModes={['tags', 'grid', 'cards']}
                 availableFilters={availableFilters}
                 filterOptions={{

@@ -55,7 +55,7 @@ function EntityAgGridInner<T = any>(props: EntityAgGridProps<T>) {
         headerHeight,
         enableCellTextSelection = true,
         suppressRowClickSelection = false,
-        rowSelection = { mode: 'singleRow' as const, enableClickSelection: false },
+        rowSelection = { mode: 'multiRow' as const, enableClickSelection: false },
         onCellValueChanged,
         onBodyScroll,
         onGridReady: onGridReadyProp,
@@ -66,11 +66,9 @@ function EntityAgGridInner<T = any>(props: EntityAgGridProps<T>) {
         showPagination = true,
     } = props;
 
-    console.log('[EntityAgGrid] Received data:', data?.length, 'items');
-
     const { theme } = useTheme();
     const gridRef = useRef<AgGridReact>(null);
-    const gridTheme = useMemo(() => theme === 'dark' ? themeQuartz.withParams({ accentColor: '#6366f1' }) : themeQuartz.withParams({ accentColor: '#6366f1' }), [theme]);
+    const gridTheme = useMemo(() => themeQuartz.withParams({ accentColor: '#6366f1' }), []);
     const isRtl = typeof document !== 'undefined' && document.documentElement.dir === 'rtl';
 
     // ---- Map our ColumnDef<T> to ag-grid ColDef ----

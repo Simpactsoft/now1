@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { exportPeople } from "@/app/actions/exportPeople";
+import { bulkDeleteCards } from "@/app/actions/bulkDeleteCards";
 import { usePermission } from "@/context/SessionContext";
 import EntityCard from "@/components/EntityCard";
 import { PortalAccessModal } from "@/components/PortalAccessModal";
@@ -186,6 +187,15 @@ export default function PeopleViewWrapper({ tenantId }: PeopleViewWrapperProps) 
         ];
     }, [language]);
 
+    const handleBulkDelete = useCallback(async (ids: string[]) => {
+        const res = await bulkDeleteCards(ids);
+        if (res.success) {
+            toast.success(`${res.deleted} רשומות נמחקו בהצלחה`);
+        } else {
+            toast.error(res.error || 'שגיאה במחיקה');
+        }
+    }, []);
+
     return (
         <>
             <EntityViewLayout
@@ -196,6 +206,7 @@ export default function PeopleViewWrapper({ tenantId }: PeopleViewWrapperProps) 
                 columns={gridColumns}
                 enableExport={canExport}
                 onExport={handleExport}
+                onBulkDelete={handleBulkDelete}
                 availableViewModes={['tags', 'grid', 'cards']}
                 availableFilters={availableFilters}
                 filterOptions={{

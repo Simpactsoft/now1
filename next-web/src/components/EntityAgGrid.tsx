@@ -47,7 +47,7 @@ export default function EntityAgGrid({
     className,
     pagination = true,
     paginationPageSize = 20,
-    rowSelection = { mode: 'singleRow', enableClickSelection: false },
+    rowSelection = { mode: 'multiRow', enableClickSelection: false },
     suppressDragLeaveHidesColumns = true,
     onCellValueChanged,
     onBodyScroll,
