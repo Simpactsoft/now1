@@ -93,9 +93,12 @@ function JobRow({ job, onRollback }: { job: ImportJob; onRollback: (id: string) 
     return (
         <div className="border border-border rounded-xl bg-card overflow-hidden transition-shadow hover:shadow-sm">
             {/* Job Header */}
-            <button
+            <div
                 onClick={handleToggle}
-                className="w-full flex items-center gap-4 px-5 py-4 text-right hover:bg-muted/30 transition-colors"
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleToggle(); }}
+                className="w-full flex items-center gap-4 px-5 py-4 text-right hover:bg-muted/30 transition-colors cursor-pointer"
             >
                 <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                     <FileSpreadsheet className="w-5 h-5 text-primary" />
@@ -163,7 +166,7 @@ function JobRow({ job, onRollback }: { job: ImportJob; onRollback: (id: string) 
                 ) : (
                     <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
                 )}
-            </button>
+            </div>
 
             {/* Expanded Card List */}
             {expanded && (
