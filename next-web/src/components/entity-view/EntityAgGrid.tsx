@@ -80,8 +80,8 @@ function EntityAgGridInner<T = any>(props: EntityAgGridProps<T>) {
             minWidth: col.minWidth || 100,
             maxWidth: col.maxWidth,
             flex: col.flex,
-            sortable: col.sortable !== false,
-            filter: col.filterable !== false,
+            sortable: col.sortable === true,
+            filter: col.filterable === true,
             resizable: col.resizable !== false,
             editable: col.editable,
             hide: col.hide,
@@ -101,7 +101,7 @@ function EntityAgGridInner<T = any>(props: EntityAgGridProps<T>) {
     // CRITICAL: filter must be false in AG Grid v32 to prevent initialization crashes
     // See: AG Grid v32 regression with "new" column menu
     const defaultColDef = useMemo<ColDef>(() => ({
-        sortable: true,
+        sortable: false,
         filter: false, // ✅ FIXED: Was true, caused v32 crashes
         resizable: true,
         suppressMovable: true,

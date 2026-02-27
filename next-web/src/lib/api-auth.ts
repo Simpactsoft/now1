@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
 
 export interface ApiAuthResult {
@@ -38,11 +38,7 @@ export async function validateApiKey(
     const keyHash = await hashApiKey(rawKey);
 
     // Use service_role client so we can query regardless of RLS
-    const supabaseAdmin = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!,
-        { auth: { persistSession: false } }
-    );
+    const supabaseAdmin = createAdminClient();
 
     const { data: apiKey, error } = await supabaseAdmin
         .from("api_keys")

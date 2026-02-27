@@ -8,8 +8,9 @@ import { getAdminClient, errorResponse } from "../../_utils";
  */
 export async function DELETE(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
+    const { id } = await params;
     const supabase = await createSessionClient();
     const { data: { user }, error: userErr } = await supabase.auth.getUser();
     if (userErr || !user) {
@@ -32,7 +33,7 @@ export async function DELETE(
     const { data: key } = await admin
         .from("api_keys")
         .select("id, tenant_id")
-        .eq("id", params.id)
+        .eq("id", id)
         .eq("tenant_id", profile.tenant_id)
         .single();
 
@@ -43,9 +44,9 @@ export async function DELETE(
     const { error } = await admin
         .from("api_keys")
         .update({ revoked_at: new Date().toISOString() })
-        .eq("id", params.id);
+        .eq("id", id);
 
     if (error) return errorResponse(error.message, "DB_ERROR", 500);
 
-    return NextResponse.json({ data: { id: params.id, revoked: true } });
+    return NextResponse.json({ data: { id, revoked: true } });
 }

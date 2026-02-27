@@ -1,22 +1,17 @@
 
-import { createClient } from '@supabase/supabase-js';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from "next/server";
 
 export async function GET() {
     // 1. Init Admin Client
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!supabaseUrl || !serviceRoleKey) {
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
         return NextResponse.json({
             error: "Configuration Error",
             message: "Missing SUPABASE_SERVICE_ROLE_KEY in .env.local"
         }, { status: 500 });
     }
 
-    const supabase = createClient(supabaseUrl, serviceRoleKey, {
-        auth: { autoRefreshToken: false, persistSession: false }
-    });
+    const supabase = createAdminClient();
 
     console.log("Admin Seeder Started...");
 

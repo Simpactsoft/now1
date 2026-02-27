@@ -147,45 +147,8 @@ export default function PeopleViewWrapper({ tenantId }: PeopleViewWrapperProps) 
         { id: 'phone', label: 'Phone', icon: null },
     ], []);
 
-    // Add dynamic Action column
-    const gridColumns = useMemo(() => {
-        return [
-            ...peopleColumns,
-            {
-                field: "actions",
-                headerName: "",
-                width: 100,
-                sortable: false,
-                filter: false,
-                pinned: "right" as const,
-                cellRenderer: (params: any) => {
-                    const person = params.data;
-                    const email = person.email || person.ret_email;
-                    return (
-                        <div className="flex items-center justify-end h-full gap-2 px-2 pb-1" onClick={(e) => e.stopPropagation()}>
-                            {email && (
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setPortalAccess({
-                                            isOpen: true,
-                                            cardId: person.id || person.ret_id,
-                                            email: email,
-                                            name: `${person.first_name || person.ret_name || ''} ${person.last_name || ''}`.trim() || 'Unknown'
-                                        });
-                                    }}
-                                    className="p-1.5 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-md transition-colors"
-                                    title={language === 'he' ? 'חיבור לפורטל' : 'Portal Access'}
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4" /><path d="m21 2-9.6 9.6" /><circle cx="7.5" cy="15.5" r="5.5" /></svg>
-                                </button>
-                            )}
-                        </div>
-                    );
-                }
-            }
-        ];
-    }, [language]);
+    // Grid columns — use peopleColumns directly
+    const gridColumns = useMemo(() => peopleColumns, []);
 
     const handleBulkDelete = useCallback(async (ids: string[]) => {
         const res = await bulkDeleteCards(ids);

@@ -1,14 +1,19 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
+import {
+    AgGridReact,
+} from "ag-grid-react";
 import {
     ColDef,
     ICellRendererParams,
     ValueFormatterParams,
+    GetRowIdParams,
+    themeQuartz,
 } from "ag-grid-community";
 import { cn } from "@/lib/utils";
-import { Plus } from "lucide-react";
-import EntityAgGrid from "@/components/EntityAgGrid";
+import { Plus, Loader2 } from "lucide-react";
+import { useTheme } from "next-themes";
 
 // Interfaces (matching QuoteBuilder)
 interface Category {
@@ -42,6 +47,11 @@ export default function ProductsAgGrid({
     onAddToQuote,
     className
 }: ProductsAgGridProps) {
+    useTheme();
+    const gridRef = useRef<AgGridReact>(null);
+    const gridTheme = useMemo(() => themeQuartz.withParams({ accentColor: '#6366f1' }), []);
+    const isRtl = typeof document !== 'undefined' && document.documentElement.dir === 'rtl';
+
     // Column Definitions
     const columnDefs = useMemo<ColDef[]>(() => {
         return [
@@ -147,15 +157,29 @@ export default function ProductsAgGrid({
         sortable: true,
         filter: false,
         resizable: true,
+        suppressMovable: true,
     }), []);
 
     return (
-        <EntityAgGrid
-            rowData={products}
-            columnDefs={columnDefs}
-            loading={loading}
-            className={className}
-        />
+        <div className={cn("w-full h-full border border-border rounded-xl overflow-hidden shadow-sm bg-card relative", className)}>
+            <div className="absolute inset-0">
+                <AgGridReact
+                    ref={gridRef}
+                    rowData={products}
+                    columnDefs={columnDefs}
+                    defaultColDef={defaultColDef}
+                    getRowId={(params: GetRowIdParams) => params.data.id}
+                    pagination={true}
+                    paginationPageSize={20}
+                    enableRtl={isRtl}
+                    theme={gridTheme}
+                />
+                {loading && (
+                    <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10 backdrop-blur-[1px]">
+                        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                    </div>
+                )}
+            </div>
+        </div>
     );
 }
-

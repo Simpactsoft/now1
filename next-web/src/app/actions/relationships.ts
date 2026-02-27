@@ -2,17 +2,9 @@
 "use server";
 
 import { createClient as createServerClient } from "@/lib/supabase/server";
-import { createClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { ActionResult, actionSuccess, actionOk, actionError } from "@/lib/action-result";
-
-// Helper to create admin client consistently
-const getAdminClient = () => {
-    return createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-};
 
 export async function fetchRelationshipTypesAction(tenantId: string) {
     const supabase = await createServerClient();
@@ -117,7 +109,7 @@ export async function fetchRelationshipsAction(tenantId: string, entityId: strin
 
         if (error) {
             console.error("Standard RPC failed. Trying Service Role...", error);
-            const adminClient = getAdminClient();
+            const adminClient = createAdminClient();
             const { data: adminData, error: adminErr } = await adminClient.rpc('get_entity_relationships', { p_entity_id: entityId });
 
             if (adminErr) {
@@ -145,7 +137,7 @@ export async function fetchRelationshipsAction(tenantId: string, entityId: strin
 
         // Enrich with Full Card Data (Admin Client to bypass RLS for visibility consistency)
         if (basicRelationships.length > 0) {
-            const adminClient = getAdminClient();
+            const adminClient = createAdminClient();
             const ids = basicRelationships.map((r: any) => r.target.id);
             const { data: cardsData, error: cardsError } = await adminClient
                 .from('cards')

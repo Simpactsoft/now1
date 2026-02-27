@@ -9,7 +9,7 @@ export const personImportSchema = z.object({
     phone: z.string().max(20).optional().or(z.literal('')),
     status: z.enum(['lead', 'customer', 'prospect', 'inactive']).default('lead'),
     tags: z.array(z.string().max(50)).max(20).default([]),
-    custom_fields: z.record(z.unknown()).default({}),
+    custom_fields: z.record(z.string(), z.unknown()).default({}),
 });
 
 export const orgImportSchema = z.object({

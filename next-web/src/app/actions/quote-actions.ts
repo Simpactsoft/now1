@@ -1,7 +1,6 @@
-
 'use server';
 
-import { createClient } from '@supabase/supabase-js';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { cookies } from 'next/headers';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { ActionResult, actionSuccess, actionError } from '@/lib/action-result';
@@ -23,23 +22,9 @@ async function getAuthClient() {
     );
 }
 
-// Helper to get admin client (Service Role)
-function getAdminClient() {
-    return createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!,
-        {
-            auth: {
-                autoRefreshToken: false,
-                persistSession: false
-            }
-        }
-    );
-}
-
 export async function getProductsForTenant(tenantId: string): Promise<ActionResult<{ products: any[]; categories: any[] }>> {
     const authClient = await getAuthClient();
-    const adminClient = getAdminClient();
+    const adminClient = createAdminClient();
 
     // 1. Authenticate User
     const { data: { user }, error: authError } = await authClient.auth.getUser();

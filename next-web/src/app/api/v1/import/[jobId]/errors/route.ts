@@ -1,11 +1,8 @@
 // src/app/api/v1/import/[jobId]/errors/route.ts
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { generateErrorReportCsv, ImportError } from '@/lib/importUtils';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 export async function GET(req: Request, { params }: { params: Promise<{ jobId: string }> }) {
     try {
@@ -16,7 +13,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ jobId: s
             return new NextResponse('Unauthorized user', { status: 401 });
         }
 
-        const supabase = createClient(supabaseUrl, supabaseServiceKey);
+        const supabase = createAdminClient();
 
         // Fetch user's tenant since jobs are RLS protected.
         const { data: profile } = await supabase

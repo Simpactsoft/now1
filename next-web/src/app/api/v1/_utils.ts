@@ -1,14 +1,10 @@
-import { createClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
 import { validateApiKey, hasScope } from "@/lib/api-auth";
 
 // Shared service-role client factory for v1 endpoints
 export function getAdminClient() {
-    return createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!,
-        { auth: { persistSession: false } }
-    );
+    return createAdminClient();
 }
 
 // Standardized paginated response envelope

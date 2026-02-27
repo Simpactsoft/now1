@@ -50,8 +50,13 @@ export default async function RootLayout({
   const cookieStore = await cookies();
   const tenantId = cookieStore.get("tenant_id")?.value;
 
+  // [Fix] Check auth FIRST before making any DB calls
+  const userResult = await getCurrentUser();
+  let userProfile = null;
+  const isAuthenticated = userResult.success && userResult.data;
+
   let peopleCount = 0;
-  if (tenantId) {
+  if (tenantId && isAuthenticated) {
     const res = await getPeopleCount(tenantId);
     if (typeof res === "number") {
       peopleCount = res;
@@ -62,7 +67,7 @@ export default async function RootLayout({
 
   // Fetch tenant RTL setting
   let isRtl = false;
-  if (tenantId) {
+  if (tenantId && isAuthenticated) {
     try {
       const supabaseTenant = await createClient();
       const { data: tenantSettings } = await supabaseTenant
@@ -76,16 +81,13 @@ export default async function RootLayout({
     }
   }
 
-  // [Fix] Fetch User Profile Server-Side (Zero Latency)
-  const userResult = await getCurrentUser();
-  let userProfile = null;
-
-  if (userResult.success && userResult.data) {
+  // Fetch User Profile Server-Side (Zero Latency)
+  if (isAuthenticated) {
     const user = userResult.data;
     const supabase = await createClient();
     const { data } = await supabase
       .from("profiles")
-      .select("first_name, last_name, role, status") // Fetch status
+      .select("first_name, last_name, role, status")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -110,8 +112,6 @@ export default async function RootLayout({
       };
     }
     console.log('[RootLayout] Constructed Profile:', userProfile);
-  } else {
-    console.warn('[RootLayout] No User found via getCurrentUser');
   }
 
   const fontClasses = isRtl

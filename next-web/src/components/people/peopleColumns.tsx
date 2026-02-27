@@ -1,12 +1,12 @@
 
 import { ColumnDef } from "@/components/entity-view/types";
 import { formatDistanceToNow } from "date-fns";
-import { User, Phone, Mail, Briefcase, Calendar } from "lucide-react";
+import { Phone, Mail } from "lucide-react";
 import Link from "next/link";
 
 export const peopleColumns: ColumnDef<any>[] = [
     {
-        field: "first_name", // We'll combine first/last in renderer or use computed field
+        field: "first_name",
         headerName: "Name",
         minWidth: 200,
         flex: 2,
@@ -14,14 +14,11 @@ export const peopleColumns: ColumnDef<any>[] = [
             const fullName = `${data.first_name || ''} ${data.last_name || ''}`.trim() || 'Unknown';
             const id = data.id || data.ret_id;
             return (
-                <Link href={`/dashboard/people/${id}`} onClick={(e) => e.stopPropagation()} className="flex items-center gap-3 py-1 group w-full cursor-pointer hover:bg-slate-50/50 rounded-md transition-colors">
+                <Link href={`/dashboard/people/${id}`} onClick={(e) => e.stopPropagation()} className="flex items-center gap-2 h-full group w-full cursor-pointer hover:bg-slate-50/50 rounded-md transition-colors">
                     <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs shrink-0">
                         {data.first_name?.[0]}{data.last_name?.[0]}
                     </div>
-                    <div className="min-w-0">
-                        <div className="font-medium text-foreground group-hover:underline group-hover:text-blue-600 truncate">{fullName}</div>
-                        {data.role && <div className="text-xs text-muted-foreground truncate">{data.role}</div>}
-                    </div>
+                    <span className="font-medium text-foreground group-hover:underline group-hover:text-blue-600 truncate">{fullName}</span>
                 </Link>
             );
         }

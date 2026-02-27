@@ -1,0 +1,31 @@
+first_name,last_name,email,phone,status,tags
+יוסי,כהן,yossi.cohen@technovate.co.il,050-1234567,customer,CEO;טכנולוגיה;VIP
+מירב,לוי,merav.levy@technovate.co.il,052-9876543,customer,CFO;טכנולוגיה;פיננסי
+אלון,שפירא,alon.shapira@technovate.co.il,054-1112233,lead,CTO;טכנולוגיה;R&D
+דנה,אברהם,dana.a@technovate.co.il,053-4455667,prospect,מפתחת;טכנולוגיה
+רועי,ברק,roi.barak@technovate.co.il,050-7788990,customer,מפתח;טכנולוגיה;בכיר
+נעמה,גולדברג,naama.g@technovate.co.il,058-1122334,lead,מעצבת UX;טכנולוגיה
+עידו,פרידמן,ido.f@technovate.co.il,054-5566778,prospect,DevOps;טכנולוגיה
+שירה,ביטון,shira.b@technovate.co.il,052-8899001,lead,QA Lead;טכנולוגיה
+תומר,מזרחי,tomer.m@technovate.co.il,050-3344556,customer,מנהל מוצר;טכנולוגיה
+יעל,רוזנברג,yael.r@technovate.co.il,053-6677889,prospect,HR Manager;טכנולוגיה;משאבי אנוש
+אבי,גרינברג,avi.greenberg@capitalflow.co.il,03-5551234,customer,משקיע;הון סיכון;VIP
+רונית,שטרן,ronit.stern@capitalflow.co.il,03-5554567,lead,שותפה;הון סיכון;פיננסי
+גיל,אורון,gil.oron@nexgen.io,054-2222111,prospect,מנכ״ל;סטארטאפ;AI
+ליאור,כספי,lior.caspi@nexgen.io,050-3333222,lead,VP R&D;סטארטאפ;AI
+מיכל,אדלר,michal.adler@nexgen.io,052-4444333,prospect,מפתחת;סטארטאפ
+טל,עוז,tal.oz@bluewave.co.il,058-5555444,customer,מנהל פרויקטים;ייעוץ
+נועם,דהן,noam.dahan@bluewave.co.il,054-6666555,lead,יועץ עסקי;ייעוץ;אסטרטגיה
+רינת,חיים,rinat.haim@bluewave.co.il,050-7777666,prospect,אנליסטית;ייעוץ;דאטה
+עמית,בן-דוד,amit.bd@globalvest.com,09-8881234,customer,משקיע;קרן גידור;VIP;בינלאומי
+סיגל,קרן,sigal.keren@globalvest.com,09-8885678,lead,מנהלת תיקים;קרן גידור;פיננסי
+דוד,ישראלי,david.israeli@solaris.co.il,04-9991234,customer,מנכ״ל;אנרגיה;סולארי
+חנה,פישר,hana.fisher@solaris.co.il,04-9995678,lead,סמנכ״ל תפעול;אנרגיה
+משה,אלוני,moshe.aloni@solaris.co.il,04-9993456,prospect,מהנדס חשמל;אנרגיה;טכני
+רחל,ברגמן,rachel.bergman@solaris.co.il,04-9997890,lead,מנהלת לוגיסטיקה;אנרגיה
+אריאל,וולף,ariel.wolf@solaris.co.il,04-9992345,customer,ראש צוות התקנות;אנרגיה;שטח
+נגה,תמיר,noga.tamir@solaris.co.il,050-1010101,prospect,מנהלת שיווק;אנרגיה;דיגיטל
+שי,מרקוביץ,shai.m@solaris.co.il,052-2020202,lead,מנהל כספים;אנרגיה;פיננסי
+עדי,זיו,adi.ziv@solaris.co.il,054-3030303,customer,מנהלת מכירות;אנרגיה;B2B
+אורן,לנדאו,oren.landau@solaris.co.il,053-4040404,prospect,מפתח תוכנה;אנרגיה;IoT
+יונתן,שגב,yonatan.segev@solaris.co.il,058-5050505,lead,מהנדס מכונות;אנרגיה;טכני

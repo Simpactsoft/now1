@@ -15,8 +15,8 @@ export async function getPeopleCount(tenantId: string): Promise<ActionResult<num
     });
 
     if (error) {
-        console.error("Error fetching people count:", error);
-        return actionError(error.message, "DB_ERROR");
+        console.error("Error fetching people count:", JSON.stringify(error, null, 2));
+        return actionError(error.message || "Failed to fetch people count", "DB_ERROR");
     }
 
     return actionSuccess(data || 0);

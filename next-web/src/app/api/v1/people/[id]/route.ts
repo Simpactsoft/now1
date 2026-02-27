@@ -4,12 +4,12 @@ import { getAdminClient, errorResponse } from "../../_utils";
 
 export async function GET(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     const auth = await validateApiKey(req);
     if (auth instanceof NextResponse) return auth;
 
-    const { id } = params;
+    const { id } = await params;
     const supabase = getAdminClient();
 
     const { data, error } = await supabase
