@@ -58,8 +58,8 @@ function EntityAgGridInner<T = any>(props: EntityAgGridProps<T>) {
         suppressRowClickSelection = false,
         rowSelection = {
             mode: 'multiRow',
-            headerCheckbox: true,
-            checkboxes: true,
+            headerCheckbox: false,
+            checkboxes: false,
             enableClickSelection: false
         },
         onCellValueChanged,
@@ -97,7 +97,7 @@ function EntityAgGridInner<T = any>(props: EntityAgGridProps<T>) {
                 pinned: col.pinned,
                 // Keep these for rendering checkboxes in the specific column
                 checkboxSelection: col.checkboxSelection,
-                headerCheckboxSelection: col.checkboxSelection,
+                headerCheckboxSelection: col.headerCheckboxSelection ?? col.checkboxSelection,
                 cellRenderer: col.cellRenderer,
                 valueGetter: col.valueGetter ? (params: any) => col.valueGetter!(params.data) : undefined,
                 valueFormatter: col.valueFormatter ? (params: any) => col.valueFormatter!(params.value) : undefined,

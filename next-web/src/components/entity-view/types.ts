@@ -87,6 +87,7 @@ export interface ColumnDef<T = any> {
     hide?: boolean;
     pinned?: 'left' | 'right';
     checkboxSelection?: boolean;
+    headerCheckboxSelection?: boolean;
     cellRenderer?: (params: { value: any; data: T }) => ReactNode;
     valueGetter?: (data: T) => any;
     valueFormatter?: (value: any) => string;
