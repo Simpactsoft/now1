@@ -8,7 +8,7 @@ This guide outlines the best practices and required patterns for implementing ne
 
 ## 1. Core Component: EntityAgGrid
 Always use the `EntityAgGrid` wrapper instead of raw `AgGridReact`. It handles:
-- **Reactive RTL/LTR support.**
+- **Reactive RTL/LTR support** via `key={dir}` on the `AgGridReact` component (forces a clean remount when language toggles).
 - **Automatic Vertical Centering** via `cellClass: "!flex items-center"`. (The `!` ensures Tailwind centering is not overridden).
 - **v32 Compatibility fixes** (disabled filters by default to prevent initialization crashes).
 

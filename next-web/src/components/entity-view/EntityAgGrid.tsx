@@ -188,6 +188,7 @@ function EntityAgGridInner<T = any>(props: EntityAgGridProps<T>) {
             )}>
                 <div className="absolute inset-0">
                     <AgGridReact
+                        key={dir} // Force remount on language/direction change to reset column order/pinning
                         ref={gridRef}
                         rowData={data}
                         columnDefs={columnDefs}
