@@ -204,24 +204,27 @@ export default function UserManagement({ tenantId }: { tenantId?: string }) {
             field: "full_name",
             headerName: t('fullName'),
             flex: 2,
-            valueGetter: (data) => `${data.first_name || ''} ${data.last_name || ''}`.trim() || data.email,
-            cellRenderer: ({ data }) => (
-                <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-xs font-bold shrink-0">
-                        {(data.first_name?.[0] || data.email[0]).toUpperCase()}
+            cellRenderer: ({ data }) => {
+                const name = `${data.first_name || ''} ${data.last_name || ''}`.trim() || data.email;
+                const initials = (data.first_name?.[0] || data.email[0]).toUpperCase();
+                return (
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-xs font-bold shrink-0">
+                            {initials}
+                        </div>
+                        <span className="truncate text-sm font-medium">{name}</span>
                     </div>
-                    <span className="truncate">{`${data.first_name || ''} ${data.last_name || ''}`.trim() || data.email}</span>
-                </div>
-            )
+                );
+            }
         },
         {
             field: "email",
             headerName: "Email",
             flex: 2,
             cellRenderer: ({ value }) => (
-                <div className="flex items-center text-muted-foreground">
-                    <Mail className="w-3.5 h-3.5 mr-2" />
-                    <span className="truncate">{value}</span>
+                <div className="flex items-center text-muted-foreground gap-2">
+                    <Mail className="w-3.5 h-3.5" />
+                    <span className="truncate text-sm">{value}</span>
                 </div>
             )
         },
@@ -230,7 +233,7 @@ export default function UserManagement({ tenantId }: { tenantId?: string }) {
             headerName: t('accessRole'),
             flex: 1,
             cellRenderer: ({ value }) => (
-                <span className="capitalize px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 border border-blue-500/20 text-[10px] font-bold">
+                <span className="capitalize px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 border border-blue-500/20 text-[10px] font-bold whitespace-nowrap">
                     {value}
                 </span>
             )
@@ -240,7 +243,7 @@ export default function UserManagement({ tenantId }: { tenantId?: string }) {
             headerName: t('status'),
             flex: 1,
             cellRenderer: ({ value }) => (
-                <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold border ${value === 'active'
+                <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold border whitespace-nowrap ${value === 'active'
                     ? 'bg-green-500/10 text-green-600 border-green-500/20'
                     : 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20'
                     }`}>
@@ -251,7 +254,7 @@ export default function UserManagement({ tenantId }: { tenantId?: string }) {
         {
             field: "actions",
             headerName: t('methods'),
-            width: 120,
+            width: 140,
             cellRenderer: ({ data }) => (
                 <div className="flex items-center gap-2">
                     <button
@@ -260,21 +263,21 @@ export default function UserManagement({ tenantId }: { tenantId?: string }) {
                             setNewPassword("");
                             setPasswordModalOpen(true);
                         }}
-                        className="p-1.5 hover:bg-secondary rounded text-muted-foreground transition-colors"
+                        className="p-1 hover:bg-secondary rounded text-muted-foreground transition-colors"
                         title={t('setPassword')}
                     >
                         <Key size={14} />
                     </button>
                     <button
                         onClick={() => handleToggleStatus(data.id, data.status, data.first_name || data.email)}
-                        className={`p-1.5 hover:bg-secondary rounded transition-colors ${data.status === 'suspended' ? 'text-green-500' : 'text-yellow-600'}`}
+                        className={`p-1 hover:bg-secondary rounded transition-colors ${data.status === 'suspended' ? 'text-green-500' : 'text-yellow-600'}`}
                         title={data.status === 'suspended' ? t('activateUser') : t('suspendUser')}
                     >
                         {data.status === 'suspended' ? <Check size={14} /> : <X size={14} />}
                     </button>
                     <button
                         onClick={() => handleDeleteUser(data.id, data.first_name || data.email)}
-                        className="p-1.5 hover:bg-destructive/10 text-destructive rounded transition-colors"
+                        className="p-1 hover:bg-destructive/10 text-destructive rounded transition-colors"
                         title={t('deleteUser')}
                     >
                         <Trash2 size={14} />

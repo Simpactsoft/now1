@@ -56,7 +56,12 @@ function EntityAgGridInner<T = any>(props: EntityAgGridProps<T>) {
         headerHeight,
         enableCellTextSelection = true,
         suppressRowClickSelection = false,
-        rowSelection = { mode: 'multiRow', headerCheckbox: true },
+        rowSelection = {
+            mode: 'multiRow',
+            headerCheckbox: true,
+            checkboxes: true,
+            enableClickSelection: false
+        },
         onCellValueChanged,
         onBodyScroll,
         onGridReady: onGridReadyProp,
@@ -90,12 +95,15 @@ function EntityAgGridInner<T = any>(props: EntityAgGridProps<T>) {
                 editable: col.editable,
                 hide: col.hide,
                 pinned: col.pinned,
+                // Keep these for rendering checkboxes in the specific column
+                checkboxSelection: col.checkboxSelection,
+                headerCheckboxSelection: col.checkboxSelection,
                 cellRenderer: col.cellRenderer,
                 valueGetter: col.valueGetter ? (params: any) => col.valueGetter!(params.data) : undefined,
                 valueFormatter: col.valueFormatter ? (params: any) => col.valueFormatter!(params.value) : undefined,
                 headerClass: col.headerClass,
                 cellClass: cn(
-                    "flex items-center",
+                    "!flex items-center",
                     isSelection && "justify-center",
                     col.cellClass
                 ),
@@ -112,7 +120,7 @@ function EntityAgGridInner<T = any>(props: EntityAgGridProps<T>) {
         filter: false,
         resizable: true,
         suppressMovable: true,
-        cellClass: "flex items-center",
+        cellClass: "!flex items-center",
     }), []);
 
     // ---- Grid Ready ----
