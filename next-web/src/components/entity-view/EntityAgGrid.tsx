@@ -82,6 +82,14 @@ function EntityAgGridInner<T = any>(props: EntityAgGridProps<T>) {
     const columnDefs: ColDef[] = useMemo(() => {
         return columns.map((col) => {
             const isSelection = col.field === 'selection' || col.checkboxSelection;
+
+            // Dynamic pinning: Flip left/right for RTL to keep items at "Start" or "End"
+            let pinned = col.pinned;
+            if (isRtl) {
+                if (pinned === 'left') pinned = 'right';
+                else if (pinned === 'right') pinned = 'left';
+            }
+
             return {
                 field: String(col.field),
                 headerName: col.headerName,
@@ -94,7 +102,7 @@ function EntityAgGridInner<T = any>(props: EntityAgGridProps<T>) {
                 resizable: col.resizable !== false,
                 editable: col.editable,
                 hide: col.hide,
-                pinned: col.pinned,
+                pinned: pinned,
                 // Keep these for rendering checkboxes in the specific column
                 checkboxSelection: col.checkboxSelection,
                 headerCheckboxSelection: col.headerCheckboxSelection ?? col.checkboxSelection,
@@ -110,7 +118,7 @@ function EntityAgGridInner<T = any>(props: EntityAgGridProps<T>) {
                 cellDataType: col.cellDataType,
             };
         });
-    }, [columns]);
+    }, [columns, isRtl]);
 
     // ---- Default col def ----
     // CRITICAL: filter must be false in AG Grid v32 to prevent initialization crashes
