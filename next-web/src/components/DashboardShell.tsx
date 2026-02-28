@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Sidebar, { UserProfileData } from "@/components/Sidebar";
 import { usePathname, useRouter } from "next/navigation";
+import { ModuleRouteGuard } from "@/components/ModuleRouteGuard";
 
 interface DashboardShellProps {
     children: React.ReactNode;
@@ -125,7 +126,9 @@ export default function DashboardShell({
                 <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-96 h-96 bg-brand-secondary/10 rounded-full blur-[120px] pointer-events-none" />
 
                 <div className="relative z-10 flex flex-col h-full overflow-hidden">
-                    {children}
+                    <ModuleRouteGuard>
+                        {children}
+                    </ModuleRouteGuard>
                 </div>
             </main>
 

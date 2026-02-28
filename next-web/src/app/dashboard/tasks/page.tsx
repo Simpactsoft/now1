@@ -32,7 +32,7 @@ export default async function TasksPage() {
         .from("activities")
         .select("*")
         .eq("tenant_id", tenantId)
-        .eq("is_task", true)
+        .eq("type", "task")
         .eq("assigned_to", userId)
         .order("created_at", { ascending: false });
 

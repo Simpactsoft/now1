@@ -1,6 +1,7 @@
 "use client";
 
 import React from 'react';
+import { useModules } from '@/context/ModulesContext';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -35,21 +36,23 @@ import LanguageSwitcher from './LanguageSwitcher';
 import { translations } from '@/lib/translations';
 
 // We'll map keys to icons, but names will come from translation
+// Maps sidebar nav item keys to module_definitions keys
+// Items without moduleKey are always shown (dashboard, settings, admin, etc.)
 const NAV_CONFIG = [
     { key: 'dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { key: 'tasks', href: '/dashboard/tasks', icon: CheckSquare },
-    { key: 'contacts', href: '/dashboard/people', icon: UserCircle },
-    { key: 'import_data', href: '/dashboard/import', icon: Database },
-    { key: 'organizations', href: '/dashboard/organizations', icon: Building2 },
-    { key: 'relationships', href: '/dashboard/relationships', icon: LinkIcon },
-    { key: 'products', href: '/dashboard/products', icon: Package },
-    { key: 'cpq', href: '/dashboard/cpq', icon: Sliders },
-    { key: 'leads', href: '/dashboard/sales/leads', icon: Inbox },
-    { key: 'pipelines', href: '/dashboard/sales/pipelines', icon: Kanban },
-    { key: 'quotes', href: '/dashboard/sales/quotes', icon: FileText },
-    { key: 'commissions_ledger', href: '/dashboard/commissions', icon: DollarSign },
-    { key: 'purchase_orders', href: '/dashboard/purchase-orders', icon: ClipboardList },
-    { key: 'payments', href: '/dashboard/payments', icon: DollarSign },
+    { key: 'tasks', href: '/dashboard/tasks', icon: CheckSquare, moduleKey: 'tasks' },
+    { key: 'contacts', href: '/dashboard/people', icon: UserCircle, moduleKey: 'people' },
+    { key: 'import_data', href: '/dashboard/import', icon: Database, moduleKey: 'import_data' },
+    { key: 'organizations', href: '/dashboard/organizations', icon: Building2, moduleKey: 'organizations' },
+    { key: 'relationships', href: '/dashboard/relationships', icon: LinkIcon, moduleKey: 'relationships' },
+    { key: 'products', href: '/dashboard/products', icon: Package, moduleKey: 'products' },
+    { key: 'cpq', href: '/dashboard/cpq', icon: Sliders, moduleKey: 'cpq' },
+    { key: 'leads', href: '/dashboard/sales/leads', icon: Inbox, moduleKey: 'leads' },
+    { key: 'pipelines', href: '/dashboard/sales/pipelines', icon: Kanban, moduleKey: 'pipelines' },
+    { key: 'quotes', href: '/dashboard/sales/quotes', icon: FileText, moduleKey: 'quotes' },
+    { key: 'commissions_ledger', href: '/dashboard/commissions', icon: DollarSign, moduleKey: 'commissions' },
+    { key: 'purchase_orders', href: '/dashboard/purchase-orders', icon: ClipboardList, moduleKey: 'purchase_orders' },
+    { key: 'payments', href: '/dashboard/payments', icon: DollarSign, moduleKey: 'payments' },
     { key: 'logs', href: '/dashboard/logs', icon: Activity },
     { key: 'team', href: '/dashboard/settings/team', icon: Users },
     { key: 'infrastructure', href: '/dashboard/infra', icon: Database },
@@ -88,6 +91,7 @@ export default function Sidebar({
 }) {
     const pathname = usePathname();
     const { t, dir } = useLanguage();
+    const { isModuleEnabled } = useModules();
 
     // Close mobile menu on route change
     React.useEffect(() => {
@@ -153,10 +157,14 @@ export default function Sidebar({
 
                 <nav className="flex-1 px-4 space-y-1 mt-4 overflow-y-auto min-h-0 pb-2">
                     {NAV_CONFIG.filter(item => {
+                        // Admin-only items
                         if (['infrastructure', 'system_admin'].includes(item.key)) {
                             return userProfile?.role === 'distributor';
                         }
-                        // Team is generally accessible so people can manage their own org
+                        // Module visibility check: if item has a moduleKey, check if enabled
+                        if ('moduleKey' in item && item.moduleKey) {
+                            if (!isModuleEnabled(item.moduleKey)) return false;
+                        }
                         return true;
                     }).map((item) => {
                         const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));

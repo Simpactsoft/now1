@@ -1,8 +1,9 @@
 
 import { fetchTenantDetails } from "@/app/actions/fetchTenantDetails";
-import { ArrowLeft, Building2, Calendar, Mail, Shield, User } from "lucide-react";
+import { ArrowLeft, Building2, Calendar, Mail, Shield, User, Layers } from "lucide-react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
+import TenantModulesPanel from "@/components/TenantModulesPanel";
 
 export default async function TenantDetailsPage({ params }: { params: { id: string } }) {
     // Await params for Next.js 15+ (if using dynamic params)
@@ -164,6 +165,21 @@ export default async function TenantDetailsPage({ params }: { params: { id: stri
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            {/* Module Visibility Management */}
+            <div className="space-y-4">
+                <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
+                    <Layers className="w-5 h-5 text-primary" />
+                    ניהול מודולים
+                    <span className="text-sm font-normal text-muted-foreground">
+                        — הפעלה וכיבוי מודולים לדייר זה
+                    </span>
+                </h2>
+
+                <div className="p-6 rounded-2xl bg-card border border-border">
+                    <TenantModulesPanel tenantId={id} />
                 </div>
             </div>
         </div>

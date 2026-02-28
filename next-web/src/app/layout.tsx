@@ -14,6 +14,7 @@ import { getCurrentUser } from "@/app/actions/getCurrentUser";
 import { createClient } from "@/lib/supabase/server";
 import { activateUser } from "@/app/actions/activateUser";
 import { QueryProvider } from "@/components/QueryProvider";
+import { ModulesProvider } from "@/context/ModulesContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -49,6 +50,7 @@ export default async function RootLayout({
 }>) {
   const cookieStore = await cookies();
   const tenantId = cookieStore.get("tenant_id")?.value;
+  const preferredLang = cookieStore.get("app-language")?.value;
 
   // [Fix] Check auth FIRST before making any DB calls
   const userResult = await getCurrentUser();
@@ -65,9 +67,10 @@ export default async function RootLayout({
     }
   }
 
-  // Fetch tenant RTL setting
-  let isRtl = false;
-  if (tenantId && isAuthenticated) {
+  // Determine RTL based on language preference (priority) then tenant setting
+  let isRtl = preferredLang === 'he';
+
+  if (!preferredLang && tenantId && isAuthenticated) {
     try {
       const supabaseTenant = await createClient();
       const { data: tenantSettings } = await supabaseTenant
@@ -134,13 +137,15 @@ export default async function RootLayout({
             <LanguageProvider>
               <SessionProvider user={userProfile}>
                 <AgGridRegistry />
-                <DashboardShell
-                  currentTenantId={tenantId}
-                  peopleCount={peopleCount}
-                  userProfile={userProfile}
-                >
-                  {children}
-                </DashboardShell>
+                <ModulesProvider>
+                  <DashboardShell
+                    currentTenantId={tenantId}
+                    peopleCount={peopleCount}
+                    userProfile={userProfile}
+                  >
+                    {children}
+                  </DashboardShell>
+                </ModulesProvider>
                 <Toaster position="top-right" theme="system" />
               </SessionProvider>
             </LanguageProvider>

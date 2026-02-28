@@ -39,6 +39,8 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
         setLanguageState(lang);
         updateDir(lang);
         localStorage.setItem('app-language', lang);
+        // Set cookie for server-side initial render
+        document.cookie = `app-language=${lang}; path=/; max-age=${60 * 60 * 24 * 365}`;
     };
 
     const toggleLanguage = () => {

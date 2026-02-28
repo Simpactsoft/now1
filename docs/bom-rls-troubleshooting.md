@@ -100,3 +100,22 @@ The following sections synthesize recurring issues encountered across the projec
 **The Problem (Context Loss):** Browser APIs like `requestFullscreen()` fail with "API can only be initiated by a user gesture".
 - **Root Cause:** The user gesture context is lost if called inside a `useEffect` or after complex async operations.
 - **Fix:** Keep operations close to the event handler or use `setTimeout(async () => { ... }, 0)` inside the `onClick` handler to maintain the gesture chain while allowing React to render.
+
+### 4. Database RPCs & adminClient (Service Role) Pitfalls
+
+**The Problem:** An RPC function fails with "Not authenticated" or silent Row Level Security blocks when called from a Server Action, even though the user is logged in.
+- **Root Cause:** Server Actions often use `createAdminClient()` (the Supabase Service Role Key) to bypass RLS or perform elevated tasks. When an RPC is called using the Service Role Key, the database function's internal call to `auth.uid()` evaluates to `NULL` because there is no JWT session context sent with the service key request.
+- **Fix:** Do not rely exclusively on `auth.uid()` inside RPCs that might be called defensively by the server. Instead, explicitly pass the user ID as a parameter from the server action and coalesce it:
+  ```sql
+  -- In the database RPC:
+  CREATE OR REPLACE FUNCTION my_admin_rpc(p_user_id UUID DEFAULT NULL) ...
+  DECLARE
+      v_user_id UUID := COALESCE(p_user_id, auth.uid());
+  BEGIN
+      IF v_user_id IS NULL THEN RAISE EXCEPTION 'Not authenticated'; END IF;
+  ```
+  ```typescript
+  // In the Next.js Server Action:
+  const adminClient = createAdminClient();
+  await adminClient.rpc('my_admin_rpc', { p_user_id: user.id });
+  ```

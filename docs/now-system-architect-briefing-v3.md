@@ -214,8 +214,9 @@ plugins/
 | `document_number_sequences` (renamed from `invoice_number_sequences`) | Shared numbering pattern for INV/PO/PAY prefixes | Batch 2 |
 | Two-level account classification (`account_type` + `account_sub_type`) | `account_type` for reporting (asset/liability/etc), `account_sub_type` for RPC lookups (cash/AR/AP/etc) | Batch 2 Fix |
 | `balance_due` as trigger (not GENERATED ALWAYS) | ALTER TABLE ADD COLUMN can't reference other columns in GENERATED expression | Batch 2 |
-| `void_payment` reverses by swapping JE debit/credit | No account lookup needed — operates on existing journal lines | Batch 2 Fix |
-| `receive_purchase_order` as single atomic RPC | Updates inventory ledger + balances + journal entries in one transaction | Batch 2 |
+| Void payment reverses by swapping JE debit/credit | No account lookup needed — operates on existing journal lines | Batch 2 Fix |
+| Receive purchase order as single atomic RPC | Updates inventory ledger + balances + journal entries in one transaction | Batch 2 |
+| **Module Toggle for Admins via adminClient** | Use explicit `p_user_id` in RPC to handle `auth.uid()` being NULL when using Service Role | Batch 3 |
 
 
 ---

@@ -1,208 +1,264 @@
 "use server";
 
-import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { verifyAuthWithTenant } from "./_shared/auth";
-import { isAuthError } from "./_shared/auth-utils";
+import { ActionResult, actionSuccess, actionError } from "@/lib/action-result";
+import { revalidatePath } from "next/cache";
 
-export async function fetchTeams(tenantId: string) {
-    if (!tenantId) return { error: "Missing tenant ID" };
-
-    const auth = await verifyAuthWithTenant(tenantId);
-    if (isAuthError(auth)) return { error: "Unauthorized" };
-
-    const adminClient = createAdminClient();
-    const { data, error } = await adminClient
-        .from("teams")
-        .select(`
-      *,
-      manager:manager_user_id ( id, email, raw_user_meta_data ),
-      parent:parent_team_id ( id, name )
-    `)
-        .eq("tenant_id", tenantId)
-        .order("name");
-
-    if (error) {
-        console.error("fetchTeams error:", error);
-        return { error: "Failed to fetch teams" };
-    }
-
-    return { success: true, data };
-}
-
-export async function fetchRoles(tenantId: string) {
-    if (!tenantId) return { error: "Missing tenant ID" };
-
-    const auth = await verifyAuthWithTenant(tenantId);
-    if (isAuthError(auth)) return { error: "Unauthorized" };
-
-    const adminClient = createAdminClient();
-    const { data, error } = await adminClient
-        .from("roles")
-        .select("*")
-        .eq("tenant_id", tenantId)
-        .is("deleted_at", null)
-        .order("hierarchy_level", { ascending: true })
-        .order("name", { ascending: true });
-
-    if (error) {
-        console.error("fetchRoles error:", error);
-        return { error: "Failed to fetch roles" };
-    }
-
-    return { success: true, data };
-}
-
-export async function fetchTeamMembers(tenantId: string, teamId: string) {
-    if (!tenantId || !teamId) return { error: "Missing required parameters" };
-
-    const auth = await verifyAuthWithTenant(tenantId);
-    if (isAuthError(auth)) return { error: "Unauthorized" };
-
-    const adminClient = createAdminClient();
-    // Using auth.users via a join or fetching directly the emails isn't directly supported using foreign keys without a view in Supabase auth schema.
-    // We will fetch team_members and then fetch user details separately or expect user details to be in user_profiles.
-    // Since user_profiles exists in the schema, we'll join that.
-
-    const { data, error } = await adminClient
-        .from("team_members")
-        .select(`
-      *,
-      user_profile:user_profiles!user_id ( id, display_name, email, avatar_url, role:roles ( id, name ) )
-    `)
-        .eq("tenant_id", tenantId)
-        .eq("team_id", teamId)
-        .is("removed_at", null)
-        .order("joined_at", { ascending: false });
-
-    if (error) {
-        console.error("fetchTeamMembers error:", error);
-        return { error: "Failed to fetch team members" };
-    }
-
-    return { success: true, data };
-}
-
-const CreateTeamSchema = z.object({
-    tenantId: z.string().min(1),
-    name: z.string().min(1),
-    description: z.string().optional(),
-    parentTeamId: z.string().optional().nullable(),
-    managerUserId: z.string().optional().nullable(),
-    region: z.string().optional().nullable(),
-    country: z.string().optional().nullable(),
-    timezone: z.string().optional().nullable(),
-});
-
-export async function createTeam(data: z.infer<typeof CreateTeamSchema>) {
-    const parsed = CreateTeamSchema.safeParse(data);
-    if (!parsed.success) return { error: "Invalid input" };
-
-    const { tenantId, name, description, parentTeamId, managerUserId, region, country, timezone } = parsed.data;
-
-    const auth = await verifyAuthWithTenant(tenantId);
-    if (isAuthError(auth)) return { error: "Unauthorized" };
-
-    const adminClient = createAdminClient();
-    const { data: team, error } = await adminClient
-        .from("teams")
-        .insert({
-            tenant_id: tenantId,
-            name,
-            description,
-            parent_team_id: parentTeamId || null,
-            manager_user_id: managerUserId || null,
-            region: region || null,
-            country: country || null,
-            timezone: timezone || null,
-            created_by: auth.userId
-        })
-        .select()
-        .single();
-
-    if (error) {
-        console.error("createTeam error:", error);
-        return { error: error.message };
-    }
-
-    return { success: true, data: team };
-}
-
-export async function updateTeamMember(tenantId: string, teamId: string, userId: string, role: 'manager' | 'member', isPrimary: boolean, systemRoleId?: string) {
-    if (!tenantId || !teamId || !userId) return { error: "Missing required parameters" };
-
-    const auth = await verifyAuthWithTenant(tenantId);
-    if (isAuthError(auth)) return { error: "Unauthorized" };
-
+/**
+ * Deletes a team member from both Auth and Profiles (via cascade).
+ */
+export async function deleteTeamMember(userId: string): Promise<ActionResult<void>> {
     const adminClient = createAdminClient();
 
-    // If a system role was provided, update the user profile
-    if (systemRoleId) {
-        const { error: profileError } = await adminClient
-            .from("user_profiles")
-            .update({ role_id: systemRoleId })
-            .eq("tenant_id", tenantId)
-            .eq("user_id", userId);
+    try {
+        // Delete from Auth (this triggers cascade delete on profiles in our schema)
+        const { error } = await adminClient.auth.admin.deleteUser(userId);
 
-        if (profileError) {
-            console.error("Failed to update user system role:", profileError);
-            // We'll proceed to update team membership anyway, but this might be an issue
+        if (error) {
+            console.error("[deleteTeamMember] Auth error:", error);
+            return actionError(error.message, "AUTH_ERROR");
         }
+
+        revalidatePath("/dashboard/settings/team");
+        return actionSuccess(undefined);
+    } catch (err: any) {
+        console.error("[deleteTeamMember] Unexpected error:", err);
+        return actionError("Failed to delete user");
     }
+}
 
-    // First check if they exist
-    const { data: existing } = await adminClient
-        .from("team_members")
-        .select("id")
-        .eq("tenant_id", tenantId)
-        .eq("team_id", teamId)
-        .eq("user_id", userId)
-        .is("removed_at", null)
-        .single();
+/**
+ * Updates a user's status (active, suspended, inactive).
+ */
+export async function updateUserStatus(
+    userId: string,
+    status: 'active' | 'suspended' | 'inactive'
+): Promise<ActionResult<void>> {
+    const adminClient = createAdminClient();
 
-    if (existing) {
-        // Update
-        const { error } = await adminClient
+    try {
+        const { error: updateError } = await adminClient
+            .from("profiles")
+            .update({
+                status,
+                updated_at: new Date().toISOString()
+            })
+            .eq("id", userId);
+
+        if (updateError) {
+            console.error("[updateUserStatus] DB error:", updateError);
+            return actionError(updateError.message, "DB_ERROR");
+        }
+
+        revalidatePath("/dashboard/settings/team");
+        return actionSuccess(undefined);
+    } catch (err: any) {
+        console.error("[updateUserStatus] Unexpected error:", err);
+        return actionError("Failed to update status");
+    }
+}
+
+// --- Team Management Actions ---
+
+/**
+ * Fetches all teams for a given tenant.
+ */
+export async function fetchTeams(tenantId: string): Promise<ActionResult<any[]>> {
+    const adminClient = createAdminClient();
+    try {
+        const { data, error } = await adminClient
+            .from("teams")
+            .select(`
+                *,
+                parent:teams!parent_team_id (name)
+            `)
+            .eq("tenant_id", tenantId)
+            .is("deleted_at", null)
+            .order("name");
+
+        if (error) {
+            console.error("[fetchTeams] error:", error);
+            return actionError(error.message);
+        }
+        return actionSuccess(data);
+    } catch (err: any) {
+        console.error("[fetchTeams] error:", err);
+        return actionError("Failed to fetch teams");
+    }
+}
+
+/**
+ * Fetches all roles available for a tenant.
+ */
+export async function fetchRoles(tenantId: string): Promise<ActionResult<any[]>> {
+    const adminClient = createAdminClient();
+    try {
+        const { data, error } = await adminClient
+            .from("roles")
+            .select("*")
+            .eq("tenant_id", tenantId)
+            .is("deleted_at", null)
+            .order("hierarchy_level", { ascending: true });
+
+        if (error) {
+            console.error("[fetchRoles] error:", error);
+            return actionError(error.message);
+        }
+        return actionSuccess(data);
+    } catch (err: any) {
+        console.error("[fetchRoles] error:", err);
+        return actionError("Failed to fetch roles");
+    }
+}
+
+/**
+ * Fetches all members of a specific team with their profiles.
+ */
+export async function fetchTeamMembers(tenantId: string, teamId: string): Promise<ActionResult<any[]>> {
+    const adminClient = createAdminClient();
+    try {
+        const { data, error } = await adminClient
             .from("team_members")
-            .update({ role_in_team: role, is_primary_team: isPrimary })
-            .eq("id", existing.id);
-        if (error) return { error: error.message };
-    } else {
-        // Insert
-        const { error } = await adminClient
-            .from("team_members")
+            .select(`
+                *,
+                user_profile:user_profiles (
+                    *,
+                    role:roles (*)
+                )
+            `)
+            .eq("tenant_id", tenantId)
+            .eq("team_id", teamId)
+            .is("removed_at", null);
+
+        if (error) {
+            console.error("[fetchTeamMembers] error:", error);
+            return actionError(error.message);
+        }
+        return actionSuccess(data);
+    } catch (err: any) {
+        console.error("[fetchTeamMembers] error:", err);
+        return actionError("Failed to fetch team members");
+    }
+}
+
+/**
+ * Creates a new team entry in the teams table.
+ */
+export async function createTeam(data: {
+    tenantId: string;
+    name: string;
+    parentTeamId?: string | null;
+    region?: string | null;
+    country?: string | null;
+    timezone?: string | null;
+}): Promise<ActionResult<any>> {
+    const adminClient = createAdminClient();
+    try {
+        const { data: team, error } = await adminClient
+            .from("teams")
             .insert({
+                tenant_id: data.tenantId,
+                name: data.name,
+                parent_team_id: data.parentTeamId,
+                region: data.region,
+                country: data.country,
+                timezone: data.timezone
+            })
+            .select()
+            .single();
+
+        if (error) {
+            console.error("[createTeam] error:", error);
+            return actionError(error.message);
+        }
+        revalidatePath("/dashboard/admin/teams");
+        return actionSuccess(team);
+    } catch (err: any) {
+        console.error("[createTeam] error:", err);
+        return actionError("Failed to create team");
+    }
+}
+
+/**
+ * Updates or inserts a team member, and optionally updates their system role.
+ */
+export async function updateTeamMember(
+    tenantId: string,
+    teamId: string,
+    userId: string,
+    roleInTeam: 'manager' | 'member',
+    isPrimary: boolean,
+    systemRoleId?: string
+): Promise<ActionResult<void>> {
+    const adminClient = createAdminClient();
+    try {
+        // 1. Update/Upsert team member
+        const { error: memberError } = await adminClient
+            .from("team_members")
+            .upsert({
                 tenant_id: tenantId,
                 team_id: teamId,
                 user_id: userId,
-                role_in_team: role,
-                is_primary_team: isPrimary
+                role_in_team: roleInTeam,
+                is_primary_team: isPrimary,
+                removed_at: null
+            }, {
+                onConflict: "team_id,user_id"
             });
-        if (error) return { error: error.message };
-    }
 
-    return { success: true };
+        if (memberError) {
+            console.error("[updateTeamMember] member error:", memberError);
+            return actionError(memberError.message);
+        }
+
+        // 2. Update system role if provided (updates user_profiles)
+        if (systemRoleId) {
+            const { error: roleError } = await adminClient
+                .from("user_profiles")
+                .update({ role_id: systemRoleId })
+                .eq("user_id", userId)
+                .eq("tenant_id", tenantId);
+
+            if (roleError) {
+                console.error("[updateTeamMember] profile role error:", roleError);
+                return actionError(roleError.message);
+            }
+        }
+
+        revalidatePath("/dashboard/admin/teams");
+        return actionSuccess(undefined);
+    } catch (err: any) {
+        console.error("[updateTeamMember] error:", err);
+        return actionError("Failed to update team member");
+    }
 }
 
-export async function removeTeamMember(tenantId: string, teamId: string, userId: string) {
-    if (!tenantId || !teamId || !userId) return { error: "Missing required parameters" };
-
-    const auth = await verifyAuthWithTenant(tenantId);
-    if (isAuthError(auth)) return { error: "Unauthorized" };
-
+/**
+ * Marks a team member as removed from a specific team.
+ */
+export async function removeTeamMember(tenantId: string, teamId: string, userId: string): Promise<ActionResult<void>> {
     const adminClient = createAdminClient();
-    const { error } = await adminClient
-        .from("team_members")
-        .update({ removed_at: new Date().toISOString() })
-        .eq("tenant_id", tenantId)
-        .eq("team_id", teamId)
-        .eq("user_id", userId)
-        .is("removed_at", null);
+    try {
+        const { error } = await adminClient
+            .from("team_members")
+            .update({ removed_at: new Date().toISOString() })
+            .eq("tenant_id", tenantId)
+            .eq("team_id", teamId)
+            .eq("user_id", userId);
 
-    if (error) {
-        console.error("removeTeamMember error:", error);
-        return { error: error.message };
+        if (error) {
+            console.error("[removeTeamMember] error:", error);
+            return actionError(error.message);
+        }
+        revalidatePath("/dashboard/admin/teams");
+        return actionSuccess(undefined);
+    } catch (err: any) {
+        console.error("[removeTeamMember] error:", err);
+        return actionError("Failed to remove team member");
     }
+}
 
-    return { success: true };
+// Helper for 'now()' on node side if DB trigger isn't sufficient
+function foreign_now() {
+    return new Date().toISOString();
 }

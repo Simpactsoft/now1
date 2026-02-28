@@ -16,6 +16,7 @@ import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { Loader2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { ColumnDef, GridRenderProps, PaginationConfig } from "./types";
+import { useLanguage } from "@/context/LanguageContext";
 
 // ==================== Props ====================
 
@@ -55,7 +56,7 @@ function EntityAgGridInner<T = any>(props: EntityAgGridProps<T>) {
         headerHeight,
         enableCellTextSelection = true,
         suppressRowClickSelection = false,
-        rowSelection = { mode: 'multiRow' as const, enableClickSelection: false },
+        rowSelection = { mode: 'multiRow', headerCheckbox: true },
         onCellValueChanged,
         onBodyScroll,
         onGridReady: onGridReadyProp,
@@ -67,34 +68,40 @@ function EntityAgGridInner<T = any>(props: EntityAgGridProps<T>) {
     } = props;
 
     const { theme } = useTheme();
+    const { t, dir } = useLanguage();
     const gridRef = useRef<AgGridReact>(null);
     const gridTheme = useMemo(() => themeQuartz.withParams({ accentColor: '#6366f1' }), []);
-    const isRtl = typeof document !== 'undefined' && document.documentElement.dir === 'rtl';
+    const isRtl = dir === 'rtl';
 
     // ---- Map our ColumnDef<T> to ag-grid ColDef ----
     const columnDefs: ColDef[] = useMemo(() => {
-        return columns.map((col) => ({
-            field: String(col.field),
-            headerName: col.headerName,
-            width: col.width,
-            minWidth: col.minWidth || 100,
-            maxWidth: col.maxWidth,
-            flex: col.flex,
-            sortable: col.sortable === true,
-            filter: col.filterable === true,
-            resizable: col.resizable !== false,
-            editable: col.editable,
-            hide: col.hide,
-            pinned: col.pinned,
-            checkboxSelection: col.checkboxSelection,
-            headerCheckboxSelection: col.checkboxSelection,
-            cellRenderer: col.cellRenderer,
-            valueGetter: col.valueGetter ? (params: any) => col.valueGetter!(params.data) : undefined,
-            valueFormatter: col.valueFormatter ? (params: any) => col.valueFormatter!(params.value) : undefined,
-            headerClass: col.headerClass,
-            cellClass: col.cellClass as any,
-            cellDataType: col.cellDataType,
-        }));
+        return columns.map((col) => {
+            const isSelection = col.field === 'selection' || col.checkboxSelection;
+            return {
+                field: String(col.field),
+                headerName: col.headerName,
+                width: col.width,
+                minWidth: col.minWidth || 100,
+                maxWidth: col.maxWidth,
+                flex: col.flex,
+                sortable: col.sortable === true,
+                filter: col.filterable === true,
+                resizable: col.resizable !== false,
+                editable: col.editable,
+                hide: col.hide,
+                pinned: col.pinned,
+                cellRenderer: col.cellRenderer,
+                valueGetter: col.valueGetter ? (params: any) => col.valueGetter!(params.data) : undefined,
+                valueFormatter: col.valueFormatter ? (params: any) => col.valueFormatter!(params.value) : undefined,
+                headerClass: col.headerClass,
+                cellClass: cn(
+                    "flex items-center",
+                    isSelection && "justify-center",
+                    col.cellClass
+                ),
+                cellDataType: col.cellDataType,
+            };
+        });
     }, [columns]);
 
     // ---- Default col def ----
@@ -102,9 +109,10 @@ function EntityAgGridInner<T = any>(props: EntityAgGridProps<T>) {
     // See: AG Grid v32 regression with "new" column menu
     const defaultColDef = useMemo<ColDef>(() => ({
         sortable: false,
-        filter: false, // ✅ FIXED: Was true, caused v32 crashes
+        filter: false,
         resizable: true,
         suppressMovable: true,
+        cellClass: "flex items-center",
     }), []);
 
     // ---- Grid Ready ----
@@ -209,6 +217,8 @@ function EntityAgGridInner<T = any>(props: EntityAgGridProps<T>) {
                 <PaginationBar
                     pagination={pagination}
                     onPaginationChange={onPaginationChange}
+                    t={t}
+                    dir={dir}
                 />
             )}
         </div>
@@ -220,9 +230,13 @@ function EntityAgGridInner<T = any>(props: EntityAgGridProps<T>) {
 function PaginationBar({
     pagination,
     onPaginationChange,
+    t,
+    dir,
 }: {
     pagination: PaginationConfig;
     onPaginationChange: (pagination: Partial<PaginationConfig>) => void;
+    t: any;
+    dir: string;
 }) {
     const { page, totalPages = 1, totalRecords } = pagination;
 
@@ -230,7 +244,7 @@ function PaginationBar({
         <div className="flex items-center justify-between px-4 py-2 border border-border rounded-b-xl bg-card/80 backdrop-blur-sm">
             <div className="text-xs text-muted-foreground">
                 {totalRecords != null && (
-                    <span>{totalRecords.toLocaleString('he-IL')} רשומות</span>
+                    <span>{totalRecords.toLocaleString(dir === 'rtl' ? 'he-IL' : 'en-US')} {t('found')}</span>
                 )}
             </div>
 
@@ -239,17 +253,17 @@ function PaginationBar({
                     onClick={() => onPaginationChange({ page: 1 })}
                     disabled={page === 1}
                     className="p-1 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                    title="ראשון"
+                    title={t('first')}
                 >
-                    <ChevronsRight className="w-4 h-4" />
+                    {dir === 'rtl' ? <ChevronsRight className="w-4 h-4" /> : <ChevronsLeft className="w-4 h-4" />}
                 </button>
                 <button
                     onClick={() => onPaginationChange({ page: page - 1 })}
                     disabled={page === 1}
                     className="p-1 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                    title="קודם"
+                    title={t('prev')}
                 >
-                    <ChevronRight className="w-4 h-4" />
+                    {dir === 'rtl' ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
                 </button>
 
                 <span className="px-3 text-sm font-medium text-foreground">
@@ -260,17 +274,17 @@ function PaginationBar({
                     onClick={() => onPaginationChange({ page: page + 1 })}
                     disabled={page === totalPages}
                     className="p-1 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                    title="הבא"
+                    title={t('next')}
                 >
-                    <ChevronLeft className="w-4 h-4" />
+                    {dir === 'rtl' ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                 </button>
                 <button
                     onClick={() => onPaginationChange({ page: totalPages })}
                     disabled={page === totalPages}
                     className="p-1 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                    title="אחרון"
+                    title={t('last')}
                 >
-                    <ChevronsLeft className="w-4 h-4" />
+                    {dir === 'rtl' ? <ChevronsLeft className="w-4 h-4" /> : <ChevronsRight className="w-4 h-4" />}
                 </button>
             </div>
         </div>
